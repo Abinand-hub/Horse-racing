@@ -16,7 +16,6 @@ import {
   Play, 
   Flame, 
   Layers, 
-  Bot, 
   CheckCircle2, 
   AlertCircle,
   Zap,
@@ -260,8 +259,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                 : 'bg-slate-900 text-slate-400 hover:text-white'
             }`}
           >
-            <Bot className="w-4 h-4 text-indigo-400" />
-            <span>DerbyAI Form Insights</span>
+            <Sparkles className="w-4 h-4 text-red-400" />
+            <span>Expert Form Insights</span>
           </button>
 
           <button
@@ -451,12 +450,12 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
         </div>
       )}
 
-      {/* ---------------- TAB 3: AI INSIGHTS ---------------- */}
+      {/* ---------------- TAB 3: EXPERT FORM INSIGHTS ---------------- */}
       {activeTab === 'insights' && (
         <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
           <div className="flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-rose-500" />
-            <h3 className="text-base font-black text-white">DerbyAI Computerized Form Analysis</h3>
+            <Sparkles className="w-5 h-5 text-red-500" />
+            <h3 className="text-base font-black text-white">Official Turf Form Analysis</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 space-y-1.5">

@@ -191,24 +191,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Personal Details</span>
               </button>
 
-              {/* Admin Button (If Admin) */}
-              {user?.role === 'admin' && (
-                <button
-                  id="nav-admin-btn"
-                  onClick={() => {
-                    soundManager.playClick();
-                    onOpenAdmin();
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                    activeTab === 'admin'
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                      : 'bg-indigo-950/40 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-900/50'
-                  }`}
-                >
-                  <Shield className="w-3 h-3" />
-                  <span>Admin</span>
-                </button>
-              )}
             </nav>
 
             {/* ---------------- RIGHT: Spacious Wallet & Profile with Red Accents ---------------- */}
@@ -401,21 +383,6 @@ export const Header: React.FC<HeaderProps> = ({
                           <BookOpen className="w-3.5 h-3.5 text-slate-400" />
                           How to Play & Rules
                         </button>
-
-                        {user.role === 'admin' && (
-                          <button
-                            id="dropdown-admin-btn"
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              soundManager.playClick();
-                              onOpenAdmin();
-                            }}
-                            className="w-full text-left px-3.5 py-1.5 text-xs font-bold text-indigo-400 hover:bg-indigo-950/40 flex items-center gap-2 transition cursor-pointer border-t border-slate-800 mt-1"
-                          >
-                            <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                            Admin Dashboard
-                          </button>
-                        )}
 
                         <div className="border-t border-slate-800 mt-1 pt-1">
                           <button

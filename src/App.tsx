@@ -16,7 +16,7 @@ import { HelpModal } from './components/HelpModal';
 import { HowToPlayRules } from './components/HowToPlayRules';
 import { PersonalDetails } from './components/PersonalDetails';
 import { AuthModal } from './components/AuthModal';
-import { AdminPanel } from './components/AdminPanel';
+import { AdminPortal } from './components/AdminPortal';
 import { BottomNav } from './components/BottomNav';
 import { OddsFormat } from './utils/odds';
 import { soundManager } from './utils/audio';
@@ -87,7 +87,7 @@ export default function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Initial user check
+  // Initial user check & URL Hash Routing for Admin Portal
   useEffect(() => {
     soundManager.init();
     const savedUser = localStorage.getItem('derby_user');
@@ -104,6 +104,40 @@ export default function App() {
         .then((res) => setUser(res.user))
         .catch(() => {});
     }
+
+    // Check hash on page load
+    const checkHashRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#/admin' || hash === '#admin') {
+        setSelectedRaceId(null);
+        setActiveTab('admin');
+      } else if (hash === '#/lobby' || hash === '#lobby') {
+        setSelectedRaceId(null);
+        setActiveTab('races');
+      } else if (hash === '#/rules' || hash === '#rules') {
+        setSelectedRaceId(null);
+        setActiveTab('rules');
+      }
+    };
+
+    checkHashRoute();
+    window.addEventListener('hashchange', checkHashRoute);
+
+    // Administrative Keyboard Shortcut (Ctrl + Shift + A or Cmd + Shift + A)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        window.location.hash = '#/admin';
+        setSelectedRaceId(null);
+        setActiveTab('admin');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', checkHashRoute);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Fetch races & banners
@@ -296,9 +330,12 @@ export default function App() {
       {/* ---------------- MAIN CONTAINER (PC / LAPTOP / TABLET / MOBILE) ---------------- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-7 pb-24 md:pb-7">
         {activeTab === 'admin' ? (
-          /* ADMIN PANEL */
-          <AdminPanel
-            onBack={() => setActiveTab('races')}
+          /* DEDICATED ADMIN PORTAL (SECURE GATE & CONSOLE) */
+          <AdminPortal
+            onBack={() => {
+              setSelectedRaceId(null);
+              setActiveTab('rules');
+            }}
             races={races}
             banners={banners}
             onRefreshData={loadRacesAndBanners}
@@ -401,16 +438,6 @@ export default function App() {
             </button>
             <button onClick={() => setIsResultsOpen(true)} className="hover:text-rose-400 transition cursor-pointer">
               Official Results
-            </button>
-            <button
-              onClick={() => {
-                setSelectedRaceId(null);
-                setActiveTab('admin');
-              }}
-              className="text-indigo-400 hover:text-indigo-300 font-bold transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Shield className="w-4 h-4" />
-              <span>Admin Management</span>
             </button>
           </div>
         </div>

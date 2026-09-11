@@ -20,9 +20,8 @@ import {
   Sparkles,
   Zap,
   Layers,
-  Calendar,
-  ShieldCheck,
-  Bot
+  Calendar, 
+  ShieldCheck
 } from 'lucide-react';
 
 interface RaceListProps {
@@ -447,18 +446,18 @@ export const RaceList: React.FC<RaceListProps> = ({
             </div>
           </div>
 
-          {/* DerbyAI Smart Punter Insights Card */}
-          <div className="rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/30 p-5 shadow-xl space-y-3">
+          {/* Turf Expert Punter Insights Card */}
+          <div className="rounded-3xl bg-gradient-to-br from-[#1a0c10] via-slate-900 to-slate-900 border border-red-500/30 p-5 shadow-xl space-y-3">
             <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-indigo-400" />
+              <TrendingUp className="w-5 h-5 text-red-400" />
               <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                DerbyAI Daily Pick
+                Turf Expert Daily Pick
               </h3>
             </div>
             <p className="text-xs text-slate-300">
-              Algorithm confidence score <strong>94%</strong> on good turf track conditions.
+              Form rating confidence score <strong>94%</strong> on good turf track conditions.
             </p>
-            <div className="p-3 rounded-2xl bg-slate-950/90 border border-indigo-500/20 space-y-1">
+            <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/20 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-white">Bangalore Derby</span>
                 <span className="text-xs font-mono font-bold text-emerald-400">Odds 2.50</span>
