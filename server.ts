@@ -736,6 +736,9 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
+    if (process.env.VERCEL === '1' || process.env.NOW_REGION) {
+      return;
+    }
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
