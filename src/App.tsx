@@ -268,10 +268,30 @@ export default function App() {
 
   const pendingBetsCount = myBets.filter((b) => b.status === 'PENDING').length;
 
+  // ---------------- DEDICATED STANDALONE ADMIN PORTAL (No Customer Nav/Header/Footer) ----------------
+  if (activeTab === 'admin') {
+    return (
+      <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-red-500 selection:text-white relative">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6">
+          <AdminPortal
+            onBack={() => {
+              setSelectedRaceId(null);
+              window.location.hash = '#/';
+              setActiveTab('rules');
+            }}
+            races={races}
+            banners={banners}
+            onRefreshData={loadRacesAndBanners}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#090c12] text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white relative">
       
-      {/* ---------------- 1. HEADER (Top bar layout common on all pages) ---------------- */}
+      {/* ---------------- 1. HEADER (Top bar layout common on all public pages) ---------------- */}
       <Header
         user={user}
         onOpenDeposit={() => setIsDepositOpen(true)}
@@ -329,18 +349,7 @@ export default function App() {
 
       {/* ---------------- MAIN CONTAINER (PC / LAPTOP / TABLET / MOBILE) ---------------- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-7 pb-24 md:pb-7">
-        {activeTab === 'admin' ? (
-          /* DEDICATED ADMIN PORTAL (SECURE GATE & CONSOLE) */
-          <AdminPortal
-            onBack={() => {
-              setSelectedRaceId(null);
-              setActiveTab('rules');
-            }}
-            races={races}
-            banners={banners}
-            onRefreshData={loadRacesAndBanners}
-          />
-        ) : activeTab === 'personal_details' ? (
+        {activeTab === 'personal_details' ? (
           /* FULL PERSONAL DETAILS TAB (Full User Details, Balance vs Exposure, Statement, Security) */
           <PersonalDetails
             user={user}
