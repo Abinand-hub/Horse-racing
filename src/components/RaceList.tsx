@@ -118,13 +118,13 @@ export const RaceList: React.FC<RaceListProps> = ({
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Search input */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-emerald-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search upcoming races (e.g. Bangalore Derby, Pune, Mumbai)..."
-            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-rose-500/60 transition shadow-inner"
+            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#091510] border border-emerald-900/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-[#e5b869]/70 transition shadow-inner"
           />
           {searchQuery && (
             <button
@@ -137,7 +137,7 @@ export const RaceList: React.FC<RaceListProps> = ({
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold overflow-x-auto scrollbar-none shadow-inner">
+        <div className="flex items-center gap-1 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 text-xs font-bold overflow-x-auto scrollbar-none shadow-inner">
           {(['all', 'upcoming', 'open', 'resulted'] as const).map((status) => (
             <button
               key={status}
@@ -147,8 +147,8 @@ export const RaceList: React.FC<RaceListProps> = ({
               }}
               className={`px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
                 filterStatus === status
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                  : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
               }`}
             >
               {status === 'all' ? `All Races (${races.length})` : status === 'upcoming' ? 'Upcoming' : status === 'open' ? 'Live Open' : 'Settled Results'}
@@ -308,43 +308,43 @@ export const RaceList: React.FC<RaceListProps> = ({
                         soundManager.playClick();
                         onSelectRace(race.id);
                       }}
-                      className="group bg-gradient-to-r from-slate-900 via-slate-900 to-slate-900/90 hover:from-slate-850 hover:to-slate-850 rounded-3xl border border-slate-800 hover:border-rose-500/40 p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer"
+                      className="group bg-[#091510]/95 hover:bg-[#0c1c15] rounded-3xl border border-emerald-900/40 hover:border-[#e5b869]/60 p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         {/* Main Title & Format */}
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="flex items-center gap-1 text-amber-400 font-black bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20">
+                            <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/30">
                               <MapPin className="w-3.5 h-3.5" />
                               {race.venue}
                             </span>
-                            <span className="text-slate-600">•</span>
+                            <span className="text-emerald-900">•</span>
                             <span className="text-slate-300 font-mono font-semibold flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-slate-400" />
                               {race.race_time} - {race.date_str}
                             </span>
                             {race.distance && (
                               <>
-                                <span className="text-slate-600">•</span>
-                                <span className="text-slate-400 font-mono">{race.distance}</span>
+                                <span className="text-emerald-900">•</span>
+                                <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
                               </>
                             )}
                           </div>
 
-                          <h3 className="text-base sm:text-lg font-black text-white group-hover:text-rose-400 transition">
+                          <h3 className="text-base sm:text-lg font-black text-white group-hover:text-[#e5b869] transition">
                             {race.name}
                           </h3>
 
                           {race.status === 'RESULTED' && winnerHorse && (
                             <p className="text-xs text-blue-300 flex items-center gap-1.5">
-                              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                              <Trophy className="w-3.5 h-3.5 text-[#e5b869]" />
                               Winner: <strong>#{winnerHorse.horse_no} {winnerHorse.name}</strong>
                             </p>
                           )}
                         </div>
 
                         {/* Status & View Button */}
-                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
                           <div className="text-left sm:text-right">
                             <div className="text-xs text-slate-400 mb-1">
                               Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
@@ -354,7 +354,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           <button
                             id={`race-view-btn-${race.id}`}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-slate-800 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
+                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#0e241b] border border-emerald-700/40 group-hover:bg-gradient-to-r group-hover:from-[#d4af37] group-hover:to-[#e5b869] text-emerald-300 group-hover:text-black font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
                           >
                             <span>Open Market</span>
                             <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
@@ -364,7 +364,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                       {/* Quick Runners & Odds Strip */}
                       {race.horses.length > 0 && race.status !== 'RESULTED' && (
-                        <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                        <div className="mt-3 pt-3 border-t border-emerald-900/30 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
                           <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
                             Top Runners:
                           </span>

@@ -220,8 +220,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             }}
             className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'runners'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -239,8 +239,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             }}
             className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'simulator'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
             <Flame className="w-4 h-4 text-amber-400" />
@@ -255,11 +255,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             }}
             className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'insights'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-red-400" />
+            <Sparkles className="w-4 h-4 text-emerald-400" />
             <span>Expert Form Insights</span>
           </button>
 
@@ -271,8 +271,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             }}
             className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'mybets'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
             <Clock className="w-4 h-4" />
@@ -400,8 +400,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                             onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
                             className={`w-full py-3 px-4 rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
                               isOpen
-                                ? 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-600 hover:from-rose-500 hover:to-red-500 text-white shadow-rose-600/30 hover:scale-[1.02]'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 opacity-60'
+                                ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-emerald-900/40 hover:scale-[1.02]'
+                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                             }`}
                           >
                             <span className="block text-base tracking-tight font-black font-mono">
@@ -421,8 +421,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                             onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
                             className={`w-full py-3 px-4 rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
                               isOpen
-                                ? 'bg-slate-800 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/40 hover:border-emerald-500 shadow-emerald-500/10 hover:scale-[1.02]'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 opacity-60'
+                                ? 'bg-[#091510] hover:bg-[#18160c] text-[#e5b869] hover:text-[#f2d08a] border border-[#e5b869]/60 hover:border-[#e5b869] shadow-[0_0_10px_rgba(229,184,105,0.2)] hover:scale-[1.02]'
+                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                             }`}
                           >
                             <span className="block text-base tracking-tight font-black font-mono">

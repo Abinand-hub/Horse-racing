@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       {/* ---------------- SLIM & SPACIOUS TOP NAVBAR ---------------- */}
-      <header className="sticky top-0 z-40 bg-[#07090e]/95 backdrop-blur-md border-b border-slate-850 text-white shadow-xl">
+      <header className="sticky top-0 z-40 bg-[#060b08]/95 backdrop-blur-md border-b border-emerald-900/40 text-white shadow-2xl">
         <div className="max-w-7xl mx-auto px-2.5 sm:px-5">
           <div className="flex items-center justify-between h-13 sm:h-16 gap-1.5 sm:gap-4">
             
@@ -88,12 +88,12 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className="flex items-center gap-2 text-left group cursor-pointer shrink-0"
               >
-                {/* Glowing Red Horse Racing Logo Box */}
-                <div className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#1c080b] border-2 border-red-500 flex items-center justify-center text-red-500 group-hover:scale-105 transition shadow-[0_0_12px_rgba(239,68,68,0.5)] shrink-0">
+                {/* Glowing Royal Ascot Gold Horse Racing Logo Box */}
+                <div className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#0b1712] border-2 border-[#e5b869] flex items-center justify-center text-[#e5b869] group-hover:scale-105 transition shadow-[0_0_15px_rgba(229,184,105,0.4)] shrink-0">
                   <svg
                     viewBox="0 0 24 24"
                     fill="currentColor"
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 transition-transform group-hover:scale-110"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#e5b869] transition-transform group-hover:scale-110"
                   >
                     <path d="M21.7 8.2c-.3-.5-.8-.8-1.4-.9l-2.8-.4c-.4-.5-1-1.1-1.8-1.6-.9-.6-2-.9-3-.7-.4.1-.7.4-.9.8l-.8 1.4-2-.7c-.8-.3-1.6 0-2.1.6l-1.6 1.8c-.4.5-.6 1.1-.5 1.7.1.6.4 1.2.9 1.5l1.6 1.1-.7 2.2c-.2.7 0 1.5.5 2 .5.5 1.3.7 2 .4l2.4-1 1.8 2.2c.4.5 1 .8 1.7.8h.4c.7-.1 1.3-.5 1.6-1.1l2.2-4.5c.3-.6.2-1.3-.2-1.8l-1.3-1.5 2-1.5c.6-.4.9-1.1.8-1.8l-.3-1.4z" />
                     <path d="M4 17l2-1.5 1.5 1.5-1.5 2H4v-2zm1.5-4L7 11.5l1.5 1-1 2-2-.5v-1z" opacity="0.7" />
@@ -103,9 +103,9 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="leading-tight">
                   <div className="flex items-center gap-1">
                     <span className="font-extrabold tracking-tight text-xs sm:text-base text-white whitespace-nowrap">
-                      Derby<span className="text-red-500">Bet</span> <span className="text-slate-100 font-bold">Turf</span>
+                      Derby<span className="text-[#e5b869]">Bet</span> <span className="text-emerald-400 font-bold">Turf</span>
                     </span>
-                    <span className="hidden xs:inline-block text-[8px] sm:text-[9px] px-1 py-0.2 rounded bg-[#2a0c10] text-red-400 border border-red-500/60 font-black tracking-wider uppercase">
+                    <span className="hidden xs:inline-block text-[8px] sm:text-[9px] px-1.5 py-0.2 rounded bg-[#0a1f16] text-emerald-400 border border-emerald-500/50 font-black tracking-wider uppercase">
                       TURF
                     </span>
                   </div>
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {/* Vertical divider */}
-              <div className="h-6 w-[1px] bg-slate-800 mx-1 hidden lg:block" />
+              <div className="h-6 w-[1px] bg-emerald-900/30 mx-1 hidden lg:block" />
             </div>
 
             {/* ---------------- CENTER: Clean Nav Items (Desktop/Tablet) ---------------- */}
@@ -130,8 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'rules'
-                    ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
@@ -147,8 +147,8 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'races'
-                    ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
                 <span>Match Lobby</span>
@@ -163,11 +163,11 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'mybets'
-                    ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
-                <Trophy className={`w-3.5 h-3.5 ${activeTab === 'mybets' ? 'text-red-400' : 'text-amber-400'}`} />
+                <Trophy className={`w-3.5 h-3.5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
                 <span>My Selections</span>
                 <span className="w-4 h-4 rounded-full bg-[#10b981] text-black font-black text-[10px] flex items-center justify-center shadow-xs">
                   {pendingBetsCount > 0 ? pendingBetsCount : 2}
@@ -183,23 +183,23 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'personal_details'
-                    ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
-                <UserIcon className={`w-3.5 h-3.5 ${activeTab === 'personal_details' ? 'text-red-400' : 'text-slate-400'}`} />
+                <UserIcon className={`w-3.5 h-3.5 ${activeTab === 'personal_details' ? 'text-[#e5b869]' : 'text-slate-400'}`} />
                 <span>Personal Details</span>
               </button>
 
             </nav>
 
-            {/* ---------------- RIGHT: Spacious Wallet & Profile with Red Accents ---------------- */}
+            {/* ---------------- RIGHT: Spacious Wallet & Profile with Gold & Emerald Accents ---------------- */}
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               
               {user ? (
                 <>
                   {/* Mobile Compact Wallet Pill (< sm) */}
-                  <div className="flex sm:hidden items-center gap-1 bg-[#0c1018] border border-slate-800 rounded-lg p-1 pr-1.5 shadow-inner">
+                  <div className="flex sm:hidden items-center gap-1 bg-[#091510] border border-emerald-900/50 rounded-lg p-1 pr-1.5 shadow-inner">
                     <button
                       onClick={() => {
                         soundManager.playClick();
@@ -214,42 +214,42 @@ export const Header: React.FC<HeaderProps> = ({
                       <span className="text-xs font-black text-white font-mono tracking-tight">
                         ₹{user.balance.toLocaleString('en-IN')}
                       </span>
-                      <div className="w-4 h-4 rounded bg-red-600 text-white flex items-center justify-center font-bold text-[10px] ml-0.5 shadow-sm">
+                      <div className="w-4 h-4 rounded bg-gradient-to-r from-amber-500 to-[#e5b869] text-black flex items-center justify-center font-black text-[10px] ml-0.5 shadow-sm">
                         +
                       </div>
                     </button>
                   </div>
 
                   {/* Desktop / Tablet Full Wallet Pill (sm+) */}
-                  <div className="hidden sm:flex items-center gap-2 bg-[#0c1018] border border-slate-800 rounded-xl p-1 pl-2.5 shadow-inner">
+                  <div className="hidden sm:flex items-center gap-2 bg-[#091510] border border-emerald-900/60 rounded-xl p-1 pl-2.5 shadow-inner">
                     {/* Emerald Wallet Box */}
-                    <div className="w-6 h-6 rounded-md bg-[#062118] border border-[#10b981]/40 flex items-center justify-center text-[#10b981] shrink-0">
+                    <div className="w-6 h-6 rounded-md bg-[#062118] border border-[#10b981]/50 flex items-center justify-center text-[#10b981] shrink-0">
                       <Wallet className="w-3 h-3" />
                     </div>
 
                     {/* Balance Stack */}
                     <div className="leading-tight pr-1">
-                      <p className="text-[7.5px] font-bold text-slate-400 tracking-wider uppercase">WALLET</p>
+                      <p className="text-[7.5px] font-bold text-emerald-400/80 tracking-wider uppercase">WALLET</p>
                       <p className="text-xs sm:text-sm font-black text-white font-mono tracking-tight">
                         ₹{user.balance.toLocaleString('en-IN')}
                       </p>
                     </div>
 
-                    {/* Glowing Red "+ Add ₹" Button */}
+                    {/* Glowing Gold "+ Add ₹" Button */}
                     <button
                       id="header-deposit-btn"
                       onClick={() => {
                         soundManager.playClick();
                         onOpenDeposit();
                       }}
-                      className="flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-[0_0_12px_rgba(239,68,68,0.45)] active:scale-95 transition cursor-pointer"
+                      className="flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-lg bg-gradient-to-r from-[#d4af37] to-[#e5b869] hover:from-[#c5a028] hover:to-[#d4af37] text-black text-xs font-black shadow-[0_0_12px_rgba(229,184,105,0.4)] active:scale-95 transition cursor-pointer"
                     >
                       <Plus className="w-3 h-3 stroke-[3]" />
                       <span>Add ₹</span>
                     </button>
                   </div>
 
-                  {/* Profile Avatar with Glowing Red Border */}
+                  {/* Profile Avatar with Glowing Gold Border */}
                   <div className="relative" ref={dropdownRef}>
                     <button
                       id="profile-dropdown-btn"
@@ -257,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
                         soundManager.playClick();
                         setDropdownOpen(!dropdownOpen);
                       }}
-                      className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl overflow-hidden border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.4)] hover:scale-105 transition cursor-pointer flex items-center justify-center shrink-0"
+                      className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl overflow-hidden border-2 border-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.35)] hover:scale-105 transition cursor-pointer flex items-center justify-center shrink-0"
                       title="Personal Details & Account"
                     >
                       <img
@@ -422,7 +422,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ---------------- MOBILE FIXED BOTTOM NAVIGATION (4 Spacious Tabs, Rules First, No Add Button) ---------------- */}
       <nav 
         id="mobile-static-bottom-nav"
-        className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-850 px-2 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.85)]"
+        className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[#060b08]/95 backdrop-blur-xl border-t border-emerald-900/40 px-2 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.9)]"
       >
         <div className="grid grid-cols-4 gap-1 items-center max-w-md mx-auto">
           {/* 1. How to Play & Rules (FIRST / HOME TAB) */}
@@ -434,7 +434,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
               activeTab === 'rules'
-                ? 'text-red-500 font-bold'
+                ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -451,7 +451,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
               activeTab === 'races'
-                ? 'text-red-500 font-bold'
+                ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -468,12 +468,12 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className={`flex flex-col items-center justify-center py-1 transition relative cursor-pointer ${
               activeTab === 'mybets'
-                ? 'text-red-500 font-bold'
+                ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <div className="relative">
-              <Trophy className={`w-4.5 h-4.5 ${activeTab === 'mybets' ? 'text-red-500' : 'text-amber-400'}`} />
+              <Trophy className={`w-4.5 h-4.5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
               <span className="absolute -top-1.5 -right-2.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-black font-black text-[8px] flex items-center justify-center">
                 {pendingBetsCount > 0 ? pendingBetsCount : 2}
               </span>
@@ -494,7 +494,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
               activeTab === 'personal_details'
-                ? 'text-red-500 font-bold'
+                ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -503,7 +503,7 @@ export const Header: React.FC<HeaderProps> = ({
                 src={user.profile_photo || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
                 alt={user.username}
                 className={`w-4.5 h-4.5 rounded-md object-cover ring-1 ${
-                  activeTab === 'personal_details' ? 'ring-red-500 ring-2' : 'ring-red-500/60'
+                  activeTab === 'personal_details' ? 'ring-[#e5b869] ring-2' : 'ring-emerald-500/60'
                 }`}
               />
             ) : (

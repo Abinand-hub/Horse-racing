@@ -40,11 +40,11 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       
       {/* Title & Quick Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0c1018] p-4 sm:p-5 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#091510] p-4 sm:p-5 rounded-2xl border border-emerald-900/50">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/40 flex items-center justify-center text-red-500">
-              <Trophy className="w-4 h-4 text-red-500" />
+            <div className="w-8 h-8 rounded-xl bg-[#18160c] border border-[#e5b869]/50 flex items-center justify-center text-[#e5b869]">
+              <Trophy className="w-4 h-4 text-[#e5b869]" />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
               Official Horse Racing Guide & Rules
@@ -57,7 +57,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
 
         <button
           onClick={onGoToLobby}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs sm:text-sm shadow-[0_0_15px_rgba(239,68,68,0.4)] transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] hover:from-[#c5a028] hover:to-[#d4af37] text-black font-black text-xs sm:text-sm shadow-[0_0_15px_rgba(229,184,105,0.4)] transition cursor-pointer self-start sm:self-auto"
         >
           <span>Go to Match Lobby</span>
           <ArrowRight className="w-4 h-4" />
@@ -65,16 +65,16 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
       </div>
 
       {/* Rules Sub-Navigation Tabs */}
-      <div className="flex items-center gap-2 bg-[#0c1018] p-1.5 rounded-2xl border border-slate-800 overflow-x-auto text-xs font-bold">
+      <div className="flex items-center gap-2 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 overflow-x-auto text-xs font-bold">
         <button
           onClick={() => setActiveSubTab('basics')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'basics'
-              ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
+              ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Zap className="w-3.5 h-3.5" />
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
           <span>1. How to Bet (3 Steps)</span>
         </button>
 
@@ -82,11 +82,11 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
           onClick={() => setActiveSubTab('win_place')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'win_place'
-              ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
+              ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Trophy className="w-3.5 h-3.5" />
+          <Trophy className="w-3.5 h-3.5 text-[#e5b869]" />
           <span>2. WIN vs PLACE & Calculator</span>
         </button>
 
@@ -94,11 +94,11 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
           onClick={() => setActiveSubTab('exposure')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'exposure'
-              ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
+              ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Shield className="w-3.5 h-3.5" />
+          <Shield className="w-3.5 h-3.5 text-emerald-400" />
           <span>3. Wallet & Exposure Mechanics</span>
         </button>
 
@@ -106,11 +106,11 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
           onClick={() => setActiveSubTab('terms')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'terms'
-              ? 'bg-[#220a0e] border border-red-500/60 text-red-400 shadow-sm'
+              ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <HelpCircle className="w-3.5 h-3.5" />
+          <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
           <span>4. Race Statuses & FAQs</span>
         </button>
       </div>

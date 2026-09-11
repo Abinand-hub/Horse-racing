@@ -289,7 +289,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090c12] text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white relative">
+    <div className="min-h-screen bg-[#070c09] text-slate-100 flex flex-col font-sans selection:bg-[#e5b869] selection:text-black relative">
       
       {/* ---------------- 1. HEADER (Top bar layout common on all public pages) ---------------- */}
       <Header
