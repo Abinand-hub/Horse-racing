@@ -73,27 +73,27 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      {/* ---------------- SLIM & ACCURATE TOP NAVBAR (Matching Reference Image) ---------------- */}
+      {/* ---------------- SLIM & SPACIOUS TOP NAVBAR ---------------- */}
       <header className="sticky top-0 z-40 bg-[#07090e]/95 backdrop-blur-md border-b border-slate-850 text-white shadow-xl">
-        <div className="max-w-7xl mx-auto px-3 sm:px-5">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-5">
+          <div className="flex items-center justify-between h-13 sm:h-16 gap-1.5 sm:gap-4">
             
             {/* ---------------- LEFT: DerbyBet Turf Horse Racing Logo ---------------- */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button 
                 id="brand-logo-btn"
                 onClick={() => {
                   soundManager.playClick();
-                  onGoHome();
+                  onOpenRules();
                 }}
-                className="flex items-center gap-2.5 text-left group cursor-pointer"
+                className="flex items-center gap-2 text-left group cursor-pointer shrink-0"
               >
                 {/* Glowing Red Horse Racing Logo Box */}
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1c080b] border-2 border-red-500 flex items-center justify-center text-red-500 group-hover:scale-105 transition shadow-[0_0_14px_rgba(239,68,68,0.55)] shrink-0">
+                <div className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#1c080b] border-2 border-red-500 flex items-center justify-center text-red-500 group-hover:scale-105 transition shadow-[0_0_12px_rgba(239,68,68,0.5)] shrink-0">
                   <svg
                     viewBox="0 0 24 24"
                     fill="currentColor"
-                    className="w-5 h-5 text-red-500 transition-transform group-hover:scale-110"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 transition-transform group-hover:scale-110"
                   >
                     <path d="M21.7 8.2c-.3-.5-.8-.8-1.4-.9l-2.8-.4c-.4-.5-1-1.1-1.8-1.6-.9-.6-2-.9-3-.7-.4.1-.7.4-.9.8l-.8 1.4-2-.7c-.8-.3-1.6 0-2.1.6l-1.6 1.8c-.4.5-.6 1.1-.5 1.7.1.6.4 1.2.9 1.5l1.6 1.1-.7 2.2c-.2.7 0 1.5.5 2 .5.5 1.3.7 2 .4l2.4-1 1.8 2.2c.4.5 1 .8 1.7.8h.4c.7-.1 1.3-.5 1.6-1.1l2.2-4.5c.3-.6.2-1.3-.2-1.8l-1.3-1.5 2-1.5c.6-.4.9-1.1.8-1.8l-.3-1.4z" />
                     <path d="M4 17l2-1.5 1.5 1.5-1.5 2H4v-2zm1.5-4L7 11.5l1.5 1-1 2-2-.5v-1z" opacity="0.7" />
@@ -101,15 +101,15 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 
                 <div className="leading-tight">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold tracking-tight text-sm sm:text-base text-white">
+                  <div className="flex items-center gap-1">
+                    <span className="font-extrabold tracking-tight text-xs sm:text-base text-white whitespace-nowrap">
                       Derby<span className="text-red-500">Bet</span> <span className="text-slate-100 font-bold">Turf</span>
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#2a0c10] text-red-400 border border-red-500/60 font-black tracking-wider uppercase">
+                    <span className="hidden xs:inline-block text-[8px] sm:text-[9px] px-1 py-0.2 rounded bg-[#2a0c10] text-red-400 border border-red-500/60 font-black tracking-wider uppercase">
                       TURF
                     </span>
                   </div>
-                  <span className="hidden xs:block text-[9px] sm:text-[10px] text-slate-400 font-normal tracking-tight">
+                  <span className="hidden sm:block text-[10px] text-slate-400 font-normal tracking-tight">
                     Official Horse Racing Exchange
                   </span>
                 </div>
@@ -119,9 +119,9 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="h-6 w-[1px] bg-slate-800 mx-1 hidden lg:block" />
             </div>
 
-            {/* ---------------- CENTER: Clean Nav Items with Consistent Active RED Styling ---------------- */}
+            {/* ---------------- CENTER: Clean Nav Items (Desktop/Tablet) ---------------- */}
             <nav className="hidden md:flex items-center gap-1.5 lg:gap-3 text-xs sm:text-sm">
-              {/* 1. How to Play & Rules */}
+              {/* 1. How to Play & Rules (FIRST / HOME) */}
               <button
                 id="nav-rules-btn"
                 onClick={() => {
@@ -134,6 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
                 }`}
               >
+                <BookOpen className="w-3.5 h-3.5" />
                 <span>How to Play & Rules</span>
               </button>
 
@@ -210,13 +211,35 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </nav>
 
-            {/* ---------------- RIGHT: Wallet Pill + Profile Avatar with Red Accents ---------------- */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            {/* ---------------- RIGHT: Spacious Wallet & Profile with Red Accents ---------------- */}
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               
               {user ? (
                 <>
-                  {/* Unified Wallet Pill */}
-                  <div className="flex items-center gap-2 bg-[#0c1018] border border-slate-800 rounded-xl p-1 pl-2.5 shadow-inner">
+                  {/* Mobile Compact Wallet Pill (< sm) */}
+                  <div className="flex sm:hidden items-center gap-1 bg-[#0c1018] border border-slate-800 rounded-lg p-1 pr-1.5 shadow-inner">
+                    <button
+                      onClick={() => {
+                        soundManager.playClick();
+                        onOpenDeposit();
+                      }}
+                      className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
+                      title="Deposit / Add Funds"
+                    >
+                      <div className="w-5 h-5 rounded bg-[#062118] border border-[#10b981]/40 flex items-center justify-center text-[#10b981] shrink-0">
+                        <Wallet className="w-3 h-3" />
+                      </div>
+                      <span className="text-xs font-black text-white font-mono tracking-tight">
+                        ₹{user.balance.toLocaleString('en-IN')}
+                      </span>
+                      <div className="w-4 h-4 rounded bg-red-600 text-white flex items-center justify-center font-bold text-[10px] ml-0.5 shadow-sm">
+                        +
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Desktop / Tablet Full Wallet Pill (sm+) */}
+                  <div className="hidden sm:flex items-center gap-2 bg-[#0c1018] border border-slate-800 rounded-xl p-1 pl-2.5 shadow-inner">
                     {/* Emerald Wallet Box */}
                     <div className="w-6 h-6 rounded-md bg-[#062118] border border-[#10b981]/40 flex items-center justify-center text-[#10b981] shrink-0">
                       <Wallet className="w-3 h-3" />
@@ -252,7 +275,7 @@ export const Header: React.FC<HeaderProps> = ({
                         soundManager.playClick();
                         setDropdownOpen(!dropdownOpen);
                       }}
-                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl overflow-hidden border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.4)] hover:scale-105 transition cursor-pointer flex items-center justify-center shrink-0"
+                      className="w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl overflow-hidden border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.4)] hover:scale-105 transition cursor-pointer flex items-center justify-center shrink-0"
                       title="Personal Details & Account"
                     >
                       <img
@@ -286,6 +309,19 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <UserIcon className="w-3.5 h-3.5 text-red-400" />
                           Full Personal Details
+                        </button>
+
+                        <button
+                          id="dropdown-deposit-btn"
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            soundManager.playClick();
+                            onOpenDeposit();
+                          }}
+                          className="w-full text-left px-3.5 py-1.5 text-xs font-medium hover:bg-slate-800 hover:text-white flex items-center gap-2 transition cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                          Deposit / Add Funds
                         </button>
 
                         <button
@@ -358,11 +394,11 @@ export const Header: React.FC<HeaderProps> = ({
                           onClick={() => {
                             setDropdownOpen(false);
                             soundManager.playClick();
-                            onOpenHelp();
+                            onOpenRules();
                           }}
                           className="w-full text-left px-3.5 py-1.5 text-xs font-medium hover:bg-slate-800 hover:text-white flex items-center gap-2 transition cursor-pointer"
                         >
-                          <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                          <BookOpen className="w-3.5 h-3.5 text-slate-400" />
                           How to Play & Rules
                         </button>
 
@@ -406,7 +442,7 @@ export const Header: React.FC<HeaderProps> = ({
                     soundManager.playClick();
                     onOpenAuth();
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-[0_0_12px_rgba(239,68,68,0.45)] transition active:scale-95 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-[0_0_12px_rgba(239,68,68,0.45)] transition active:scale-95 cursor-pointer"
                 >
                   <span>Sign In</span>
                 </button>
@@ -416,30 +452,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* ---------------- MOBILE STATIC BOTTOM NAVIGATION BAR (Slim & Fixed with Red Highlights) ---------------- */}
+      {/* ---------------- MOBILE FIXED BOTTOM NAVIGATION (4 Spacious Tabs, Rules First, No Add Button) ---------------- */}
       <nav 
         id="mobile-static-bottom-nav"
         className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-850 px-2 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.85)]"
       >
-        <div className="grid grid-cols-5 gap-1 items-center max-w-md mx-auto">
-          {/* 1. Match Lobby */}
-          <button
-            id="mobile-nav-lobby"
-            onClick={() => {
-              soundManager.playClick();
-              onGoHome();
-            }}
-            className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
-              activeTab === 'races'
-                ? 'text-red-500 font-bold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Home className="w-4.5 h-4.5" />
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Lobby</span>
-          </button>
-
-          {/* 2. How to Play & Rules */}
+        <div className="grid grid-cols-4 gap-1 items-center max-w-md mx-auto">
+          {/* 1. How to Play & Rules (FIRST / HOME TAB) */}
           <button
             id="mobile-nav-rules"
             onClick={() => {
@@ -453,7 +472,24 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <BookOpen className="w-4.5 h-4.5" />
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Rules</span>
+            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">How to Play</span>
+          </button>
+
+          {/* 2. Match Lobby */}
+          <button
+            id="mobile-nav-lobby"
+            onClick={() => {
+              soundManager.playClick();
+              onGoHome();
+            }}
+            className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
+              activeTab === 'races'
+                ? 'text-red-500 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Home className="w-4.5 h-4.5" />
+            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Match Lobby</span>
           </button>
 
           {/* 3. My Selections */}
@@ -470,7 +506,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <div className="relative">
-              <Trophy className="w-4.5 h-4.5 text-amber-400" />
+              <Trophy className={`w-4.5 h-4.5 ${activeTab === 'mybets' ? 'text-red-500' : 'text-amber-400'}`} />
               <span className="absolute -top-1.5 -right-2.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-black font-black text-[8px] flex items-center justify-center">
                 {pendingBetsCount > 0 ? pendingBetsCount : 2}
               </span>
@@ -478,22 +514,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Selections</span>
           </button>
 
-          {/* 4. Wallet / Add Money */}
-          <button
-            id="mobile-nav-wallet"
-            onClick={() => {
-              soundManager.playClick();
-              onOpenDeposit();
-            }}
-            className="flex flex-col items-center justify-center py-1 text-slate-400 hover:text-slate-200 transition cursor-pointer"
-          >
-            <div className="p-1 rounded-md bg-red-500/20 text-red-400 border border-red-500/40 shadow-[0_0_8px_rgba(239,68,68,0.3)]">
-              <Wallet className="w-4 h-4" />
-            </div>
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-bold text-red-400">+ Add ₹</span>
-          </button>
-
-          {/* 5. Personal Details */}
+          {/* 4. Personal Details */}
           <button
             id="mobile-nav-profile"
             onClick={() => {
@@ -521,7 +542,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <UserIcon className="w-4.5 h-4.5" />
             )}
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Profile</span>
+            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Personal Details</span>
           </button>
         </div>
       </nav>

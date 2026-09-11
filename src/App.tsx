@@ -40,8 +40,8 @@ export default function App() {
   const [myBets, setMyBets] = useState<Bet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  // Navigation & View state
-  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('races');
+  // Navigation & View state - Default home is How to Play & Rules
+  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('rules');
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'open' | 'resulted'>('open');
   const [isLoadingRaces, setIsLoadingRaces] = useState(true);
@@ -224,7 +224,7 @@ export default function App() {
     setMyBets([]);
     setTransactions([]);
     setSelectedRaceId(null);
-    setActiveTab('races');
+    setActiveTab('rules');
     showToast('Signed out successfully', 'info');
   };
 
