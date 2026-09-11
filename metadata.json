@@ -1,0 +1,6 @@
+{
+  "name": "Horse Racing Betting App",
+  "description": "Horse race betting platform with live odds, Win and Place bets, real-time exposure and balance tracking, bet slips, and full admin race settlement.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
