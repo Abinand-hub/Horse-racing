@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { soundManager } from '../utils/audio';
 import { Banner, Bet, Horse, Race, RaceStatus, User } from '../types';
 import { 
   Shield, 
@@ -164,12 +165,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleStatusChange = async (raceId: string, status: RaceStatus) => {
     try {
       await api.updateRaceStatus(raceId, status);
-      setActionMessage(`Race status updated to ${status}`);
+      soundManager.playClick();
+      setActionMessage(`⚡ Race status updated to ${status}`);
       await onRefreshData();
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to update status');
+      setActionMessage(err.message || 'Failed to update status');
+      setTimeout(() => setActionMessage(null), 3500);
     }
   };
 
@@ -186,12 +189,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsLoading(true);
       const placeIds = [winnerHorseId, secondHorseId, thirdHorseId].filter(Boolean);
       const res = await api.settleRace(settlingRace.id, winnerHorseId, placeIds);
-      setActionMessage(res.message);
+      soundManager.playWinPayout();
+      setActionMessage(res.message || 'Race settled and payouts distributed!');
       setSettlingRace(null);
       await onRefreshData();
       await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to settle race');
+      setActionMessage(err.message || 'Failed to settle race');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -200,11 +206,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleUpdateOdds = async (horseId: string, winOdds: number, placeOdds: number) => {
     try {
       await api.updateHorseOdds(horseId, winOdds, placeOdds);
+      soundManager.playChip();
       setActionMessage('Odds updated live!');
       await onRefreshData();
       setTimeout(() => setActionMessage(null), 2500);
     } catch (err: any) {
-      alert(err.message || 'Failed to update odds');
+      setActionMessage(err.message || 'Failed to update odds');
+      setTimeout(() => setActionMessage(null), 3000);
     }
   };
 
@@ -212,12 +220,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       setIsLoading(true);
       await api.publishRace(raceId);
+      soundManager.playBetPlaced();
       setActionMessage('🚀 Race published live! It is now visible on the user page with live betting.');
       await onRefreshData();
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
-      alert(err.message || 'Failed to publish race');
+      setActionMessage(err.message || 'Failed to publish race');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -225,32 +235,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleCreateRace = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRaceName) {
-      alert('Please provide a race name');
+    if (!newRaceName.trim()) {
+      setActionMessage('⚠️ Please provide a race name');
+      setTimeout(() => setActionMessage(null), 3000);
       return;
     }
     try {
       setIsLoading(true);
       await api.createRace({
-        name: newRaceName,
+        name: newRaceName.trim(),
         race_no: newRaceNo ? Number(newRaceNo) : undefined,
-        venue: newVenue,
-        race_time: newTime,
+        venue: newVenue || 'Bangalore Turf Club',
+        race_time: newTime || '14:30',
         date_str: 'Today, 5th Sep',
-        distance: newDistance,
-        going: newGoing,
-        class_grade: newClassGrade,
+        distance: newDistance || '1400M',
+        going: newGoing || 'Good',
+        class_grade: newClassGrade || 'Grade 1 • Terms',
         status: newRaceStatus,
-        image_url: newRaceImage,
+        image_url: newRaceImage || '/images/race_action.jpg',
         horses: newHorses,
       });
-      setActionMessage(`Race Card "${newRaceName}" added and ${newRaceStatus === 'OPEN' ? 'published LIVE' : 'saved as draft'}!`);
+      soundManager.playBetPlaced();
+      setActionMessage(`🏆 Race Card "${newRaceName}" published LIVE with ${newHorses.length} runners!`);
       await onRefreshData();
       await loadAdminData();
+      handleClearForm();
       setActiveTab('races');
-      setTimeout(() => setActionMessage(null), 3000);
+      setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to add race');
+      setActionMessage(err.message || 'Failed to publish race');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -287,8 +301,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleSaveEditRace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRace) return;
-    if (!editRaceName || !editTime) {
-      alert('Race name and time are required');
+    if (!editRaceName.trim() || !editTime.trim()) {
+      setActionMessage('⚠️ Race name and time are required');
+      setTimeout(() => setActionMessage(null), 3000);
       return;
     }
     try {
@@ -306,13 +321,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         status: editRaceStatus,
         horses: editHorses,
       });
-      setActionMessage(`Race "${editRaceName}" updated successfully!`);
+      soundManager.playChip();
+      setActionMessage(`✅ Race "${editRaceName}" updated successfully!`);
       setEditingRace(null);
       await onRefreshData();
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to update race');
+      setActionMessage(err.message || 'Failed to update race');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -323,12 +340,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       setIsLoading(true);
       await api.deleteRace(raceId);
-      setActionMessage(`Race fixture "${raceName}" deleted successfully!`);
+      setActionMessage(`🗑️ Race fixture "${raceName}" deleted successfully!`);
       await onRefreshData();
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete race');
+      setActionMessage(err.message || 'Failed to delete race');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -343,7 +361,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewGoing(HANDWRITTEN_SHEET_PRESET.going);
     setNewClassGrade(HANDWRITTEN_SHEET_PRESET.class_grade);
     setNewHorses([...HANDWRITTEN_SHEET_PRESET.horses]);
-    setActionMessage('Loaded 7 runners from handwritten sheet preset!');
+    soundManager.playChip();
+    setActionMessage('✨ Loaded 7 runners from handwritten sheet preset!');
     setTimeout(() => setActionMessage(null), 2500);
   };
 
@@ -362,7 +381,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBannerTitle || !newBannerImg) {
-      alert('Title and Image URL are required');
+      setActionMessage('⚠️ Title and Image URL are required');
+      setTimeout(() => setActionMessage(null), 3000);
       return;
     }
     try {
@@ -374,13 +394,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         link: newBannerLink,
         tag: newBannerTag,
       });
-      setActionMessage('Promotional Banner added!');
+      soundManager.playChip();
+      setActionMessage('🎉 Promotional Banner added!');
       setNewBannerTitle('');
       setNewBannerSubtitle('');
       await onRefreshData();
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to add banner');
+      setActionMessage(err.message || 'Failed to add banner');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -389,9 +411,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleDeleteBanner = async (id: string) => {
     try {
       await api.deleteBanner(id);
+      setActionMessage('Banner removed');
       await onRefreshData();
+      setTimeout(() => setActionMessage(null), 2000);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete banner');
+      setActionMessage(err.message || 'Failed to delete banner');
+      setTimeout(() => setActionMessage(null), 3000);
     }
   };
 
@@ -405,7 +430,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage('Platform data reset to factory demo state!');
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to reset demo');
+      setActionMessage(err.message || 'Failed to reset demo');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }

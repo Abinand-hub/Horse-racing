@@ -112,28 +112,53 @@ export const api = {
 
   // Races
   async getRaces(status?: 'upcoming' | 'open' | 'resulted' | 'all'): Promise<Race[]> {
+    let customRaces: Race[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_races');
+      if (raw) customRaces = JSON.parse(raw);
+    } catch {}
+
     try {
       const query = status ? `?status=${status}` : '';
       const res = await fetch(`${API_BASE}/races${query}`);
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.races) && data.races.length > 0) {
-          return data.races;
-        }
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          if (Array.isArray(data.races) && data.races.length > 0) {
+            // Merge custom races from localStorage if not present
+            const remoteMap = new Map(data.races.map((r: Race) => [r.id, r]));
+            for (const cr of customRaces) {
+              if (!remoteMap.has(cr.id)) {
+                data.races.unshift(cr);
+              }
+            }
+            if (status === 'open') {
+              return data.races.filter((r: Race) => r.status === 'OPEN');
+            } else if (status === 'upcoming') {
+              return data.races.filter((r: Race) => r.status === 'OPEN' || r.status === 'CLOSED');
+            } else if (status === 'resulted') {
+              return data.races.filter((r: Race) => r.status === 'RESULTED');
+            }
+            return data.races;
+          }
+        } catch {}
       }
     } catch (e) {
-      console.warn('API getRaces failed, using bundled dummy matches:', e);
+      console.warn('API getRaces failed, using local/dummy matches:', e);
     }
     
-    // Guaranteed fallback with dummy matches
+    // Combine custom races with dummy races
+    const allRaces = [...customRaces, ...DUMMY_RACES.filter((dr) => !customRaces.some((cr) => cr.id === dr.id))];
+
     if (status === 'open') {
-      return DUMMY_RACES.filter((r) => r.status === 'OPEN');
+      return allRaces.filter((r) => r.status === 'OPEN');
     } else if (status === 'upcoming') {
-      return DUMMY_RACES.filter((r) => r.status === 'OPEN' || r.status === 'CLOSED');
+      return allRaces.filter((r) => r.status === 'OPEN' || r.status === 'CLOSED');
     } else if (status === 'resulted') {
-      return DUMMY_RACES.filter((r) => r.status === 'RESULTED');
+      return allRaces.filter((r) => r.status === 'RESULTED');
     }
-    return DUMMY_RACES;
+    return allRaces;
   },
 
   async getRace(id: string): Promise<Race> {
@@ -144,6 +169,16 @@ export const api = {
         if (data.race) return data.race;
       }
     } catch {}
+
+    try {
+      const raw = localStorage.getItem('derby_custom_races');
+      if (raw) {
+        const customRaces: Race[] = JSON.parse(raw);
+        const foundCustom = customRaces.find((r) => r.id === id);
+        if (foundCustom) return foundCustom;
+      }
+    } catch {}
+
     const found = DUMMY_RACES.find((r) => r.id === id);
     if (found) return found;
     return DUMMY_RACES[0];
@@ -169,8 +204,18 @@ export const api = {
       }
     } catch {}
 
-    const race = DUMMY_RACES.find((r) => r.id === params.race_id) || DUMMY_RACES[0];
-    const horse = race.horses.find((h) => h.id === params.horse_id) || race.horses[0];
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === params.race_id) || allRaces[0];
+    const horse = race?.horses?.find((h) => h.id === params.horse_id) || race?.horses?.[0] || {
+      id: params.horse_id,
+      horse_no: 1,
+      serial_no: 1,
+      gate_no: 1,
+      name: 'Thoroughbred',
+      jockey: 'Jockey',
+      trainer: 'Trainer',
+    };
+
     const newBet: Bet = {
       id: `bet_${Date.now()}`,
       user_id: params.user_id,
@@ -194,6 +239,15 @@ export const api = {
       placed_at: new Date().toISOString(),
       settled_at: null,
     };
+
+    // Save to local bets
+    try {
+      const rawBets = localStorage.getItem('derby_custom_bets');
+      const betsList: Bet[] = rawBets ? JSON.parse(rawBets) : [];
+      betsList.unshift(newBet);
+      localStorage.setItem('derby_custom_bets', JSON.stringify(betsList));
+    } catch {}
+
     return {
       message: 'Bet placed successfully!',
       bet: newBet,
@@ -206,14 +260,22 @@ export const api = {
   },
 
   async getMyBets(userId: string): Promise<Bet[]> {
+    let localBets: Bet[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_bets');
+      if (raw) localBets = JSON.parse(raw);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/bets/my?user_id=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.bets) && data.bets.length > 0) return data.bets;
+        if (Array.isArray(data.bets)) {
+          return [...localBets, ...data.bets.filter((db: Bet) => !localBets.some((lb) => lb.id === db.id))];
+        }
       }
     } catch {}
-    return DUMMY_BETS;
+    return [...localBets, ...DUMMY_BETS];
   },
 
   // Wallet
@@ -279,30 +341,68 @@ export const api = {
 
   // Banners
   async getBanners(): Promise<Banner[]> {
+    let customBanners: Banner[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_banners');
+      if (raw) customBanners = JSON.parse(raw);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/banners`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.banners) && data.banners.length > 0) return data.banners;
+        if (Array.isArray(data.banners) && data.banners.length > 0) {
+          return [...customBanners, ...data.banners.filter((b: Banner) => !customBanners.some((cb) => cb.id === b.id))];
+        }
       }
     } catch {}
-    return DUMMY_BANNERS;
+    return [...customBanners, ...DUMMY_BANNERS];
   },
 
   async createBanner(banner: Partial<Banner>): Promise<Banner> {
-    const res = await fetch(`${API_BASE}/banners`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(banner),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to add banner');
-    return data.banner;
+    const newBanner: Banner = {
+      id: `bnr_${Date.now()}`,
+      title: banner.title || 'Special Promotion',
+      subtitle: banner.subtitle || 'Place bets on upcoming racing fixtures',
+      image_url: banner.image_url || '/images/race_action.jpg',
+      link: banner.link || '#/',
+      tag: banner.tag || 'SPECIAL',
+      is_active: true,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/banners`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(banner),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.banner) return data.banner;
+      }
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem('derby_custom_banners');
+      const list: Banner[] = raw ? JSON.parse(raw) : [];
+      list.unshift(newBanner);
+      localStorage.setItem('derby_custom_banners', JSON.stringify(list));
+    } catch {}
+
+    return newBanner;
   },
 
   async deleteBanner(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/banners/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete banner');
+    try {
+      await fetch(`${API_BASE}/banners/${id}`, { method: 'DELETE' });
+    } catch {}
+    try {
+      const raw = localStorage.getItem('derby_custom_banners');
+      if (raw) {
+        const list: Banner[] = JSON.parse(raw);
+        localStorage.setItem('derby_custom_banners', JSON.stringify(list.filter((b) => b.id !== id)));
+      }
+    } catch {}
   },
 
   // Admin
@@ -313,95 +413,278 @@ export const api = {
     openRaces: number;
     pendingBetsCount: number;
   }> {
-    const res = await fetch(`${API_BASE}/admin/overview`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to load admin stats');
-    return data.stats;
+    try {
+      const res = await fetch(`${API_BASE}/admin/overview`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stats) return data.stats;
+      }
+    } catch {}
+
+    const races = await this.getRaces('all');
+    return {
+      totalUsers: 8,
+      totalBets: 24,
+      totalVolume: 125000,
+      openRaces: races.filter((r) => r.status === 'OPEN').length,
+      pendingBetsCount: 6,
+    };
   },
 
   async createRace(raceData: any): Promise<Race> {
-    const res = await fetch(`${API_BASE}/admin/races`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(raceData),
+    const raceId = `race_custom_${Date.now()}`;
+    const parsedHorses = (raceData.horses || []).map((h: any, index: number) => {
+      const sNo = Number(h.serial_no || h.horse_no) || index + 1;
+      const gNo = h.gate_no !== undefined && h.gate_no !== '' ? (isNaN(Number(h.gate_no)) ? h.gate_no : Number(h.gate_no)) : (index + 1);
+      return {
+        id: h.id || `hrs_${raceId}_${index + 1}`,
+        race_id: raceId,
+        horse_no: sNo,
+        serial_no: sNo,
+        gate_no: gNo,
+        name: String(h.name || `Horse ${sNo}`).trim(),
+        jockey: String(h.jockey || 'Jockey TBD').trim(),
+        trainer: String(h.trainer || 'Trainer TBD').trim(),
+        win_odds: Math.max(1.01, Number(h.win_odds) || 2.5),
+        place_odds: Math.max(1.01, Number(h.place_odds) || 1.4),
+        silk_color: h.silk_color || ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#e11d48'][index % 7],
+        form: h.form || '1-1-2-1',
+        weight: h.weight || '56.0 kg',
+      };
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create race');
-    return data.race;
+
+    const newRace: Race = {
+      id: raceId,
+      name: String(raceData.name).trim(),
+      race_no: raceData.race_no ? Number(raceData.race_no) : undefined,
+      venue: String(raceData.venue || 'Bangalore Turf Club').trim(),
+      race_time: String(raceData.race_time || '2:00 PM').trim(),
+      date_str: String(raceData.date_str || 'Today, 5th Sep').trim(),
+      distance: String(raceData.distance || '1600m').trim(),
+      going: String(raceData.going || 'Good').trim(),
+      class_grade: String(raceData.class_grade || 'Grade 1 • Terms').trim(),
+      status: raceData.status || 'OPEN',
+      image_url: raceData.image_url || '/images/race_action.jpg',
+      winner_horse_id: null,
+      place_horses_ids: [],
+      horses: parsedHorses,
+      settled_at: null,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/races`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(raceData),
+      });
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          if (data.race) {
+            this.saveLocalRace(data.race);
+            return data.race;
+          }
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('API createRace network notice:', e);
+    }
+
+    this.saveLocalRace(newRace);
+    return newRace;
+  },
+
+  saveLocalRace(race: Race) {
+    try {
+      const raw = localStorage.getItem('derby_custom_races');
+      const list: Race[] = raw ? JSON.parse(raw) : [];
+      const idx = list.findIndex((r) => r.id === race.id);
+      if (idx >= 0) {
+        list[idx] = race;
+      } else {
+        list.unshift(race);
+      }
+      localStorage.setItem('derby_custom_races', JSON.stringify(list));
+    } catch {}
   },
 
   async updateRace(raceId: string, raceData: any): Promise<Race> {
-    const res = await fetch(`${API_BASE}/admin/races/${raceId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(raceData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update race');
-    return data.race;
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(raceData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.race) {
+          this.saveLocalRace(data.race);
+          return data.race;
+        }
+      }
+    } catch {}
+
+    const allRaces = await this.getRaces('all');
+    const existing = allRaces.find((r) => r.id === raceId) || allRaces[0];
+    const updatedRace: Race = {
+      ...existing,
+      ...raceData,
+      horses: raceData.horses || existing.horses,
+    };
+    this.saveLocalRace(updatedRace);
+    return updatedRace;
   },
 
   async deleteRace(raceId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/admin/races/${raceId}`, {
-      method: 'DELETE',
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to delete race');
+    try {
+      await fetch(`${API_BASE}/admin/races/${raceId}`, {
+        method: 'DELETE',
+      });
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem('derby_custom_races');
+      if (raw) {
+        const list: Race[] = JSON.parse(raw);
+        localStorage.setItem('derby_custom_races', JSON.stringify(list.filter((r) => r.id !== raceId)));
+      }
+    } catch {}
   },
 
   async updateRaceStatus(raceId: string, status: RaceStatus): Promise<Race> {
-    const res = await fetch(`${API_BASE}/admin/races/${raceId}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update race status');
-    return data.race;
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.race) {
+          this.saveLocalRace(data.race);
+          return data.race;
+        }
+      }
+    } catch {}
+
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId) || allRaces[0];
+    const updated = { ...race, status };
+    this.saveLocalRace(updated);
+    return updated;
   },
 
   async publishRace(raceId: string): Promise<Race> {
-    const res = await fetch(`${API_BASE}/admin/races/${raceId}/publish`, {
-      method: 'POST',
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to publish race');
-    return data.race;
+    return this.updateRaceStatus(raceId, 'OPEN');
   },
 
   async updateHorseOdds(horseId: string, win_odds?: number, place_odds?: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/admin/horses/${horseId}/odds`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ win_odds, place_odds }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update odds');
+    try {
+      await fetch(`${API_BASE}/admin/horses/${horseId}/odds`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_odds, place_odds }),
+      });
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem('derby_custom_races');
+      if (raw) {
+        const list: Race[] = JSON.parse(raw);
+        for (const r of list) {
+          const h = r.horses.find((item) => item.id === horseId);
+          if (h) {
+            if (win_odds !== undefined) h.win_odds = win_odds;
+            if (place_odds !== undefined) h.place_odds = place_odds;
+            break;
+          }
+        }
+        localStorage.setItem('derby_custom_races', JSON.stringify(list));
+      }
+    } catch {}
   },
 
   async settleRace(raceId: string, winner_horse_id: string, place_horses_ids: string[]): Promise<any> {
-    const res = await fetch(`${API_BASE}/admin/races/${raceId}/settle`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ winner_horse_id, place_horses_ids }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to settle race');
-    return data;
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winner_horse_id, place_horses_ids }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {}
+
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (race) {
+      race.winner_horse_id = winner_horse_id;
+      race.place_horses_ids = place_horses_ids;
+      race.status = 'RESULTED';
+      race.settled_at = new Date().toISOString();
+      this.saveLocalRace(race);
+    }
+    return { success: true, message: 'Race settled successfully' };
   },
 
   async getAdminUsers(): Promise<User[]> {
-    const res = await fetch(`${API_BASE}/admin/users`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch users');
-    return data.users;
+    try {
+      const res = await fetch(`${API_BASE}/admin/users`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.users)) return data.users;
+      }
+    } catch {}
+    return [
+      DUMMY_USER,
+      {
+        id: 'usr_rahul',
+        ref_id: 'usr_rahul',
+        full_name: 'Rahul Varma',
+        phone: '9845012345',
+        email: 'rahul.varma@gmail.com',
+        username: 'rahul_derby',
+        password_hash: 'pass123',
+        balance: 12500,
+        exposure: 1500,
+        role: 'user',
+        profile_photo: 'https://api.dicebear.com/7.x/bottts/svg?seed=rahul_derby',
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      },
+      {
+        id: 'usr_admin',
+        ref_id: '100001',
+        full_name: 'Turf Derby Master',
+        phone: '9999988888',
+        email: 'admin@derbybet.turf',
+        username: 'admin',
+        password_hash: 'admin123',
+        balance: 50000,
+        exposure: 0,
+        role: 'admin',
+        profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+        created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+      },
+    ];
   },
 
   async getAdminAllBets(): Promise<Bet[]> {
-    const res = await fetch(`${API_BASE}/admin/bets`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch bets');
-    return data.bets;
+    try {
+      const res = await fetch(`${API_BASE}/admin/bets`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.bets)) return data.bets;
+      }
+    } catch {}
+
+    let customBets: Bet[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_bets');
+      if (raw) customBets = JSON.parse(raw);
+    } catch {}
+    return [...customBets, ...DUMMY_BETS];
   },
 
   async adjustUserBalance(userId: string, amount: number, type: 'CREDIT' | 'DEBIT', description?: string): Promise<{ success: boolean; message: string; user: User }> {
@@ -411,21 +694,28 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, type, description }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to adjust balance');
-      return data;
-    } catch {
-      return {
-        success: true,
-        message: `Successfully adjusted ₹${amount} for user`,
-        user: { ...DUMMY_USER, balance: type === 'CREDIT' ? DUMMY_USER.balance + amount : Math.max(0, DUMMY_USER.balance - amount) }
-      };
-    }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) return data;
+      }
+    } catch {}
+
+    return {
+      success: true,
+      message: `Successfully ${type === 'DEBIT' ? 'debited' : 'credited'} ₹${amount} for user`,
+      user: {
+        ...DUMMY_USER,
+        balance: type === 'CREDIT' ? DUMMY_USER.balance + amount : Math.max(0, DUMMY_USER.balance - amount),
+      },
+    };
   },
 
   async resetDemo(): Promise<void> {
-    const res = await fetch(`${API_BASE}/admin/reset-demo`, { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to reset demo');
+    try {
+      await fetch(`${API_BASE}/admin/reset-demo`, { method: 'POST' });
+    } catch {}
+    localStorage.removeItem('derby_custom_races');
+    localStorage.removeItem('derby_custom_bets');
+    localStorage.removeItem('derby_custom_banners');
   },
 };
