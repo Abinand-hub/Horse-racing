@@ -109,6 +109,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newBannerLink, setNewBannerLink] = useState('#deposit');
   const [newBannerTag, setNewBannerTag] = useState('WEEKEND SPECIAL');
 
+  // User Balance Adjustment state
+  const [balanceModalUser, setBalanceModalUser] = useState<User | null>(null);
+  const [balanceModalAmount, setBalanceModalAmount] = useState<string>('1000');
+  const [balanceModalType, setBalanceModalType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [balanceModalDesc, setBalanceModalDesc] = useState<string>('');
+
   // Load Admin Data
   const loadAdminData = async () => {
     try {
@@ -131,6 +137,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     loadAdminData();
   }, []);
+
+  const handleAdjustUserBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!balanceModalUser) return;
+    const amount = Number(balanceModalAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setActionMessage('Please enter a valid amount');
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const res = await api.adjustUserBalance(balanceModalUser.id, amount, balanceModalType, balanceModalDesc);
+      setActionMessage(res.message);
+      setBalanceModalUser(null);
+      setBalanceModalAmount('1000');
+      setBalanceModalDesc('');
+      await loadAdminData();
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to adjust user balance');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleStatusChange = async (raceId: string, status: RaceStatus) => {
     try {
@@ -1347,11 +1376,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 5: All Users */}
+      {/* TAB 5: All Users & Wallet Operations */}
       {activeTab === 'users' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 overflow-x-auto space-y-3">
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 overflow-x-auto space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-white">Registered Users & Wallet Balances</h2>
+            <div>
+              <h2 className="text-base font-bold text-white">Registered Users & Wallet Balances</h2>
+              <p className="text-xs text-slate-400">View user exposure, approve transaction adjustments, credit or debit balances</p>
+            </div>
             <span className="text-xs text-slate-400">{users.length} Users</span>
           </div>
 
@@ -1364,6 +1396,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <th className="py-2.5 px-3">Balance</th>
                 <th className="py-2.5 px-3">Exposure</th>
                 <th className="py-2.5 px-3">Registered</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -1381,10 +1414,105 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <td className="py-3 px-3 font-mono font-bold text-emerald-400">₹{u.balance.toLocaleString()}</td>
                   <td className="py-3 px-3 font-mono text-rose-400">₹{u.exposure.toLocaleString()}</td>
                   <td className="py-3 px-3 text-slate-500">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="py-3 px-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => {
+                          setBalanceModalUser(u);
+                          setBalanceModalType('CREDIT');
+                          setBalanceModalAmount('1000');
+                        }}
+                        className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-bold text-[10px] transition cursor-pointer border border-emerald-500/30"
+                      >
+                        + Credit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setBalanceModalUser(u);
+                          setBalanceModalType('DEBIT');
+                          setBalanceModalAmount('500');
+                        }}
+                        className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-[10px] transition cursor-pointer border border-rose-500/30"
+                      >
+                        - Debit
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* Balance Adjustment Modal */}
+          {balanceModalUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-emerald-400" />
+                    <span>{balanceModalType === 'CREDIT' ? 'Credit Balance' : 'Debit Balance'}</span>
+                  </h3>
+                  <button
+                    onClick={() => setBalanceModalUser(null)}
+                    className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white text-xs"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1 text-xs">
+                  <p className="text-slate-400">User: <strong className="text-white">@{balanceModalUser.username}</strong></p>
+                  <p className="text-slate-400">Current Balance: <strong className="text-emerald-400 font-mono">₹{balanceModalUser.balance.toLocaleString()}</strong></p>
+                </div>
+
+                <form onSubmit={handleAdjustUserBalance} className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Amount (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={balanceModalAmount}
+                      onChange={(e) => setBalanceModalAmount(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Reason / Note (Optional)</label>
+                    <input
+                      type="text"
+                      value={balanceModalDesc}
+                      onChange={(e) => setBalanceModalDesc(e.target.value)}
+                      placeholder="e.g. Approved Deposit / Bonus / Adjustment"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setBalanceModalUser(null)}
+                      className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                        balanceModalType === 'CREDIT'
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-rose-600 hover:bg-rose-500 text-white'
+                      }`}
+                    >
+                      Confirm {balanceModalType === 'CREDIT' ? 'Credit' : 'Debit'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

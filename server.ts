@@ -1475,7 +1475,49 @@ app.get('/api/admin/bets', (req, res) => {
   return res.json({ success: true, bets: db.bets });
 });
 
-// 8. Admin Reset Demo Data
+// 8. Admin Adjust User Balance (Credit/Debit / Approve Transaction)
+app.post('/api/admin/users/:id/adjust-balance', (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const { amount, type, description } = req.body;
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid adjustment amount' });
+  }
+
+  if (type === 'DEBIT' && user.balance < numAmount) {
+    return res.status(400).json({ error: 'Insufficient balance to debit' });
+  }
+
+  if (type === 'DEBIT') {
+    user.balance -= numAmount;
+  } else {
+    user.balance += numAmount;
+  }
+
+  const newTx: Transaction = {
+    id: `tx_adm_${Date.now()}`,
+    user_id: user.id,
+    username: user.username,
+    type: type === 'DEBIT' ? 'WITHDRAW' : 'DEPOSIT',
+    amount: numAmount,
+    balance_after: user.balance,
+    description: description || `Admin ${type === 'DEBIT' ? 'Debit' : 'Credit'} Adjustment`,
+    created_at: new Date().toISOString(),
+  };
+
+  db.transactions.unshift(newTx);
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Successfully ${type === 'DEBIT' ? 'debited' : 'credited'} ₹${numAmount} for @${user.username}`,
+    user,
+  });
+});
+
+// 9. Admin Reset Demo Data
 app.post('/api/admin/reset-demo', (req, res) => {
   db = JSON.parse(JSON.stringify(defaultData));
   saveDatabase();
