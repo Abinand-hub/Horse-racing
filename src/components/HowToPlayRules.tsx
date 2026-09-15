@@ -65,10 +65,10 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
       </div>
 
       {/* Rules Sub-Navigation Tabs */}
-      <div className="flex items-center gap-2 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 overflow-x-auto text-xs font-bold">
+      <div className="flex items-center gap-2 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 overflow-x-auto scrollbar-none text-xs font-bold">
         <button
           onClick={() => setActiveSubTab('basics')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeSubTab === 'basics'
               ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -80,7 +80,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
 
         <button
           onClick={() => setActiveSubTab('win_place')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeSubTab === 'win_place'
               ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -92,7 +92,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
 
         <button
           onClick={() => setActiveSubTab('exposure')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeSubTab === 'exposure'
               ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -104,7 +104,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
 
         <button
           onClick={() => setActiveSubTab('terms')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeSubTab === 'terms'
               ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-sm'
               : 'text-slate-400 hover:text-white'

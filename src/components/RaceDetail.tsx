@@ -211,14 +211,14 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
       {/* ---------------- TABS: RUNNERS & ODDS / 2D SIMULATOR / AI INSIGHTS / MY BETS ---------------- */}
       <div className="flex flex-wrap items-center justify-between border-b border-slate-800 gap-2 pb-2">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none w-full lg:w-auto">
           <button
             id="tab-runners-btn"
             onClick={() => {
               soundManager.playClick();
               setActiveTab('runners');
             }}
-            className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'runners'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
@@ -237,7 +237,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               soundManager.playClick();
               setActiveTab('simulator');
             }}
-            className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'simulator'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
@@ -253,7 +253,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               soundManager.playClick();
               setActiveTab('insights');
             }}
-            className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'insights'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
@@ -269,7 +269,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               soundManager.playClick();
               setActiveTab('mybets');
             }}
-            className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'mybets'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
@@ -303,27 +303,27 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
           {/* TABLE - 4 COLUMNS: No | Horse Name | Win Odds | Place Odds */}
           <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto scrollbar-none">
+              <table className="w-full min-w-[340px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-950 border-b border-slate-800 text-xs font-black uppercase tracking-wider text-slate-400">
-                    <th className="py-4 px-3 sm:px-5 w-16 text-center">No</th>
-                    <th className="py-4 px-4 sm:px-6">Horse Name & Info</th>
-                    <th className="py-4 px-3 sm:px-6 text-center w-36 sm:w-48">
+                    <th className="py-3 sm:py-4 px-2 sm:px-4 w-12 sm:w-16 text-center">No</th>
+                    <th className="py-3 sm:py-4 px-2.5 sm:px-6">Horse Name & Info</th>
+                    <th className="py-3 sm:py-4 px-1.5 sm:px-6 text-center w-24 sm:w-44">
                       <div className="flex flex-col items-center">
-                        <span className="text-white font-black text-sm">Win Odds</span>
-                        <span className="text-[10px] text-amber-400 lowercase font-medium">must finish 1st</span>
+                        <span className="text-white font-black text-xs sm:text-sm">Win Odds</span>
+                        <span className="text-[9px] sm:text-[10px] text-amber-400 lowercase font-medium">must finish 1st</span>
                       </div>
                     </th>
-                    <th className="py-4 px-3 sm:px-6 text-center w-36 sm:w-48">
+                    <th className="py-3 sm:py-4 px-1.5 sm:px-6 text-center w-24 sm:w-44">
                       <div className="flex flex-col items-center">
-                        <span className="text-white font-black text-sm">Place Odds</span>
-                        <span className="text-[10px] text-emerald-400 lowercase font-medium">top 3 finish</span>
+                        <span className="text-white font-black text-xs sm:text-sm">Place Odds</span>
+                        <span className="text-[9px] sm:text-[10px] text-emerald-400 lowercase font-medium">top 3 finish</span>
                       </div>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-sm">
+                <tbody className="divide-y divide-slate-800/60 text-xs sm:text-sm">
                   {race.horses.map((horse) => {
                     const isWinner = race.winner_horse_id === horse.id;
                     const isPlaced = race.place_horses_ids?.includes(horse.id);
@@ -337,46 +337,46 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                         }`}
                       >
                         {/* Column 1: No */}
-                        <td className="py-4 px-3 sm:px-5 text-center align-middle">
-                          <div className="inline-flex items-center justify-center w-9 h-9 rounded-2xl font-black text-sm bg-slate-950 border border-slate-800 text-amber-400 shadow-inner font-mono">
+                        <td className="py-3 sm:py-4 px-2 sm:px-4 text-center align-middle">
+                          <div className="inline-flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm bg-slate-950 border border-slate-800 text-amber-400 shadow-inner font-mono">
                             {horse.horse_no}
                           </div>
                         </td>
 
                         {/* Column 2: Horse Name */}
-                        <td className="py-4 px-4 sm:px-6 align-middle">
-                          <div className="flex items-center gap-3.5">
+                        <td className="py-3 sm:py-4 px-2.5 sm:px-6 align-middle min-w-[130px]">
+                          <div className="flex items-center gap-2.5 sm:gap-3.5">
                             <SilkIcon
                               color={horse.silk_color}
                               number={horse.horse_no}
                               size="md"
                             />
 
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-extrabold text-white text-base tracking-tight hover:text-rose-400 transition">
+                            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <span className="font-extrabold text-white text-xs sm:text-base tracking-tight hover:text-rose-400 transition">
                                   {horse.name}
                                 </span>
                                 {isWinner && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase shadow">
-                                    <Trophy className="w-3 h-3" /> Winner
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] uppercase shadow">
+                                    <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Winner
                                   </span>
                                 )}
                                 {!isWinner && isPlaced && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[10px] uppercase">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[9px] sm:text-[10px] uppercase">
                                     Placed
                                   </span>
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-slate-400">
                                 <span>J: <strong className="text-slate-200">{horse.jockey}</strong></span>
                                 <span>•</span>
                                 <span>T: <strong className="text-slate-300">{horse.trainer}</strong></span>
                                 {horse.form && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-amber-400 font-mono font-bold text-[11px] bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+                                    <span className="text-amber-400 font-mono font-bold text-[10px] sm:text-[11px] bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
                                       Form: {horse.form}
                                     </span>
                                   </>
@@ -384,7 +384,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                                 {horse.weight && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-slate-500 font-mono">{horse.weight}</span>
+                                    <span className="text-slate-500 font-mono hidden sm:inline">{horse.weight}</span>
                                   </>
                                 )}
                               </div>
@@ -393,42 +393,42 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                         </td>
 
                         {/* Column 3: Win Odds (Clickable Button) */}
-                        <td className="py-4 px-3 sm:px-6 text-center align-middle">
+                        <td className="py-3 sm:py-4 px-1.5 sm:px-6 text-center align-middle">
                           <button
                             id={`win-odds-btn-${horse.id}`}
                             disabled={!isOpen}
                             onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
-                            className={`w-full py-3 px-4 rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
+                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
                               isOpen
                                 ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-emerald-900/40 hover:scale-[1.02]'
                                 : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                             }`}
                           >
-                            <span className="block text-base tracking-tight font-black font-mono">
+                            <span className="block text-sm sm:text-base tracking-tight font-black font-mono">
                               {formatOdds(horse.win_odds, oddsFormat)}
                             </span>
-                            <span className="text-[10px] uppercase tracking-wider block font-bold opacity-90">
+                            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider block font-bold opacity-90">
                               WIN
                             </span>
                           </button>
                         </td>
 
                         {/* Column 4: Place Odds (Clickable Button) */}
-                        <td className="py-4 px-3 sm:px-6 text-center align-middle">
+                        <td className="py-3 sm:py-4 px-1.5 sm:px-6 text-center align-middle">
                           <button
                             id={`place-odds-btn-${horse.id}`}
                             disabled={!isOpen}
                             onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
-                            className={`w-full py-3 px-4 rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
+                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
                               isOpen
                                 ? 'bg-[#091510] hover:bg-[#18160c] text-[#e5b869] hover:text-[#f2d08a] border border-[#e5b869]/60 hover:border-[#e5b869] shadow-[0_0_10px_rgba(229,184,105,0.2)] hover:scale-[1.02]'
                                 : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                             }`}
                           >
-                            <span className="block text-base tracking-tight font-black font-mono">
+                            <span className="block text-sm sm:text-base tracking-tight font-black font-mono">
                               {formatOdds(horse.place_odds, oddsFormat)}
                             </span>
-                            <span className="text-[10px] uppercase tracking-wider block font-bold opacity-90">
+                            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider block font-bold opacity-90">
                               PLACE
                             </span>
                           </button>

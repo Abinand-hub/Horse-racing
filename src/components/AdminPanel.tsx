@@ -480,11 +480,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* Admin Tabs */}
-      <div className="flex items-center gap-1 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto text-xs font-bold">
+      <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
         <button
           id="admin-tab-races"
           onClick={() => setActiveTab('races')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'races'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -497,7 +497,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-odds"
           onClick={() => setActiveTab('odds')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'odds'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -510,7 +510,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-add-race"
           onClick={() => setActiveTab('add_race')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'add_race'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -523,7 +523,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-banners"
           onClick={() => setActiveTab('banners')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'banners'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -536,7 +536,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-users"
           onClick={() => setActiveTab('users')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'users'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -549,7 +549,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-bets"
           onClick={() => setActiveTab('bets')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'bets'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
@@ -1099,14 +1099,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {newHorses.map((horse, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-950 p-3 rounded-xl border border-slate-800/90 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center text-xs"
+                  className="bg-slate-950 p-3 sm:p-3.5 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
                 >
                   {/* Serial Number (S.No) */}
-                  <div className="sm:col-span-1">
+                  <div className="col-span-1 sm:col-span-1">
                     <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">S.No</label>
                     <input
                       type="number"
@@ -1117,13 +1117,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].serial_no = parseInt(e.target.value) || 0;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-center"
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-center text-xs"
                       placeholder="S.No"
                     />
                   </div>
 
                   {/* Gate Number (Draw) */}
-                  <div className="sm:col-span-1">
+                  <div className="col-span-1 sm:col-span-1">
                     <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Gate</label>
                     <input
                       type="text"
@@ -1134,13 +1134,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].gate_no = e.target.value;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center"
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center text-xs"
                       placeholder="Gate"
                     />
                   </div>
 
                   {/* Horse Name */}
-                  <div className="sm:col-span-3">
+                  <div className="col-span-2 sm:col-span-3">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                       Name of the Horse <span className="text-rose-400">*</span>
                     </label>
@@ -1153,13 +1153,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].name = e.target.value;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold"
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs"
                       placeholder="Horse Name"
                     />
                   </div>
 
                   {/* Jockey Name */}
-                  <div className="sm:col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                       Jockey Name <span className="text-rose-400">*</span>
                     </label>
@@ -1172,13 +1172,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].jockey = e.target.value;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
                       placeholder="Jockey"
                     />
                   </div>
 
                   {/* Trainer Name */}
-                  <div className="sm:col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                       Trainer Name <span className="text-rose-400">*</span>
                     </label>
@@ -1191,13 +1191,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].trainer = e.target.value;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
                       placeholder="Trainer"
                     />
                   </div>
 
                   {/* Win Odds */}
-                  <div className="sm:col-span-1">
+                  <div className="col-span-1 sm:col-span-1">
                     <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Win</label>
                     <input
                       type="number"
@@ -1209,13 +1209,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].win_odds = parseFloat(e.target.value) || 1.05;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center"
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center text-xs"
                       placeholder="Win"
                     />
                   </div>
 
                   {/* Place Odds */}
-                  <div className="sm:col-span-1">
+                  <div className="col-span-1 sm:col-span-1">
                     <label className="block text-[10px] text-emerald-400 font-semibold mb-0.5">Place</label>
                     <input
                       type="number"
@@ -1227,13 +1227,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].place_odds = parseFloat(e.target.value) || 1.02;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center"
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center text-xs"
                       placeholder="Place"
                     />
                   </div>
 
                   {/* Actions / Delete Row */}
-                  <div className="sm:col-span-1 flex items-end justify-center pt-2 sm:pt-0">
+                  <div className="col-span-2 sm:col-span-1 flex items-center justify-end sm:justify-center pt-1 sm:pt-0">
                     <button
                       type="button"
                       disabled={newHorses.length <= 1}
@@ -1241,10 +1241,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         if (newHorses.length <= 1) return;
                         setNewHorses(newHorses.filter((_, i) => i !== idx));
                       }}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
                       title="Remove runner"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
+                      <span className="sm:hidden text-[10px] text-rose-400 font-semibold">Delete</span>
                     </button>
                   </div>
                 </div>
@@ -1378,7 +1379,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* TAB 5: All Users & Wallet Operations */}
       {activeTab === 'users' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 overflow-x-auto space-y-4">
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-white">Registered Users & Wallet Balances</h2>
@@ -1387,61 +1388,63 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <span className="text-xs text-slate-400">{users.length} Users</span>
           </div>
 
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase font-semibold">
-                <th className="py-2.5 px-3">User</th>
-                <th className="py-2.5 px-3">Phone</th>
-                <th className="py-2.5 px-3">Role</th>
-                <th className="py-2.5 px-3">Balance</th>
-                <th className="py-2.5 px-3">Exposure</th>
-                <th className="py-2.5 px-3">Registered</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-850/50">
-                  <td className="py-3 px-3 font-bold text-white">@{u.username}</td>
-                  <td className="py-3 px-3 text-slate-300">{u.phone}</td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      u.role === 'admin' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-300'
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 font-mono font-bold text-emerald-400">₹{u.balance.toLocaleString()}</td>
-                  <td className="py-3 px-3 font-mono text-rose-400">₹{u.exposure.toLocaleString()}</td>
-                  <td className="py-3 px-3 text-slate-500">{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => {
-                          setBalanceModalUser(u);
-                          setBalanceModalType('CREDIT');
-                          setBalanceModalAmount('1000');
-                        }}
-                        className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-bold text-[10px] transition cursor-pointer border border-emerald-500/30"
-                      >
-                        + Credit
-                      </button>
-                      <button
-                        onClick={() => {
-                          setBalanceModalUser(u);
-                          setBalanceModalType('DEBIT');
-                          setBalanceModalAmount('500');
-                        }}
-                        className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-[10px] transition cursor-pointer border border-rose-500/30"
-                      >
-                        - Debit
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
+            <table className="w-full min-w-[650px] text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                  <th className="py-2.5 px-3">User</th>
+                  <th className="py-2.5 px-3">Phone</th>
+                  <th className="py-2.5 px-3">Role</th>
+                  <th className="py-2.5 px-3">Balance</th>
+                  <th className="py-2.5 px-3">Exposure</th>
+                  <th className="py-2.5 px-3">Registered</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-850/50">
+                    <td className="py-3 px-3 font-bold text-white">@{u.username}</td>
+                    <td className="py-3 px-3 text-slate-300">{u.phone}</td>
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        u.role === 'admin' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-mono font-bold text-emerald-400">₹{u.balance.toLocaleString()}</td>
+                    <td className="py-3 px-3 font-mono text-rose-400">₹{u.exposure.toLocaleString()}</td>
+                    <td className="py-3 px-3 text-slate-500">{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td className="py-3 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            setBalanceModalUser(u);
+                            setBalanceModalType('CREDIT');
+                            setBalanceModalAmount('1000');
+                          }}
+                          className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-bold text-[10px] transition cursor-pointer border border-emerald-500/30"
+                        >
+                          + Credit
+                        </button>
+                        <button
+                          onClick={() => {
+                            setBalanceModalUser(u);
+                            setBalanceModalType('DEBIT');
+                            setBalanceModalAmount('500');
+                          }}
+                          className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-[10px] transition cursor-pointer border border-rose-500/30"
+                        >
+                          - Debit
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Balance Adjustment Modal */}
           {balanceModalUser && (
@@ -1518,62 +1521,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* TAB 6: Global Bets Book */}
       {activeTab === 'bets' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 overflow-x-auto space-y-3">
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white">Platform Bets Ledger (Audit Trail)</h2>
             <span className="text-xs text-slate-400">{allBets.length} Bets Placed</span>
           </div>
 
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 uppercase font-semibold">
-                <th className="py-2.5 px-3">Time</th>
-                <th className="py-2.5 px-3">Bettor</th>
-                <th className="py-2.5 px-3">Race</th>
-                <th className="py-2.5 px-3">Runner</th>
-                <th className="py-2.5 px-3">Type</th>
-                <th className="py-2.5 px-3">Odds</th>
-                <th className="py-2.5 px-3">Stake</th>
-                <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3">Payout</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {allBets.map((b) => (
-                <tr key={b.id} className="hover:bg-slate-850/50">
-                  <td className="py-2.5 px-3 text-slate-400">
-                    {new Date(b.placed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="py-2.5 px-3 font-semibold text-white">@{b.username || b.user_id}</td>
-                  <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate">{b.race_name}</td>
-                  <td className="py-2.5 px-3 font-bold text-white">#{b.horse_no} {b.horse_name}</td>
-                  <td className="py-2.5 px-3">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
-                      {b.bet_type}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}</td>
-                  <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
-                  <td className="py-2.5 px-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        b.status === 'WON'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : b.status === 'LOST'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : 'bg-amber-500/20 text-amber-400'
-                      }`}
-                    >
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                    {b.payout ? `+₹${b.payout.toLocaleString()}` : '-'}
-                  </td>
+          <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
+            <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                  <th className="py-2.5 px-3">Time</th>
+                  <th className="py-2.5 px-3">Bettor</th>
+                  <th className="py-2.5 px-3">Race</th>
+                  <th className="py-2.5 px-3">Runner</th>
+                  <th className="py-2.5 px-3">Type</th>
+                  <th className="py-2.5 px-3">Odds</th>
+                  <th className="py-2.5 px-3">Stake</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Payout</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {allBets.map((b) => (
+                  <tr key={b.id} className="hover:bg-slate-850/50">
+                    <td className="py-2.5 px-3 text-slate-400">
+                      {new Date(b.placed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="py-2.5 px-3 font-semibold text-white">@{b.username || b.user_id}</td>
+                    <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate">{b.race_name}</td>
+                    <td className="py-2.5 px-3 font-bold text-white">#{b.horse_no} {b.horse_name}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
+                        {b.bet_type}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          b.status === 'WON'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : b.status === 'LOST'
+                            ? 'bg-rose-500/20 text-rose-400'
+                            : 'bg-amber-500/20 text-amber-400'
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                      {b.payout ? `+₹${b.payout.toLocaleString()}` : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1848,14 +1853,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {editHorses.map((horse, idx) => (
                     <div
                       key={horse.id || idx}
-                      className="bg-slate-950 p-3 rounded-xl border border-slate-800/90 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center text-xs"
+                      className="bg-slate-950 p-3 sm:p-3.5 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
                     >
                       {/* Serial Number */}
-                      <div className="sm:col-span-1">
+                      <div className="col-span-1 sm:col-span-1">
                         <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">S.No</label>
                         <input
                           type="number"
@@ -1866,12 +1871,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].serial_no = parseInt(e.target.value) || 0;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-center"
+                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-center text-xs"
                         />
                       </div>
 
                       {/* Gate Number */}
-                      <div className="sm:col-span-1">
+                      <div className="col-span-1 sm:col-span-1">
                         <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Gate</label>
                         <input
                           type="text"
@@ -1882,12 +1887,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].gate_no = e.target.value;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center"
+                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-center text-xs"
                         />
                       </div>
 
                       {/* Name of the Horse */}
-                      <div className="sm:col-span-3">
+                      <div className="col-span-2 sm:col-span-3">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                           Name of the Horse <span className="text-rose-400">*</span>
                         </label>
@@ -1900,12 +1905,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].name = e.target.value;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs"
                         />
                       </div>
 
                       {/* Name of the Jockey */}
-                      <div className="sm:col-span-2">
+                      <div className="col-span-1 sm:col-span-2">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                           Name of the Jockey <span className="text-rose-400">*</span>
                         </label>
@@ -1918,12 +1923,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].jockey = e.target.value;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
                         />
                       </div>
 
                       {/* Name of the Trainer */}
-                      <div className="sm:col-span-2">
+                      <div className="col-span-1 sm:col-span-2">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                           Name of the Trainer <span className="text-rose-400">*</span>
                         </label>
@@ -1936,12 +1941,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].trainer = e.target.value;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
                         />
                       </div>
 
                       {/* Win Odds */}
-                      <div className="sm:col-span-1">
+                      <div className="col-span-1 sm:col-span-1">
                         <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Win</label>
                         <input
                           type="number"
@@ -1953,12 +1958,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].win_odds = parseFloat(e.target.value) || 1.05;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center"
+                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center text-xs"
                         />
                       </div>
 
                       {/* Place Odds */}
-                      <div className="sm:col-span-1">
+                      <div className="col-span-1 sm:col-span-1">
                         <label className="block text-[10px] text-emerald-400 font-semibold mb-0.5">Place</label>
                         <input
                           type="number"
@@ -1970,12 +1975,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].place_odds = parseFloat(e.target.value) || 1.02;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center"
+                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center text-xs"
                         />
                       </div>
 
                       {/* Remove Button */}
-                      <div className="sm:col-span-1 flex items-end justify-center pt-2 sm:pt-0">
+                      <div className="col-span-2 sm:col-span-1 flex items-center justify-end sm:justify-center pt-1 sm:pt-0">
                         <button
                           type="button"
                           disabled={editHorses.length <= 1}
@@ -1983,10 +1988,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             if (editHorses.length <= 1) return;
                             setEditHorses(editHorses.filter((_, i) => i !== idx));
                           }}
-                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
                           title="Remove runner"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
+                          <span className="sm:hidden text-[10px] text-rose-400 font-semibold">Delete</span>
                         </button>
                       </div>
                     </div>
