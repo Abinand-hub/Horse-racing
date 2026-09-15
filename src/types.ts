@@ -1,6 +1,6 @@
 export type BetType = 'WIN' | 'PLACE';
 export type BetStatus = 'PENDING' | 'WON' | 'LOST';
-export type RaceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'RESULTED';
+export type RaceStatus = 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED';
 export type TransactionType = 'DEPOSIT' | 'WITHDRAW' | 'BET' | 'WIN' | 'REFUND';
 
 export interface User {

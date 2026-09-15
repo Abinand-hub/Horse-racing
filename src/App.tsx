@@ -43,7 +43,7 @@ export default function App() {
   // Navigation & View state - Default home is How to Play & Rules
   const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('rules');
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
-  const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'open' | 'resulted'>('open');
+  const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('upcoming');
   const [isLoadingRaces, setIsLoadingRaces] = useState(true);
   const [isLoadingBets, setIsLoadingBets] = useState(false);
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);

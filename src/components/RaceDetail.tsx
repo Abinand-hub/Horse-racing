@@ -57,7 +57,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
         .filter(Boolean) as Horse[]
     : [];
 
-  const isOpen = race.status === 'OPEN';
+  const isOpen = race.status === 'OPEN' || race.status === 'UPCOMING' || race.status === 'LIVE';
 
   const handleOddsClick = (horse: Horse, betType: BetType, odds: number) => {
     soundManager.playChip();
@@ -87,10 +87,16 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
         {/* Live Status Badge */}
         <div className="flex items-center gap-2">
-          {race.status === 'OPEN' && (
+          {race.status === 'LIVE' && (
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              🔴 Live In-Play
+            </span>
+          )}
+          {(race.status === 'OPEN' || race.status === 'UPCOMING') && (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-black uppercase tracking-wider shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live Betting Open
+              <Clock className="w-3.5 h-3.5" />
+              ⏱ Upcoming (Pre-Match Market)
             </span>
           )}
           {race.status === 'CLOSED' && (

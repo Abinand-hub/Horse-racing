@@ -27,8 +27,8 @@ import {
 interface RaceListProps {
   races: Race[];
   onSelectRace: (raceId: string) => void;
-  filterStatus: 'all' | 'upcoming' | 'open' | 'resulted';
-  onChangeFilter: (status: 'all' | 'upcoming' | 'open' | 'resulted') => void;
+  filterStatus: 'all' | 'upcoming' | 'live' | 'resulted';
+  onChangeFilter: (status: 'all' | 'upcoming' | 'live' | 'resulted') => void;
   isLoading: boolean;
   oddsFormat?: OddsFormat;
   onOpenSearch?: () => void;
@@ -68,24 +68,38 @@ export const RaceList: React.FC<RaceListProps> = ({
     }
 
     if (filterStatus === 'upcoming') {
-      return race.status === 'OPEN' || race.status === 'CLOSED';
+      return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
     }
-    if (filterStatus === 'open') {
-      return race.status === 'OPEN';
+    if (filterStatus === 'live') {
+      return race.status === 'LIVE';
     }
     if (filterStatus === 'resulted') {
-      return race.status === 'RESULTED';
+      return race.status === 'RESULTED' || race.status === 'CLOSED';
     }
     return true;
   });
 
   const getStatusBadge = (status: RaceStatus) => {
     switch (status) {
+      case 'LIVE':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            🔴 LIVE IN-PLAY
+          </span>
+        );
       case 'OPEN':
+      case 'UPCOMING':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-black uppercase tracking-wider shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Live Open
+            <Clock className="w-3.5 h-3.5" />
+            ⏱ Upcoming
+          </span>
+        );
+      case 'DRAFT':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/50 text-slate-300 border border-slate-600/50 text-xs font-bold uppercase tracking-wider">
+            📝 Draft
           </span>
         );
       case 'CLOSED':
@@ -137,23 +151,69 @@ export const RaceList: React.FC<RaceListProps> = ({
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 text-xs font-bold overflow-x-auto scrollbar-none shadow-inner">
-          {(['all', 'upcoming', 'open', 'resulted'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => {
-                soundManager.playClick();
-                onChangeFilter(status);
-              }}
-              className={`px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-                filterStatus === status
-                  ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
-                  : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
-              }`}
-            >
-              {status === 'all' ? `All Races (${races.length})` : status === 'upcoming' ? 'Upcoming' : status === 'open' ? 'Live Open' : 'Settled Results'}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 bg-[#091510] p-1.5 rounded-2xl border border-emerald-900/50 text-xs font-bold overflow-x-auto scrollbar-none shadow-inner">
+          <button
+            id="tab-filter-upcoming"
+            onClick={() => {
+              soundManager.playClick();
+              onChangeFilter('upcoming');
+            }}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'upcoming'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Upcoming Matches ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+          </button>
+
+          <button
+            id="tab-filter-live"
+            onClick={() => {
+              soundManager.playClick();
+              onChangeFilter('live');
+            }}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'live'
+                ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white font-black shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse'
+                : 'text-rose-400 hover:text-rose-200 hover:bg-rose-950/40'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            <span>🔴 Live Matches ({races.filter((r) => r.status === 'LIVE').length})</span>
+          </button>
+
+          <button
+            id="tab-filter-resulted"
+            onClick={() => {
+              soundManager.playClick();
+              onChangeFilter('resulted');
+            }}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'resulted'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Completed Matches ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+          </button>
+
+          <button
+            id="tab-filter-all"
+            onClick={() => {
+              soundManager.playClick();
+              onChangeFilter('all');
+            }}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              filterStatus === 'all'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
+            }`}
+          >
+            <span>All Races ({races.length})</span>
+          </button>
         </div>
       </div>
 

@@ -111,7 +111,7 @@ export const api = {
   },
 
   // Races
-  async getRaces(status?: 'upcoming' | 'open' | 'resulted' | 'all'): Promise<Race[]> {
+  async getRaces(status?: 'upcoming' | 'open' | 'live' | 'resulted' | 'all'): Promise<Race[]> {
     let customRaces: Race[] = [];
     try {
       const raw = localStorage.getItem('derby_custom_races');
@@ -133,12 +133,14 @@ export const api = {
                 data.races.unshift(cr);
               }
             }
-            if (status === 'open') {
-              return data.races.filter((r: Race) => r.status === 'OPEN');
+            if (status === 'live') {
+              return data.races.filter((r: Race) => r.status === 'LIVE');
+            } else if (status === 'open') {
+              return data.races.filter((r: Race) => r.status === 'OPEN' || r.status === 'UPCOMING' || r.status === 'LIVE');
             } else if (status === 'upcoming') {
-              return data.races.filter((r: Race) => r.status === 'OPEN' || r.status === 'CLOSED');
+              return data.races.filter((r: Race) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT');
             } else if (status === 'resulted') {
-              return data.races.filter((r: Race) => r.status === 'RESULTED');
+              return data.races.filter((r: Race) => r.status === 'RESULTED' || r.status === 'CLOSED');
             }
             return data.races;
           }
@@ -151,12 +153,14 @@ export const api = {
     // Combine custom races with dummy races
     const allRaces = [...customRaces, ...DUMMY_RACES.filter((dr) => !customRaces.some((cr) => cr.id === dr.id))];
 
-    if (status === 'open') {
-      return allRaces.filter((r) => r.status === 'OPEN');
+    if (status === 'live') {
+      return allRaces.filter((r) => r.status === 'LIVE');
+    } else if (status === 'open') {
+      return allRaces.filter((r) => r.status === 'OPEN' || r.status === 'UPCOMING' || r.status === 'LIVE');
     } else if (status === 'upcoming') {
-      return allRaces.filter((r) => r.status === 'OPEN' || r.status === 'CLOSED');
+      return allRaces.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT');
     } else if (status === 'resulted') {
-      return allRaces.filter((r) => r.status === 'RESULTED');
+      return allRaces.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED');
     }
     return allRaces;
   },

@@ -23,7 +23,9 @@ import {
   FileText,
   MapPin,
   Clock,
-  RotateCcw
+  RotateCcw,
+  Flame,
+  Play
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -66,6 +68,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshData,
 }) => {
   const [activeTab, setActiveTab] = useState<'races' | 'odds' | 'add_race' | 'banners' | 'users' | 'bets'>('races');
+  const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [users, setUsers] = useState<User[]>([]);
   const [allBets, setAllBets] = useState<Bet[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -87,7 +90,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newGoing, setNewGoing] = useState(HANDWRITTEN_SHEET_PRESET.going);
   const [newClassGrade, setNewClassGrade] = useState(HANDWRITTEN_SHEET_PRESET.class_grade);
   const [newRaceImage, setNewRaceImage] = useState('/images/race_action.jpg');
-  const [newRaceStatus, setNewRaceStatus] = useState<RaceStatus>('OPEN');
+  const [newRaceStatus, setNewRaceStatus] = useState<RaceStatus>('UPCOMING');
   const [newHorses, setNewHorses] = useState([...HANDWRITTEN_SHEET_PRESET.horses]);
 
   // Edit Race Modal state (Manual Edit)
@@ -100,7 +103,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editGoing, setEditGoing] = useState('');
   const [editClassGrade, setEditClassGrade] = useState('');
   const [editRaceImage, setEditRaceImage] = useState('/images/race_action.jpg');
-  const [editRaceStatus, setEditRaceStatus] = useState<RaceStatus>('OPEN');
+  const [editRaceStatus, setEditRaceStatus] = useState<RaceStatus>('UPCOMING');
   const [editHorses, setEditHorses] = useState<any[]>([]);
 
   // Add Banner Form state
@@ -216,14 +219,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleMakeMatchLive = async (race: Race) => {
+    try {
+      setIsLoading(true);
+      await api.updateRaceStatus(race.id, 'LIVE');
+      soundManager.playRaceBugle();
+      setActionMessage(`⚡ Race "${race.name}" is now LIVE! Visible in Live Matches on user page.`);
+      await onRefreshData();
+      await loadAdminData();
+      setAdminRaceFilter('live');
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to make race live');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMakeMatchUpcoming = async (race: Race) => {
+    try {
+      setIsLoading(true);
+      await api.updateRaceStatus(race.id, 'UPCOMING');
+      soundManager.playClick();
+      setActionMessage(`⏱ Race "${race.name}" moved to Upcoming Matches.`);
+      await onRefreshData();
+      await loadAdminData();
+      setAdminRaceFilter('upcoming');
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to update status');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handlePublishRace = async (raceId: string) => {
     try {
       setIsLoading(true);
-      await api.publishRace(raceId);
+      await api.updateRaceStatus(raceId, 'UPCOMING');
       soundManager.playBetPlaced();
-      setActionMessage('🚀 Race published live! It is now visible on the user page with live betting.');
+      setActionMessage('🚀 Race published to Upcoming Matches! Visible on user page.');
       await onRefreshData();
       await loadAdminData();
+      setAdminRaceFilter('upcoming');
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to publish race');
@@ -240,6 +280,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setTimeout(() => setActionMessage(null), 3000);
       return;
     }
+    const finalStatus = newRaceStatus || 'UPCOMING';
     try {
       setIsLoading(true);
       await api.createRace({
@@ -251,12 +292,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         distance: newDistance || '1400M',
         going: newGoing || 'Good',
         class_grade: newClassGrade || 'Grade 1 • Terms',
-        status: newRaceStatus,
+        status: finalStatus,
         image_url: newRaceImage || '/images/race_action.jpg',
         horses: newHorses,
       });
-      soundManager.playBetPlaced();
-      setActionMessage(`🏆 Race Card "${newRaceName}" published LIVE with ${newHorses.length} runners!`);
+      if (finalStatus === 'LIVE') {
+        soundManager.playRaceBugle();
+        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE MATCHES with ${newHorses.length} runners!`);
+        setAdminRaceFilter('live');
+      } else {
+        soundManager.playBetPlaced();
+        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING MATCHES with ${newHorses.length} runners!`);
+        setAdminRaceFilter('upcoming');
+      }
       await onRefreshData();
       await loadAdminData();
       handleClearForm();
@@ -589,25 +637,99 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* TAB 1: Races & Settlement */}
       {activeTab === 'races' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white">Race Control & Status Dispatch</h2>
-              <p className="text-xs text-slate-400">Manage manual race fixtures, edit runners, or declare official results</p>
+              <p className="text-xs text-slate-400">Manage upcoming matches, launch LIVE races, or declare official results</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">Total Fixtures: {races.length}</span>
               <button
                 onClick={() => setActiveTab('add_race')}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer shadow-md"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Race</span>
+                <span>+ Add Race Fixture</span>
               </button>
             </div>
           </div>
 
+          {/* Sub-Filter Tabs: Upcoming Matches, Live Matches, Completed Matches, All */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setAdminRaceFilter('upcoming');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                adminRaceFilter === 'upcoming'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-emerald-300" />
+              <span>⏱ Upcoming Matches ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setAdminRaceFilter('live');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                adminRaceFilter === 'live'
+                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md animate-pulse'
+                  : 'text-rose-400 hover:text-rose-200 hover:bg-rose-950/40'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              <span>🔴 Live Matches ({races.filter((r) => r.status === 'LIVE').length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setAdminRaceFilter('resulted');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                adminRaceFilter === 'resulted'
+                  ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-black font-black shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>🏁 Completed Matches ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setAdminRaceFilter('all');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
+                adminRaceFilter === 'all'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <span>All Races ({races.length})</span>
+            </button>
+          </div>
+
           <div className="space-y-4">
-            {races.map((race) => (
+            {races
+              .filter((race) => {
+                if (adminRaceFilter === 'upcoming') {
+                  return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
+                }
+                if (adminRaceFilter === 'live') {
+                  return race.status === 'LIVE';
+                }
+                if (adminRaceFilter === 'resulted') {
+                  return race.status === 'RESULTED' || race.status === 'CLOSED';
+                }
+                return true;
+              })
+              .map((race) => (
               <div
                 key={race.id}
                 className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-3 shadow-sm hover:border-slate-700 transition"
@@ -659,10 +781,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <h3 className="text-base font-bold text-white">
                           {race.name}
                         </h3>
-                        {race.status === 'OPEN' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            🟢 LIVE ON USER PAGE
+                        {race.status === 'LIVE' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[11px] font-black uppercase tracking-wider animate-pulse">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                            🔴 LIVE IN-PLAY
+                          </span>
+                        ) : race.status === 'UPCOMING' || race.status === 'OPEN' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-wider">
+                            <Clock className="w-3 h-3" />
+                            ⏱ UPCOMING MATCH
                           </span>
                         ) : race.status === 'DRAFT' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 border border-slate-600/50 text-[11px] font-bold uppercase tracking-wider">
@@ -674,7 +801,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-bold uppercase tracking-wider">
-                            🏆 RESULTED
+                            🏆 RESULTED & SETTLED
                           </span>
                         )}
                       </div>
@@ -683,28 +810,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   {/* Status & Action controls */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* 1-Click Publish Live Button */}
-                    {race.status !== 'OPEN' && (
+                    {/* Make Match Live Button */}
+                    {race.status !== 'LIVE' && race.status !== 'RESULTED' && (
                       <button
-                        id={`publish-race-live-btn-${race.id}`}
-                        onClick={() => handlePublishRace(race.id)}
+                        id={`make-live-btn-${race.id}`}
+                        onClick={() => handleMakeMatchLive(race)}
                         disabled={isLoading}
-                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-900/30 border border-emerald-400/30"
-                        title="Publish this race immediately to the user page with active live betting"
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-red-950/40 border border-red-400/40 animate-pulse active:scale-95"
+                        title="Make this match LIVE immediately on the user page!"
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                        <span>🚀 Publish LIVE</span>
+                        <Flame className="w-3.5 h-3.5 text-amber-200" />
+                        <span>▶ Make Match LIVE</span>
                       </button>
                     )}
 
-                    {race.status === 'OPEN' && (
+                    {/* If LIVE: Settle Button + Move to Upcoming Button */}
+                    {race.status === 'LIVE' && (
+                      <>
+                        <button
+                          id={`settle-live-race-btn-${race.id}`}
+                          onClick={() => handleOpenSettle(race)}
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-950/40 border border-amber-300/50"
+                          title="Declare official winner and settle all bets"
+                        >
+                          <Trophy className="w-3.5 h-3.5 text-black" />
+                          <span>🏁 Settle & Declare Winner</span>
+                        </button>
+                        <button
+                          id={`move-upcoming-btn-${race.id}`}
+                          onClick={() => handleMakeMatchUpcoming(race)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                          title="Move match back to upcoming"
+                        >
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>Move to Upcoming</span>
+                        </button>
+                      </>
+                    )}
+
+                    {race.status === 'RESULTED' && (
                       <button
-                        id={`set-draft-btn-${race.id}`}
-                        onClick={() => handleStatusChange(race.id, 'DRAFT')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
-                        title="Hide race from users and keep as draft"
+                        id={`re-settle-btn-${race.id}`}
+                        onClick={() => handleOpenSettle(race)}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                       >
-                        Hide / Set Draft
+                        <Trophy className="w-3.5 h-3.5 text-blue-400" />
+                        <span>View / Re-Settle</span>
                       </button>
                     )}
 
@@ -714,26 +865,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
                     >
                       <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Edit Race & Runners</span>
-                    </button>
-
-                    {race.status !== 'CLOSED' && (
-                      <button
-                        id={`set-closed-btn-${race.id}`}
-                        onClick={() => handleStatusChange(race.id, 'CLOSED')}
-                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 text-xs font-semibold transition cursor-pointer"
-                      >
-                        Close Race
-                      </button>
-                    )}
-
-                    <button
-                      id={`settle-race-btn-${race.id}`}
-                      onClick={() => handleOpenSettle(race)}
-                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md"
-                    >
-                      <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                      <span>{race.status === 'RESULTED' ? 'Re-Settle' : 'Settle Payouts'}</span>
+                      <span>Edit</span>
                     </button>
 
                     <button
@@ -1051,21 +1183,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* Publishing Mode */}
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-            <label className="block text-xs font-bold text-white">Publishing Status:</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-xs font-bold text-white">Publishing Target & Status:</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => setNewRaceStatus('OPEN')}
+                onClick={() => setNewRaceStatus('UPCOMING')}
                 className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                  newRaceStatus === 'OPEN'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-white'
-                    : 'border-slate-800 bg-slate-900/50 text-slate-400'
+                  newRaceStatus === 'UPCOMING' || newRaceStatus === 'OPEN'
+                    ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-md'
+                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
                 }`}
               >
-                <span className="text-xl">🟢</span>
+                <span className="text-xl">⏱️</span>
                 <div>
-                  <p className="font-bold text-xs text-white">Publish LIVE Immediately</p>
-                  <p className="text-[10px] text-slate-400">Instantly visible on user page with active betting</p>
+                  <p className="font-bold text-xs text-white">Upcoming Matches</p>
+                  <p className="text-[10px] text-slate-400">Scheduled match open in Upcoming tab</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setNewRaceStatus('LIVE')}
+                className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
+                  newRaceStatus === 'LIVE'
+                    ? 'border-red-500 bg-red-500/15 text-white shadow-md animate-pulse'
+                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <span className="text-xl">🔴</span>
+                <div>
+                  <p className="font-bold text-xs text-white">Publish LIVE Now</p>
+                  <p className="text-[10px] text-slate-400">In-play live match in Live Matches tab</p>
                 </div>
               </button>
 
@@ -1075,13 +1223,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
                   newRaceStatus === 'DRAFT'
                     ? 'border-amber-500 bg-amber-500/10 text-white'
-                    : 'border-slate-800 bg-slate-900/50 text-slate-400'
+                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <span className="text-xl">📝</span>
                 <div>
-                  <p className="font-bold text-xs text-white">Save as DRAFT (Hidden)</p>
-                  <p className="text-[10px] text-slate-400">Hidden from users until published by admin</p>
+                  <p className="font-bold text-xs text-white">Save as DRAFT</p>
+                  <p className="text-[10px] text-slate-400">Hidden from user page until published</p>
                 </div>
               </button>
             </div>
@@ -1807,10 +1955,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setEditRaceStatus(e.target.value as RaceStatus)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-bold"
                   >
-                    <option value="OPEN">🟢 OPEN (Live Betting on User Page)</option>
+                    <option value="UPCOMING">⏱ UPCOMING (Visible in Upcoming Matches)</option>
+                    <option value="LIVE">🔴 LIVE IN-PLAY (Active Live Match)</option>
+                    <option value="OPEN">🟢 OPEN (Pre-Match Betting)</option>
                     <option value="DRAFT">📝 DRAFT (Hidden from Users)</option>
                     <option value="CLOSED">🔒 CLOSED / RUNNING</option>
-                    <option value="RESULTED">🏆 RESULTED</option>
+                    <option value="RESULTED">🏆 RESULTED & SETTLED</option>
                   </select>
                 </div>
               </div>
