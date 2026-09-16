@@ -105,16 +105,35 @@ export default function App() {
         .catch(() => {});
     }
 
-    // Check hash on page load
+    // Check hash on page load and on back/forward button clicks
     const checkHashRoute = () => {
-      const hash = window.location.hash.toLowerCase();
+      const rawHash = window.location.hash || '';
+      const hash = rawHash.toLowerCase();
+
       if (hash === '#/admin' || hash === '#admin') {
         setSelectedRaceId(null);
         setActiveTab('admin');
+      } else if (hash.startsWith('#/race/') || hash.startsWith('#race/')) {
+        const rId = rawHash.replace(/^#\/?race\//i, '');
+        setSelectedRaceId(rId);
+        setActiveTab('races');
       } else if (hash === '#/lobby' || hash === '#lobby') {
         setSelectedRaceId(null);
         setActiveTab('races');
+      } else if (hash === '#/mybets' || hash === '#mybets') {
+        setSelectedRaceId(null);
+        setActiveTab('mybets');
+      } else if (hash === '#/personal_details' || hash === '#personal_details' || hash === '#/profile' || hash === '#profile') {
+        setSelectedRaceId(null);
+        setActiveTab('personal_details');
       } else if (hash === '#/rules' || hash === '#rules') {
+        setSelectedRaceId(null);
+        setActiveTab('rules');
+      } else {
+        // If hash is empty, set default hash to #/rules
+        if (!rawHash) {
+          window.location.replace('#/rules');
+        }
         setSelectedRaceId(null);
         setActiveTab('rules');
       }
@@ -122,20 +141,20 @@ export default function App() {
 
     checkHashRoute();
     window.addEventListener('hashchange', checkHashRoute);
+    window.addEventListener('popstate', checkHashRoute);
 
     // Administrative Keyboard Shortcut (Ctrl + Shift + A or Cmd + Shift + A)
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         window.location.hash = '#/admin';
-        setSelectedRaceId(null);
-        setActiveTab('admin');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('hashchange', checkHashRoute);
+      window.removeEventListener('popstate', checkHashRoute);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -257,8 +276,7 @@ export default function App() {
     setUser(null);
     setMyBets([]);
     setTransactions([]);
-    setSelectedRaceId(null);
-    setActiveTab('rules');
+    window.location.hash = '#/rules';
     showToast('Signed out successfully', 'info');
   };
 
@@ -275,9 +293,7 @@ export default function App() {
         <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6">
           <AdminPortal
             onBack={() => {
-              setSelectedRaceId(null);
-              window.location.hash = '#/';
-              setActiveTab('rules');
+              window.location.hash = '#/rules';
             }}
             races={races}
             banners={banners}
@@ -306,24 +322,19 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
         onOpenAdmin={() => {
-          setSelectedRaceId(null);
-          setActiveTab('admin');
+          window.location.hash = '#/admin';
         }}
         onGoHome={() => {
-          setSelectedRaceId(null);
-          setActiveTab('races');
+          window.location.hash = '#/lobby';
         }}
         onOpenMyBets={() => {
-          setSelectedRaceId(null);
-          setActiveTab('mybets');
+          window.location.hash = '#/mybets';
         }}
         onOpenRules={() => {
-          setSelectedRaceId(null);
-          setActiveTab('rules');
+          window.location.hash = '#/rules';
         }}
         onOpenPersonalDetails={() => {
-          setSelectedRaceId(null);
-          setActiveTab('personal_details');
+          window.location.hash = '#/personal_details';
         }}
         activeTab={activeTab}
         pendingBetsCount={pendingBetsCount}
@@ -361,8 +372,7 @@ export default function App() {
             onOpenAuth={() => setIsAuthOpen(true)}
             onLogout={handleLogout}
             onGoToLobby={() => {
-              setSelectedRaceId(null);
-              setActiveTab('races');
+              window.location.hash = '#/lobby';
             }}
           />
         ) : activeTab === 'mybets' ? (
@@ -372,24 +382,27 @@ export default function App() {
             isLoading={isLoadingBets}
             oddsFormat={oddsFormat}
             onSelectRace={(raceId) => {
-              setSelectedRaceId(raceId);
-              setActiveTab('races');
+              window.location.hash = `#/race/${raceId}`;
             }}
             onGoToLobby={() => {
-              setSelectedRaceId(null);
-              setActiveTab('races');
+              window.location.hash = '#/lobby';
             }}
           />
         ) : currentSelectedRace ? (
           /* RACE DETAIL VIEW */
           <RaceDetail
             race={currentSelectedRace}
-            onBack={() => setSelectedRaceId(null)}
+            onBack={() => {
+              if (window.location.hash.startsWith('#/race/')) {
+                window.location.hash = '#/lobby';
+              } else {
+                setSelectedRaceId(null);
+              }
+            }}
             onSelectBet={handleOpenBetSlip}
             userBetsForRace={myBets.filter((b) => b.race_id === currentSelectedRace.id)}
             onOpenMyBets={() => {
-              setSelectedRaceId(null);
-              setActiveTab('mybets');
+              window.location.hash = '#/mybets';
             }}
             onOpenAuth={() => setIsAuthOpen(true)}
             isLoggedIn={!!user}
@@ -401,15 +414,14 @@ export default function App() {
             <BannerSlider
               banners={banners}
               onSelectRace={(raceId) => {
-                setSelectedRaceId(raceId);
-                setActiveTab('races');
+                window.location.hash = `#/race/${raceId}`;
               }}
               onOpenDeposit={() => setIsDepositOpen(true)}
             />
             <HowToPlayRules
               onGoToLobby={() => {
                 soundManager.playClick();
-                setActiveTab('races');
+                window.location.hash = '#/lobby';
               }}
               onOpenDeposit={() => setIsDepositOpen(true)}
             />
@@ -418,7 +430,9 @@ export default function App() {
           /* MATCH LOBBY: Direct race fixtures and live betting only (no banner, clean view) */
           <RaceList
             races={races}
-            onSelectRace={(raceId) => setSelectedRaceId(raceId)}
+            onSelectRace={(raceId) => {
+              window.location.hash = `#/race/${raceId}`;
+            }}
             filterStatus={raceFilter}
             onChangeFilter={setRaceFilter}
             isLoading={isLoadingRaces}
