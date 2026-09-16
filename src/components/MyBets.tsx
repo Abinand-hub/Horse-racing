@@ -47,7 +47,7 @@ export const MyBets: React.FC<MyBetsProps> = ({
             My Contest Selections
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            Your live contested matches, runner selections, and placed bet slips
+            Your live contested races, runner selections, and placed bet slips
           </p>
         </div>
 
@@ -90,7 +90,7 @@ export const MyBets: React.FC<MyBetsProps> = ({
           <h3 className="text-base font-bold text-slate-300">No contest selections found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {filter === 'ALL'
-              ? 'You have not contested in any race yet. Choose a race from the Match Lobby to make your selections.'
+              ? 'You have not contested in any race yet. Choose a race from the Race Lobby to make your selections.'
               : `You do not have any ${filter === 'PENDING' ? 'in-play' : filter.toLowerCase()} selections.`}
           </p>
           {onGoToLobby && (
@@ -98,7 +98,7 @@ export const MyBets: React.FC<MyBetsProps> = ({
               onClick={onGoToLobby}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg shadow-red-600/30 transition cursor-pointer"
             >
-              <span>Explore Match Lobby</span>
+              <span>Explore Race Lobby</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}

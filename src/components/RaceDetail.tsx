@@ -72,7 +72,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-emerald-900/40 text-[11px] font-bold transition shadow cursor-pointer active:scale-95"
         >
           <ArrowLeft className="w-3 h-3" />
-          <span>Back to Matches</span>
+          <span>Back to Races</span>
         </button>
 
         {/* Live Status Badge */}

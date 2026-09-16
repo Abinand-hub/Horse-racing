@@ -59,7 +59,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
           onClick={onGoToLobby}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] hover:from-[#c5a028] hover:to-[#d4af37] text-black font-black text-xs sm:text-sm shadow-[0_0_15px_rgba(229,184,105,0.4)] transition cursor-pointer self-start sm:self-auto"
         >
-          <span>Go to Match Lobby</span>
+          <span>Go to Race Lobby</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -127,7 +127,7 @@ export const HowToPlayRules: React.FC<HowToPlayRulesProps> = ({
             </div>
             <h3 className="text-base font-bold text-white">Select a Live Fixture</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Navigate to the <strong>Match Lobby</strong> to see active fixtures (e.g. <em>The Star Future Cup</em>, <em>Bangalore Derby</em>). Each race displays distance, track going, time, and verified field runners.
+              Navigate to the <strong>Race Lobby</strong> to see active fixtures (e.g. <em>The Star Future Cup</em>, <em>Bangalore Derby</em>). Each race displays distance, track going, time, and verified field runners.
             </p>
           </div>
 

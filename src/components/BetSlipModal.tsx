@@ -76,8 +76,12 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
       setError(`Insufficient balance. Current balance is ₹${userBalance.toLocaleString()}`);
       return;
     }
-    if (betSlip.race.status !== 'OPEN') {
-      setError('This race is closed. Cannot place bets.');
+    if (betSlip.race.status === 'CLOSED') {
+      setError('This race is currently closed / running.');
+      return;
+    }
+    if (betSlip.race.status === 'RESULTED') {
+      setError('This race has already resulted. Payouts have been distributed.');
       return;
     }
 

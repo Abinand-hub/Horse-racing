@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>How to Play & Rules</span>
               </button>
 
-              {/* 2. Match Lobby */}
+              {/* 2. Race Lobby */}
               <button
                 id="nav-races-btn"
                 onClick={() => {
@@ -151,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
-                <span>Match Lobby</span>
+                <span>Race Lobby</span>
               </button>
 
               {/* 3. My Selections */}
@@ -442,7 +442,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">How to Play</span>
           </button>
 
-          {/* 2. Match Lobby */}
+          {/* 2. Race Lobby */}
           <button
             id="mobile-nav-lobby"
             onClick={() => {
@@ -456,7 +456,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Home className="w-4.5 h-4.5" />
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Match Lobby</span>
+            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Race Lobby</span>
           </button>
 
           {/* 3. My Selections */}

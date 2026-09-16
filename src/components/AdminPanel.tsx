@@ -224,7 +224,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsLoading(true);
       await api.updateRaceStatus(race.id, 'LIVE');
       soundManager.playRaceBugle();
-      setActionMessage(`⚡ Race "${race.name}" is now LIVE! Visible in Live Matches on user page.`);
+      setActionMessage(`⚡ Race "${race.name}" is now LIVE! Visible in Live Races on user page.`);
       await onRefreshData();
       await loadAdminData();
       setAdminRaceFilter('live');
@@ -242,7 +242,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsLoading(true);
       await api.updateRaceStatus(race.id, 'UPCOMING');
       soundManager.playClick();
-      setActionMessage(`⏱ Race "${race.name}" moved to Upcoming Matches.`);
+      setActionMessage(`⏱ Race "${race.name}" moved to Upcoming Races.`);
       await onRefreshData();
       await loadAdminData();
       setAdminRaceFilter('upcoming');
@@ -260,7 +260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsLoading(true);
       await api.updateRaceStatus(raceId, 'UPCOMING');
       soundManager.playBetPlaced();
-      setActionMessage('🚀 Race published to Upcoming Matches! Visible on user page.');
+      setActionMessage('🚀 Race published to Upcoming Races! Visible on user page.');
       await onRefreshData();
       await loadAdminData();
       setAdminRaceFilter('upcoming');
@@ -298,11 +298,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       if (finalStatus === 'LIVE') {
         soundManager.playRaceBugle();
-        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE MATCHES with ${newHorses.length} runners!`);
+        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${newHorses.length} runners!`);
         setAdminRaceFilter('live');
       } else {
         soundManager.playBetPlaced();
-        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING MATCHES with ${newHorses.length} runners!`);
+        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING RACES with ${newHorses.length} runners!`);
         setAdminRaceFilter('upcoming');
       }
       await onRefreshData();
@@ -640,7 +640,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white">Race Control & Status Dispatch</h2>
-              <p className="text-xs text-slate-400">Manage upcoming matches, launch LIVE races, or declare official results</p>
+              <p className="text-xs text-slate-400">Manage upcoming races, launch LIVE races, or declare official results</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -653,7 +653,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* Sub-Filter Tabs: Upcoming Matches, Live Matches, Completed Matches, All */}
+          {/* Sub-Filter Tabs: Upcoming Races, Live Races, Completed Races, All */}
           <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
             <button
               onClick={() => {
@@ -667,7 +667,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Clock className="w-3.5 h-3.5 text-emerald-300" />
-              <span>⏱ Upcoming Matches ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+              <span>⏱ Upcoming Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
             </button>
 
             <button
@@ -682,7 +682,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              <span>🔴 Live Matches ({races.filter((r) => r.status === 'LIVE').length})</span>
+              <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE').length})</span>
             </button>
 
             <button
@@ -697,7 +697,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Trophy className="w-3.5 h-3.5" />
-              <span>🏁 Completed Matches ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+              <span>🏁 Completed Races ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
             </button>
 
             <button
@@ -946,9 +946,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto animate-pulse">
                     <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
                   </div>
-                  <h3 className="text-base font-black text-white">No Live Matches In-Play Right Now</h3>
+                  <h3 className="text-base font-black text-white">No Live Races In-Play Right Now</h3>
                   <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    Live Odds Editor strictly manages in-play matches. Go to <strong>Races & Settlement</strong> and click <strong>"▶ Make Match LIVE"</strong> on any upcoming match to start editing live odds here.
+                    Live Odds Editor strictly manages in-play races. Go to <strong>Races & Settlement</strong> and click <strong>"▶ Make Race LIVE"</strong> on any upcoming race to start editing live odds here.
                   </p>
                   <button
                     type="button"
@@ -1237,8 +1237,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 <span className="text-xl">⏱️</span>
                 <div>
-                  <p className="font-bold text-xs text-white">Upcoming Matches</p>
-                  <p className="text-[10px] text-slate-400">Scheduled match open in Upcoming tab</p>
+                  <p className="font-bold text-xs text-white">Upcoming Races</p>
+                  <p className="text-[10px] text-slate-400">Scheduled race open in Upcoming tab</p>
                 </div>
               </button>
 
@@ -1254,7 +1254,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span className="text-xl">🔴</span>
                 <div>
                   <p className="font-bold text-xs text-white">Publish LIVE Now</p>
-                  <p className="text-[10px] text-slate-400">In-play live match in Live Matches tab</p>
+                  <p className="text-[10px] text-slate-400">In-play live race in Live Races tab</p>
                 </div>
               </button>
 
@@ -1996,9 +1996,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setEditRaceStatus(e.target.value as RaceStatus)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 font-bold"
                   >
-                    <option value="UPCOMING">⏱ UPCOMING (Visible in Upcoming Matches)</option>
-                    <option value="LIVE">🔴 LIVE IN-PLAY (Active Live Match)</option>
-                    <option value="OPEN">🟢 OPEN (Pre-Match Betting)</option>
+                    <option value="UPCOMING">⏱ UPCOMING (Visible in Upcoming Races)</option>
+                    <option value="LIVE">🔴 LIVE IN-PLAY (Active Live Race)</option>
+                    <option value="OPEN">🟢 OPEN (Pre-Race Betting)</option>
                     <option value="DRAFT">📝 DRAFT (Hidden from Users)</option>
                     <option value="CLOSED">🔒 CLOSED / RUNNING</option>
                     <option value="RESULTED">🏆 RESULTED & SETTLED</option>

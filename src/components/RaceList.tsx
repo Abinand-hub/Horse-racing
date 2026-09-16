@@ -165,7 +165,7 @@ export const RaceList: React.FC<RaceListProps> = ({
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Upcoming Matches ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+            <span>Upcoming Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
           </button>
 
           <button
@@ -181,7 +181,7 @@ export const RaceList: React.FC<RaceListProps> = ({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-            <span>🔴 Live Matches ({races.filter((r) => r.status === 'LIVE').length})</span>
+            <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE').length})</span>
           </button>
 
           <button
@@ -197,7 +197,7 @@ export const RaceList: React.FC<RaceListProps> = ({
             }`}
           >
             <Trophy className="w-3.5 h-3.5" />
-            <span>Completed Matches ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+            <span>Completed Races ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
           </button>
 
           <button
@@ -333,7 +333,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                   {filterStatus === 'live' ? (
                     <>
                       <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
-                      <span>Live In-Play Matches (List View)</span>
+                      <span>Live In-Play Races (List View)</span>
                     </>
                   ) : filterStatus === 'resulted' ? (
                     <>

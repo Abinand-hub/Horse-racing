@@ -982,9 +982,9 @@ app.post('/api/bets/place', (req, res) => {
     return res.status(404).json({ error: 'Race not found' });
   }
 
-  // Check race status == OPEN
-  if (race.status !== 'OPEN') {
-    return res.status(400).json({ error: `Cannot place bet. Race is currently ${race.status}. Only OPEN races accept bets.` });
+  // Allow betting for OPEN, UPCOMING, LIVE, DRAFT (only block if CLOSED or RESULTED)
+  if (race.status === 'CLOSED' || race.status === 'RESULTED') {
+    return res.status(400).json({ error: `Cannot place bet. Race is currently ${race.status}. Betting is closed for this race.` });
   }
 
   const horse = race.horses.find((h) => h.id === horse_id);

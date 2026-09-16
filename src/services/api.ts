@@ -197,6 +197,12 @@ export const api = {
     stake: number;
     user_id: string;
   }): Promise<{ message: string; bet: Bet; user: User }> {
+    let currentUser: User = DUMMY_USER;
+    try {
+      const saved = localStorage.getItem('derby_user');
+      if (saved) currentUser = JSON.parse(saved);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/bets/place`, {
         method: 'POST',
@@ -204,7 +210,11 @@ export const api = {
         body: JSON.stringify(params),
       });
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
       }
     } catch {}
 
@@ -223,7 +233,7 @@ export const api = {
     const newBet: Bet = {
       id: `bet_${Date.now()}`,
       user_id: params.user_id,
-      username: 'arjun_punters',
+      username: currentUser.username || 'arjun_punters',
       race_id: race.id,
       race_name: race.name,
       venue: race.venue,
@@ -252,14 +262,34 @@ export const api = {
       localStorage.setItem('derby_custom_bets', JSON.stringify(betsList));
     } catch {}
 
+    const updatedUser: User = {
+      ...currentUser,
+      balance: Math.max(0, (currentUser.balance ?? 5000) - params.stake),
+      exposure: (currentUser.exposure ?? 0) + params.stake,
+    };
+    localStorage.setItem('derby_user', JSON.stringify(updatedUser));
+
+    // Save transaction
+    try {
+      const rawTx = localStorage.getItem('derby_custom_txs');
+      const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
+      txs.unshift({
+        id: `tx_${Date.now()}`,
+        user_id: params.user_id,
+        type: 'BET',
+        amount: -params.stake,
+        balance_after: updatedUser.balance,
+        description: `Bet placed on #${horse.horse_no} ${horse.name} (${params.bet_type} @ ${params.odds}x)`,
+        created_at: new Date().toISOString(),
+        reference_id: newBet.id,
+      });
+      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+    } catch {}
+
     return {
       message: 'Bet placed successfully!',
       bet: newBet,
-      user: {
-        ...DUMMY_USER,
-        balance: Math.max(0, DUMMY_USER.balance - params.stake),
-        exposure: DUMMY_USER.exposure + params.stake,
-      },
+      user: updatedUser,
     };
   },
 
@@ -290,11 +320,45 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, amount, payment_method }),
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
+      }
     } catch {}
+
+    let currentUser: User = DUMMY_USER;
+    try {
+      const saved = localStorage.getItem('derby_user');
+      if (saved) currentUser = JSON.parse(saved);
+    } catch {}
+
+    const updatedUser: User = {
+      ...currentUser,
+      balance: (currentUser.balance ?? 5000) + amount,
+    };
+    localStorage.setItem('derby_user', JSON.stringify(updatedUser));
+
+    try {
+      const rawTx = localStorage.getItem('derby_custom_txs');
+      const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
+      txs.unshift({
+        id: `tx_${Date.now()}`,
+        user_id: userId,
+        type: 'DEPOSIT',
+        amount: amount,
+        balance_after: updatedUser.balance,
+        description: `Wallet Deposit via ${payment_method || 'Dummy Money / UPI'}`,
+        created_at: new Date().toISOString(),
+      });
+      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+    } catch {}
+
     return {
-      user: { ...DUMMY_USER, balance: DUMMY_USER.balance + amount },
-      message: 'Deposit simulated successfully',
+      user: updatedUser,
+      message: 'Deposit successful!',
     };
   },
 
@@ -305,29 +369,74 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, amount, ...details }),
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
+      }
     } catch {}
+
+    let currentUser: User = DUMMY_USER;
+    try {
+      const saved = localStorage.getItem('derby_user');
+      if (saved) currentUser = JSON.parse(saved);
+    } catch {}
+
+    const updatedUser: User = {
+      ...currentUser,
+      balance: Math.max(0, (currentUser.balance ?? 5000) - amount),
+    };
+    localStorage.setItem('derby_user', JSON.stringify(updatedUser));
+
+    try {
+      const rawTx = localStorage.getItem('derby_custom_txs');
+      const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
+      txs.unshift({
+        id: `tx_${Date.now()}`,
+        user_id: userId,
+        type: 'WITHDRAW',
+        amount: -amount,
+        balance_after: updatedUser.balance,
+        description: `Withdrawal request to ${details.upi_id || details.bank_account || 'Bank'}`,
+        created_at: new Date().toISOString(),
+      });
+      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+    } catch {}
+
     return {
-      user: { ...DUMMY_USER, balance: Math.max(0, DUMMY_USER.balance - amount) },
+      user: updatedUser,
       message: 'Withdrawal submitted successfully',
     };
   },
 
   async getTransactions(userId: string): Promise<Transaction[]> {
+    let localTxs: Transaction[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_txs');
+      if (raw) localTxs = JSON.parse(raw);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/wallet/transactions?user_id=${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.transactions) && data.transactions.length > 0) return data.transactions;
+        if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+          return [...localTxs, ...data.transactions.filter((t: Transaction) => !localTxs.some((lt) => lt.id === t.id))];
+        }
       }
     } catch {}
+
+    if (localTxs.length > 0) return localTxs;
+
     return [
       {
         id: 'tx_01',
         user_id: userId,
         type: 'DEPOSIT',
-        amount: 4200,
-        balance_after: 4200,
+        amount: 5000,
+        balance_after: 5000,
         description: 'Initial Wallet Deposit via UPI',
         created_at: new Date(Date.now() - 86400000).toISOString(),
       },
@@ -336,7 +445,7 @@ export const api = {
         user_id: userId,
         type: 'WIN',
         amount: 1300,
-        balance_after: 5000,
+        balance_after: 6300,
         description: 'Payout: Mystic Bay won Mysore 1000 Guineas (Odds 2.60)',
         created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
       },
