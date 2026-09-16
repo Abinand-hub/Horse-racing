@@ -221,19 +221,19 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             <table className="w-full text-left border-collapse table-fixed">
               <thead>
                 <tr className="bg-[#040805] border-b border-emerald-900/60 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
-                  <th className="py-2 px-1 sm:px-2.5 w-[12%] sm:w-14 text-center text-slate-300">
+                  <th className="py-2 px-1 sm:px-2 w-[10%] sm:w-12 text-center text-slate-300">
                     No
                   </th>
-                  <th className="py-2 px-1.5 sm:px-3 w-[48%] sm:w-auto text-slate-300">
+                  <th className="py-2 px-1.5 sm:px-3 w-[54%] sm:w-auto text-slate-300">
                     Horse & Jockey / Trainer
                   </th>
-                  <th className="py-2 px-1 sm:px-2 w-[20%] sm:w-28 text-center">
+                  <th className="py-2 px-1 sm:px-2 w-[18%] sm:w-28 text-center">
                     <div className="flex flex-col items-center leading-tight">
                       <span className="text-white font-black text-[10px] sm:text-xs">WIN Odds</span>
                       <span className="text-[8px] text-emerald-400 font-medium hidden sm:inline">1st place</span>
                     </div>
                   </th>
-                  <th className="py-2 px-1 sm:px-2 w-[20%] sm:w-28 text-center">
+                  <th className="py-2 px-1 sm:px-2 w-[18%] sm:w-28 text-center">
                     <div className="flex flex-col items-center leading-tight">
                       <span className="text-white font-black text-[10px] sm:text-xs">PLACE Odds</span>
                       <span className="text-[8px] text-[#e5b869] font-medium hidden sm:inline">Top 3 place</span>
@@ -255,7 +255,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                       }`}
                     >
                       {/* Column 1: Serial No & Draw Gate */}
-                      <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
+                      <td className="py-2 px-1 sm:px-2 text-center align-middle">
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1">
                           <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-[#040805] border border-emerald-900/60 text-[#e5b869] font-black text-[10px] sm:text-[11px] flex items-center justify-center font-mono shadow-inner">
                             {horse.horse_no || horse.serial_no}
@@ -268,8 +268,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                         </div>
                       </td>
 
-                      {/* Column 2: Horse Info, Silk, Jockey, Trainer, Form */}
-                      <td className="py-1.5 sm:py-2 px-1.5 sm:px-3 align-middle overflow-hidden">
+                      {/* Column 2: Horse Info, Silk, Jockey, Trainer, Form (Fully Visible Names) */}
+                      <td className="py-2 px-1.5 sm:px-3 align-middle">
                         <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
                           <SilkIcon
                             color={horse.silk_color}
@@ -277,9 +277,9 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                             size="sm"
                           />
 
-                          <div className="min-w-0 flex-1 leading-tight">
-                            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                              <span className="font-bold text-white text-xs sm:text-sm tracking-tight truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap leading-tight">
+                              <span className="font-bold text-white text-xs sm:text-sm tracking-tight break-words">
                                 {horse.name}
                               </span>
                               {isWinner && (
@@ -294,10 +294,14 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               )}
                             </div>
 
-                            <div className="flex items-center gap-x-1.5 text-[9px] sm:text-[10px] text-slate-300 truncate mt-0.5">
-                              <span className="truncate">J: <strong className="text-white font-semibold">{horse.jockey}</strong></span>
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] text-slate-300 mt-0.5 leading-snug">
+                              <span className="whitespace-normal">
+                                J: <strong className="text-white font-semibold">{horse.jockey}</strong>
+                              </span>
                               <span className="text-emerald-800">•</span>
-                              <span className="truncate">T: <strong className="text-slate-300 font-semibold">{horse.trainer}</strong></span>
+                              <span className="whitespace-normal">
+                                T: <strong className="text-slate-300 font-semibold">{horse.trainer}</strong>
+                              </span>
                               {horse.form && (
                                 <>
                                   <span className="text-emerald-800 hidden sm:inline">•</span>

@@ -106,8 +106,8 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
                         <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
                           1st
                         </span>
-                        <div className="truncate">
-                          <p className="font-bold text-white truncate">#{winner.horse_no} {winner.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-white break-words">#{winner.horse_no} {winner.name}</p>
                           <p className="text-[11px] text-amber-400 font-mono">Win: {winner.win_odds.toFixed(2)}</p>
                         </div>
                       </div>
@@ -117,8 +117,8 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
                         <span className="w-5 h-5 rounded-full bg-slate-400 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
                           2nd
                         </span>
-                        <div className="truncate">
-                          <p className="font-bold text-white truncate">#{second.horse_no} {second.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-white break-words">#{second.horse_no} {second.name}</p>
                           <p className="text-[11px] text-slate-400 font-mono">Place: {second.place_odds.toFixed(2)}</p>
                         </div>
                       </div>
@@ -128,8 +128,8 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
                         <span className="w-5 h-5 rounded-full bg-amber-800 text-amber-200 font-black text-[10px] flex items-center justify-center shrink-0">
                           3rd
                         </span>
-                        <div className="truncate">
-                          <p className="font-bold text-white truncate">#{third.horse_no} {third.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-white break-words">#{third.horse_no} {third.name}</p>
                           <p className="text-[11px] text-slate-400 font-mono">Place: {third.place_odds.toFixed(2)}</p>
                         </div>
                       </div>
