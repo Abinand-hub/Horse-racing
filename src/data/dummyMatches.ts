@@ -148,7 +148,7 @@ export const DUMMY_RACES: Race[] = [
     distance: '2400m',
     going: 'Good to Firm',
     class_grade: 'Grade 1 • 3yo Colts & Fillies',
-    status: 'LIVE',
+    status: 'UPCOMING',
     image_url: '/images/jockey_hero.jpg',
     winner_horse_id: null,
     place_horses_ids: [],

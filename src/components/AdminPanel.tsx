@@ -573,12 +573,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           onClick={() => setActiveTab('odds')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'odds'
-              ? 'bg-indigo-600 text-white shadow-sm'
+              ? 'bg-rose-600 text-white shadow-sm font-bold'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Sliders className="w-3.5 h-3.5" />
-          Live Odds Editor
+          <Sliders className="w-3.5 h-3.5 text-rose-400" />
+          <span>Live Odds Editor ({races.filter((r) => r.status === 'LIVE').length})</span>
         </button>
 
         <button
@@ -919,100 +919,141 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 2: Live Odds Editor */}
+      {/* TAB 2: Live Odds Editor (Only LIVE In-Play Matches) */}
       {activeTab === 'odds' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-white">Live Odds Editor</h2>
-              <p className="text-xs text-slate-400">Modify Win and Place odds for active runners in real time with auto bet book synchronization</p>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-rose-400" />
+                <span>Live Odds Editor</span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                  🔴 LIVE ONLY ({races.filter((r) => r.status === 'LIVE').length})
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Modify Win and Place odds in real time for in-play races currently running
+              </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            {races.map((race) => (
-              <div key={race.id} className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div className="flex items-center gap-2">
-                    {race.race_no && (
-                      <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[11px]">
-                        R#{race.race_no}
-                      </span>
-                    )}
-                    <h3 className="font-bold text-white text-sm">
-                      {race.name} ({race.venue} • {race.race_time})
-                    </h3>
+          {(() => {
+            const liveRaces = races.filter((r) => r.status === 'LIVE');
+
+            if (liveRaces.length === 0) {
+              return (
+                <div className="p-8 sm:p-12 text-center bg-[#091510] rounded-2xl border border-emerald-900/50 space-y-3 shadow-xl">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto animate-pulse">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase font-semibold">
-                    {race.status}
-                  </span>
+                  <h3 className="text-base font-black text-white">No Live Matches In-Play Right Now</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Live Odds Editor strictly manages in-play matches. Go to <strong>Races & Settlement</strong> and click <strong>"▶ Make Match LIVE"</strong> on any upcoming match to start editing live odds here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playClick();
+                      setActiveTab('races');
+                      setAdminRaceFilter('upcoming');
+                    }}
+                    className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black text-xs transition cursor-pointer shadow-lg active:scale-95"
+                  >
+                    <span>View Upcoming Races to Make Live</span>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  </button>
                 </div>
+              );
+            }
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {race.horses.map((horse) => (
-                    <div
-                      key={horse.id}
-                      className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2 text-xs"
-                    >
-                      <div className="flex items-center justify-between font-bold text-white">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-indigo-300 font-mono">
-                            S.{horse.serial_no || horse.horse_no}
+            return (
+              <div className="space-y-6">
+                {liveRaces.map((race) => (
+                  <div key={race.id} className="bg-slate-900 rounded-2xl border border-rose-500/40 p-4 space-y-3 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-2">
+                        {race.race_no && (
+                          <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-black text-[11px] border border-rose-500/30">
+                            R#{race.race_no}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono">
-                            Gate {horse.gate_no !== undefined ? horse.gate_no : (horse.serial_no || horse.horse_no)}
-                          </span>
-                          <span className="truncate">{horse.name}</span>
-                        </div>
+                        )}
+                        <h3 className="font-bold text-white text-sm">
+                          {race.name} ({race.venue} • {race.race_time})
+                        </h3>
                       </div>
-
-                      <div className="text-[11px] text-slate-400 truncate">
-                        <span>Jockey: <strong className="text-slate-200">{horse.jockey}</strong></span>
-                        <span className="mx-1">•</span>
-                        <span>Trainer: <strong className="text-slate-200">{horse.trainer}</strong></span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Win Odds (₹100)</label>
-                          <input
-                            type="number"
-                            step="0.05"
-                            min="1.05"
-                            defaultValue={horse.win_odds}
-                            onBlur={(e) => {
-                              const val = parseFloat(e.target.value);
-                              if (val > 1 && val !== horse.win_odds) {
-                                handleUpdateOdds(horse.id, val, horse.place_odds);
-                              }
-                            }}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono focus:outline-none focus:border-amber-400"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Place Odds (₹100)</label>
-                          <input
-                            type="number"
-                            step="0.05"
-                            min="1.02"
-                            defaultValue={horse.place_odds}
-                            onBlur={(e) => {
-                              const val = parseFloat(e.target.value);
-                              if (val > 1 && val !== horse.place_odds) {
-                                handleUpdateOdds(horse.id, horse.win_odds, val);
-                              }
-                            }}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-400"
-                          />
-                        </div>
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 uppercase font-black tracking-wider animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                        LIVE IN-PLAY
+                      </span>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {race.horses.map((horse) => (
+                        <div
+                          key={horse.id}
+                          className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2 text-xs"
+                        >
+                          <div className="flex items-center justify-between font-bold text-white">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-indigo-300 font-mono">
+                                S.{horse.serial_no || horse.horse_no}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono">
+                                Gate {horse.gate_no !== undefined ? horse.gate_no : (horse.serial_no || horse.horse_no)}
+                              </span>
+                              <span className="truncate">{horse.name}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] text-slate-400 truncate">
+                            <span>Jockey: <strong className="text-slate-200">{horse.jockey}</strong></span>
+                            <span className="mx-1">•</span>
+                            <span>Trainer: <strong className="text-slate-200">{horse.trainer}</strong></span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Win Odds (₹100)</label>
+                              <input
+                                type="number"
+                                step="0.05"
+                                min="1.05"
+                                defaultValue={horse.win_odds}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (val > 1 && val !== horse.win_odds) {
+                                    handleUpdateOdds(horse.id, val, horse.place_odds);
+                                  }
+                                }}
+                                className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Place Odds (₹100)</label>
+                              <input
+                                type="number"
+                                step="0.05"
+                                min="1.02"
+                                defaultValue={horse.place_odds}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (val > 1 && val !== horse.place_odds) {
+                                    handleUpdateOdds(horse.id, horse.win_odds, val);
+                                  }
+                                }}
+                                className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       )}
 

@@ -274,14 +274,24 @@ export const RaceList: React.FC<RaceListProps> = ({
                     </div>
 
                     <div className="absolute top-3.5 left-3.5 z-10">
-                      {race.status === 'OPEN' ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-500/90 text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-1 shadow">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                          Live Betting
+                      {race.status === 'LIVE' ? (
+                        <span className="px-3 py-1 rounded-full bg-rose-600/95 text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-lg animate-pulse border border-rose-400/40">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                          🔴 Live In-Play
+                        </span>
+                      ) : race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT' ? (
+                        <span className="px-3 py-1 rounded-full bg-emerald-600/90 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow border border-emerald-400/30">
+                          <Clock className="w-3 h-3 text-emerald-200" />
+                          Upcoming
+                        </span>
+                      ) : race.status === 'RESULTED' ? (
+                        <span className="px-3 py-1 rounded-full bg-blue-600/90 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow border border-blue-400/30">
+                          <CheckCircle2 className="w-3 h-3 text-blue-200" />
+                          Official Result
                         </span>
                       ) : (
-                        <span className="px-3 py-1 rounded-full bg-black/70 text-slate-300 font-bold text-[10px] uppercase border border-white/10">
-                          {race.status}
+                        <span className="px-3 py-1 rounded-full bg-amber-600/80 text-white font-bold text-[10px] uppercase border border-amber-400/30">
+                          Closed
                         </span>
                       )}
                     </div>
@@ -315,13 +325,32 @@ export const RaceList: React.FC<RaceListProps> = ({
             </div>
           </div>
 
-          {/* Section 2: SRS Mandated "Upcoming Races" List View */}
+          {/* Section 2: Races List View (Dynamic by Tab) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-1">
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-amber-400" />
-                  Upcoming Races (List View)
+                  {filterStatus === 'live' ? (
+                    <>
+                      <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
+                      <span>Live In-Play Matches (List View)</span>
+                    </>
+                  ) : filterStatus === 'resulted' ? (
+                    <>
+                      <Trophy className="w-5 h-5 text-[#e5b869]" />
+                      <span>Completed & Resulted Races</span>
+                    </>
+                  ) : filterStatus === 'all' ? (
+                    <>
+                      <Calendar className="w-5 h-5 text-emerald-400" />
+                      <span>All Racing Fixtures</span>
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-5 h-5 text-amber-400" />
+                      <span>Upcoming Races (List View)</span>
+                    </>
+                  )}
                 </h2>
                 <p className="text-xs text-slate-400">
                   SRS Format: <span className="text-slate-300 font-mono">Venue - Race Name - Time - Date</span>
