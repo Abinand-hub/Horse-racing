@@ -4,7 +4,7 @@ interface SilkIconProps {
   color?: string;
   number?: number | string;
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export const SilkIcon: React.FC<SilkIconProps> = ({
@@ -18,6 +18,7 @@ export const SilkIcon: React.FC<SilkIconProps> = ({
   const patternType = (num % 6);
 
   const sizeDimensions = {
+    xs: { width: 18, height: 18 },
     sm: { width: 24, height: 24 },
     md: { width: 34, height: 34 },
     lg: { width: 44, height: 44 },
