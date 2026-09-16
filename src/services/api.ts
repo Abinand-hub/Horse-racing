@@ -701,21 +701,16 @@ export const api = {
       });
     } catch {}
 
-    try {
-      const raw = localStorage.getItem('derby_custom_races');
-      if (raw) {
-        const list: Race[] = JSON.parse(raw);
-        for (const r of list) {
-          const h = r.horses.find((item) => item.id === horseId);
-          if (h) {
-            if (win_odds !== undefined) h.win_odds = win_odds;
-            if (place_odds !== undefined) h.place_odds = place_odds;
-            break;
-          }
-        }
-        localStorage.setItem('derby_custom_races', JSON.stringify(list));
+    const allRaces = await this.getRaces('all');
+    for (const r of allRaces) {
+      const h = r.horses?.find((item) => item.id === horseId);
+      if (h) {
+        if (win_odds !== undefined && !isNaN(win_odds)) h.win_odds = Number(win_odds);
+        if (place_odds !== undefined && !isNaN(place_odds)) h.place_odds = Number(place_odds);
+        this.saveLocalRace(r);
+        break;
       }
-    } catch {}
+    }
   },
 
   async settleRace(raceId: string, winner_horse_id: string, place_horses_ids: string[]): Promise<any> {
@@ -726,20 +721,109 @@ export const api = {
         body: JSON.stringify({ winner_horse_id, place_horses_ids }),
       });
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        // Server response received
       }
     } catch {}
 
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
+    
+    const placeList: string[] = Array.isArray(place_horses_ids) && place_horses_ids.length > 0
+      ? [...place_horses_ids]
+      : [winner_horse_id];
+    if (!placeList.includes(winner_horse_id)) {
+      placeList.unshift(winner_horse_id);
+    }
+
     if (race) {
       race.winner_horse_id = winner_horse_id;
-      race.place_horses_ids = place_horses_ids;
+      race.place_horses_ids = placeList;
       race.status = 'RESULTED';
       race.settled_at = new Date().toISOString();
       this.saveLocalRace(race);
     }
-    return { success: true, message: 'Race settled successfully' };
+
+    // Process all bets for this race
+    let localBets: Bet[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_bets');
+      if (raw) localBets = JSON.parse(raw);
+    } catch {}
+
+    let currentUser: User = DUMMY_USER;
+    try {
+      const savedUser = localStorage.getItem('derby_user');
+      if (savedUser) currentUser = JSON.parse(savedUser);
+    } catch {}
+
+    let localTxs: Transaction[] = [];
+    try {
+      const rawTxs = localStorage.getItem('derby_custom_txs');
+      if (rawTxs) localTxs = JSON.parse(rawTxs);
+    } catch {}
+
+    let settledCount = 0;
+    let totalPaidOut = 0;
+
+    for (const bet of localBets) {
+      const isRaceMatch = bet.race_id === raceId || (race && bet.race_name === race.name);
+      if (isRaceMatch && bet.status === 'PENDING') {
+        let isWon = false;
+        if (bet.bet_type === 'WIN') {
+          isWon = bet.horse_id === winner_horse_id;
+        } else if (bet.bet_type === 'PLACE') {
+          isWon = placeList.includes(bet.horse_id);
+        }
+
+        bet.settled_at = new Date().toISOString();
+
+        if (isWon) {
+          bet.status = 'WON';
+          const payoutAmount = Math.round(bet.stake * bet.odds);
+          bet.payout = payoutAmount;
+          totalPaidOut += payoutAmount;
+
+          // Credit balance & release exposure
+          currentUser.balance = (currentUser.balance ?? 0) + payoutAmount;
+          currentUser.exposure = Math.max(0, (currentUser.exposure ?? 0) - bet.stake);
+
+          // Log WIN transaction
+          localTxs.unshift({
+            id: `tx_${Date.now()}_${bet.id}`,
+            user_id: bet.user_id,
+            type: 'WIN',
+            amount: payoutAmount,
+            balance_after: currentUser.balance,
+            description: `Payout WON: ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race?.name || bet.race_name} (${bet.odds}x)`,
+            created_at: new Date().toISOString(),
+            reference_id: bet.id,
+          });
+        } else {
+          bet.status = 'LOST';
+          bet.payout = 0;
+          // Release exposure on loss
+          currentUser.exposure = Math.max(0, (currentUser.exposure ?? 0) - bet.stake);
+        }
+        settledCount++;
+      }
+    }
+
+    // Save back to localStorage
+    try {
+      localStorage.setItem('derby_custom_bets', JSON.stringify(localBets));
+      localStorage.setItem('derby_user', JSON.stringify(currentUser));
+      localStorage.setItem('derby_custom_txs', JSON.stringify(localTxs));
+    } catch {}
+
+    const winnerName = race?.horses?.find((h) => h.id === winner_horse_id)?.name || 'Winner';
+
+    return { 
+      success: true, 
+      message: `Race "${race?.name || 'Fixture'}" resulted with winner ${winnerName}! ${settledCount} bets settled (${totalPaidOut > 0 ? `₹${totalPaidOut.toLocaleString('en-IN')} paid out to wallet` : 'no winning bets'}).`,
+      settledCount,
+      totalPaidOut
+    };
   },
 
   async getAdminUsers(): Promise<User[]> {

@@ -297,7 +297,10 @@ export default function App() {
             }}
             races={races}
             banners={banners}
-            onRefreshData={loadRacesAndBanners}
+            onRefreshData={async () => {
+              await loadRacesAndBanners();
+              await loadUserFinancials();
+            }}
           />
         </main>
       </div>
