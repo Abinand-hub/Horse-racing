@@ -1,26 +1,18 @@
 import React, { useState } from 'react';
 import { Bet, BetType, Horse, Race } from '../types';
 import { SilkIcon } from './SilkIcon';
-import { RaceSimulator } from './RaceSimulator';
 import { OddsFormat, formatOdds } from '../utils/odds';
 import { soundManager } from '../utils/audio';
 import { 
   ArrowLeft, 
-  Heart, 
-  Search, 
   Clock, 
   MapPin, 
   Trophy, 
-  Star, 
   Sparkles, 
-  Play, 
-  Flame, 
   Layers, 
   CheckCircle2, 
   AlertCircle,
-  Zap,
-  Info,
-  DollarSign
+  Info
 } from 'lucide-react';
 
 interface RaceDetailProps {
@@ -39,13 +31,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
   onBack,
   onSelectBet,
   userBetsForRace,
-  onOpenMyBets,
   onOpenAuth,
   isLoggedIn,
   oddsFormat = 'DECIMAL',
 }) => {
-  const [activeTab, setActiveTab] = useState<'runners' | 'simulator' | 'insights' | 'mybets'>('runners');
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [activeTab, setActiveTab] = useState<'runners' | 'insights' | 'mybets'>('runners');
 
   const winnerHorse = race.winner_horse_id
     ? race.horses.find((h) => h.id === race.winner_horse_id)
@@ -69,145 +59,133 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-3 sm:space-y-4 pb-16">
       
-      {/* ---------------- TOP BAR NAVIGATION ---------------- */}
-      <div className="flex items-center justify-between gap-3">
+      {/* ---------------- TOP BAR NAVIGATION (Compact & High-Density) ---------------- */}
+      <div className="flex items-center justify-between gap-2">
         <button
           id="back-to-races-btn"
           onClick={() => {
             soundManager.playClick();
             onBack();
           }}
-          className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs sm:text-sm font-bold transition shadow cursor-pointer active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-emerald-900/40 text-xs font-bold transition shadow cursor-pointer active:scale-95"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to All Races</span>
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Matches</span>
         </button>
 
         {/* Live Status Badge */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {race.status === 'LIVE' && (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
               🔴 Live In-Play
             </span>
           )}
           {(race.status === 'OPEN' || race.status === 'UPCOMING') && (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-black uppercase tracking-wider shadow-sm">
-              <Clock className="w-3.5 h-3.5" />
-              ⏱ Upcoming (Pre-Match Market)
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] sm:text-xs font-bold uppercase tracking-wider shadow-sm">
+              <Clock className="w-3 h-3 text-emerald-400" />
+              ⏱ Upcoming Market
             </span>
           )}
           {race.status === 'CLOSED' && (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
-              <AlertCircle className="w-4 h-4" />
-              Betting Closed / Running
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+              <AlertCircle className="w-3 h-3" />
+              Closed / Running
             </span>
           )}
           {race.status === 'RESULTED' && (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-bold uppercase tracking-wider">
-              <CheckCircle2 className="w-4 h-4 text-blue-400" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+              <CheckCircle2 className="w-3 h-3 text-blue-400" />
               Official Result
             </span>
           )}
         </div>
       </div>
 
-      {/* ---------------- RACE HEADER BANNER (SRS Spec) ---------------- */}
-      <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-              <span className="flex items-center gap-1.5 text-amber-400 font-black bg-amber-500/10 px-3 py-1 rounded-xl border border-amber-500/20">
-                <MapPin className="w-3.5 h-3.5" />
-                {race.venue}
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-200 font-semibold bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 font-mono">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                {race.race_time} • {race.date_str}
-              </span>
-              {race.distance && (
-                <span className="text-slate-300 bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 font-mono font-bold">
-                  Distance: {race.distance}
+      {/* ---------------- RACE HEADER BANNER (Compact & Elegant Ascot Theme) ---------------- */}
+      <div className="rounded-2xl bg-[#091510]/95 border border-emerald-900/60 p-3.5 sm:p-4 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs">
+              {race.race_no && (
+                <span className="px-1.5 py-0.5 rounded bg-[#1a170b] text-[#e5b869] border border-[#e5b869]/30 font-black font-mono">
+                  RACE #{race.race_no}
                 </span>
               )}
+              <span className="flex items-center gap-1 text-[#e5b869] font-bold bg-[#1a170b] px-2 py-0.5 rounded border border-[#e5b869]/20">
+                <MapPin className="w-3 h-3" />
+                {race.venue}
+              </span>
+              <span className="text-emerald-900">•</span>
+              <span className="text-slate-300 font-mono flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-400" />
+                {race.race_time} - {race.date_str}
+              </span>
+              {race.distance && (
+                <>
+                  <span className="text-emerald-900">•</span>
+                  <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
+                </>
+              )}
               {race.going && (
-                <span className="text-emerald-400 bg-emerald-950/40 px-3 py-1 rounded-xl border border-emerald-800/40 font-medium">
-                  Track: {race.going}
-                </span>
+                <>
+                  <span className="text-emerald-900">•</span>
+                  <span className="text-slate-400">Track: <strong className="text-emerald-400">{race.going}</strong></span>
+                </>
               )}
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
+            <h1 className="text-base sm:text-xl font-black text-white tracking-tight">
               {race.name}
             </h1>
 
             {race.class_grade && (
-              <p className="text-xs sm:text-sm text-slate-400">
-                Grade: {race.class_grade}
+              <p className="text-[10px] sm:text-xs text-slate-400">
+                {race.class_grade}
               </p>
             )}
           </div>
 
-          {/* Quick stats on PC */}
-          <div className="flex items-center gap-4 bg-slate-950/90 p-3.5 rounded-2xl border border-slate-800 self-start lg:self-auto shadow-inner">
-            <div className="text-center px-2">
-              <p className="text-[11px] text-slate-500 uppercase font-bold">Runners</p>
-              <p className="text-xl font-black text-white font-mono">{race.horses.length}</p>
+          {/* Quick Runner & Bet Counters */}
+          <div className="flex items-center gap-2 bg-[#050e0a] px-3 py-1.5 rounded-xl border border-emerald-900/50 self-start sm:self-auto text-xs font-mono shadow-inner">
+            <div className="text-center px-1.5">
+              <span className="text-[9px] text-slate-500 uppercase font-bold block">Runners</span>
+              <span className="font-black text-white">{race.horses.length}</span>
             </div>
-            <div className="h-8 w-px bg-slate-800" />
-            <div className="text-center px-2">
-              <p className="text-[11px] text-slate-500 uppercase font-bold">My Bets</p>
-              <p className="text-xl font-black text-amber-400 font-mono">{userBetsForRace.length}</p>
-            </div>
-            <div className="h-8 w-px bg-slate-800" />
-            <div className="text-center px-2">
-              <p className="text-[11px] text-slate-500 uppercase font-bold">Pool Est.</p>
-              <p className="text-xl font-black text-emerald-400 font-mono">₹2.5L</p>
+            <div className="h-5 w-px bg-emerald-900/60" />
+            <div className="text-center px-1.5">
+              <span className="text-[9px] text-slate-500 uppercase font-bold block">My Bets</span>
+              <span className="font-black text-amber-400">{userBetsForRace.length}</span>
             </div>
           </div>
         </div>
 
         {/* Official Placements if RESULTED */}
         {race.status === 'RESULTED' && (
-          <div className="mt-5 p-4 rounded-2xl bg-blue-950/50 border border-blue-800/80 shadow-md">
-            <div className="flex items-center gap-2 mb-3 text-blue-300 font-bold text-sm">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span>Official Placing & Settled Results</span>
+          <div className="mt-3 p-2.5 rounded-xl bg-blue-950/40 border border-blue-800/60 text-xs">
+            <div className="flex items-center gap-1.5 mb-1.5 text-blue-300 font-bold text-[11px]">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>Official Placing</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               {winnerHorse && (
-                <div className="bg-slate-900 rounded-xl p-3 border border-amber-500/50 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
-                    1st
-                  </span>
-                  <div className="truncate">
-                    <p className="text-sm font-bold text-white truncate">#{winnerHorse.horse_no} {winnerHorse.name}</p>
-                    <p className="text-[11px] text-slate-400">Jockey: {winnerHorse.jockey}</p>
-                  </div>
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-amber-500/40 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] flex items-center justify-center">1st</span>
+                  <p className="text-xs font-bold text-white truncate">#{winnerHorse.horse_no} {winnerHorse.name}</p>
                 </div>
               )}
               {placeHorses[1] && (
-                <div className="bg-slate-900 rounded-xl p-3 border border-slate-700 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-xl bg-slate-300 text-slate-950 font-black text-xs flex items-center justify-center">
-                    2nd
-                  </span>
-                  <div className="truncate">
-                    <p className="text-sm font-bold text-white truncate">#{placeHorses[1].horse_no} {placeHorses[1].name}</p>
-                    <p className="text-[11px] text-slate-400">Jockey: {placeHorses[1].jockey}</p>
-                  </div>
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-slate-700 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-slate-300 text-slate-950 font-black text-[10px] flex items-center justify-center">2nd</span>
+                  <p className="text-xs font-bold text-white truncate">#{placeHorses[1].horse_no} {placeHorses[1].name}</p>
                 </div>
               )}
               {placeHorses[2] && (
-                <div className="bg-slate-900 rounded-xl p-3 border border-slate-700 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-xl bg-amber-700 text-amber-100 font-black text-xs flex items-center justify-center">
-                    3rd
-                  </span>
-                  <div className="truncate">
-                    <p className="text-sm font-bold text-white truncate">#{placeHorses[2].horse_no} {placeHorses[2].name}</p>
-                    <p className="text-[11px] text-slate-400">Jockey: {placeHorses[2].jockey}</p>
-                  </div>
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-slate-700 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-amber-700 text-amber-100 font-black text-[10px] flex items-center justify-center">3rd</span>
+                  <p className="text-xs font-bold text-white truncate">#{placeHorses[2].horse_no} {placeHorses[2].name}</p>
                 </div>
               )}
             </div>
@@ -215,42 +193,23 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
         )}
       </div>
 
-      {/* ---------------- TABS: RUNNERS & ODDS / 2D SIMULATOR / AI INSIGHTS / MY BETS ---------------- */}
-      <div className="flex flex-wrap items-center justify-between border-b border-slate-800 gap-2 pb-2">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none w-full lg:w-auto">
+      {/* ---------------- TABS: RUNNERS & ODDS / AI INSIGHTS / MY BETS (Simulator Removed) ---------------- */}
+      <div className="flex items-center justify-between border-b border-emerald-900/40 pb-1.5 gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
           <button
             id="tab-runners-btn"
             onClick={() => {
               soundManager.playClick();
               setActiveTab('runners');
             }}
-            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'runners'
-                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_10px_rgba(229,184,105,0.35)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>4-Column Odds Table</span>
-            <span className="px-2 py-0.2 bg-black/40 rounded-full text-[11px] font-mono">
-              {race.horses.length}
-            </span>
-          </button>
-
-          <button
-            id="tab-simulator-btn"
-            onClick={() => {
-              soundManager.playClick();
-              setActiveTab('simulator');
-            }}
-            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
-              activeTab === 'simulator'
-                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
-                : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
-            }`}
-          >
-            <Flame className="w-4 h-4 text-amber-400" />
-            <span>2D Turf Track Simulator</span>
+            <Layers className="w-3.5 h-3.5" />
+            <span>4-Column Odds Table ({race.horses.length})</span>
           </button>
 
           <button
@@ -259,13 +218,13 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               soundManager.playClick();
               setActiveTab('insights');
             }}
-            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'insights'
-                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_10px_rgba(229,184,105,0.35)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
             <span>Expert Form Insights</span>
           </button>
 
@@ -275,208 +234,203 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               soundManager.playClick();
               setActiveTab('mybets');
             }}
-            className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'mybets'
-                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_10px_rgba(229,184,105,0.35)]'
                 : 'bg-[#091510] text-slate-300 hover:text-white border border-emerald-900/40'
             }`}
           >
-            <Clock className="w-4 h-4" />
-            <span>My Bets on Race ({userBetsForRace.length})</span>
+            <Clock className="w-3.5 h-3.5" />
+            <span>My Bets ({userBetsForRace.length})</span>
           </button>
         </div>
 
-        <div className="hidden lg:flex items-center gap-2 text-xs text-slate-400">
+        <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400">
           <Info className="w-3.5 h-3.5 text-amber-400" />
-          <span>Click any Win or Place odds box to open the Bet Slip popup</span>
+          <span>Click Win / Place box to open Bet Slip</span>
         </div>
       </div>
 
-      {/* ---------------- TAB 1: 4-COLUMN ODDS TABLE (EXACT SRS SPEC) ---------------- */}
+      {/* ---------------- TAB 1: 4-COLUMN ODDS TABLE (HIGH-DENSITY, COMPACT FONT, NO HORIZONTAL SCROLL) ---------------- */}
       {activeTab === 'runners' && (
-        <div className="space-y-4">
-          
+        <div className="space-y-2">
           {!isOpen && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {race.status === 'CLOSED'
-                  ? 'This race is currently closed for betting. Odds are locked while runners compete.'
-                  : 'This race has been officially resulted. Payouts have been distributed to winning accounts.'}
+                  ? 'Betting is closed. Runners are in-play.'
+                  : 'Race resulted. Payouts distributed.'}
               </span>
             </div>
           )}
 
-          {/* TABLE - 4 COLUMNS: No | Horse Name | Win Odds | Place Odds */}
-          <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
-            <div className="overflow-x-auto scrollbar-none">
-              <table className="w-full min-w-[340px] text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-950 border-b border-slate-800 text-xs font-black uppercase tracking-wider text-slate-400">
-                    <th className="py-3 sm:py-4 px-2 sm:px-4 w-12 sm:w-16 text-center">No</th>
-                    <th className="py-3 sm:py-4 px-2.5 sm:px-6">Horse Name & Info</th>
-                    <th className="py-3 sm:py-4 px-1.5 sm:px-6 text-center w-24 sm:w-44">
-                      <div className="flex flex-col items-center">
-                        <span className="text-white font-black text-xs sm:text-sm">Win Odds</span>
-                        <span className="text-[9px] sm:text-[10px] text-amber-400 lowercase font-medium">must finish 1st</span>
-                      </div>
-                    </th>
-                    <th className="py-3 sm:py-4 px-1.5 sm:px-6 text-center w-24 sm:w-44">
-                      <div className="flex flex-col items-center">
-                        <span className="text-white font-black text-xs sm:text-sm">Place Odds</span>
-                        <span className="text-[9px] sm:text-[10px] text-emerald-400 lowercase font-medium">top 3 finish</span>
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-xs sm:text-sm">
-                  {race.horses.map((horse) => {
-                    const isWinner = race.winner_horse_id === horse.id;
-                    const isPlaced = race.place_horses_ids?.includes(horse.id);
+          {/* Compact Exchange Odds Table */}
+          <div className="overflow-hidden rounded-2xl border border-emerald-900/50 bg-[#07100b] shadow-xl">
+            <table className="w-full text-left border-collapse table-fixed">
+              <thead>
+                <tr className="bg-[#040906] border-b border-emerald-900/60 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
+                  <th className="py-2 px-1.5 sm:px-3 w-[12%] sm:w-12 text-center text-slate-300">
+                    No
+                  </th>
+                  <th className="py-2 px-1 sm:px-3 w-[48%] sm:w-auto text-slate-300">
+                    Horse & Jockey / Trainer
+                  </th>
+                  <th className="py-2 px-1 sm:px-2 w-[20%] sm:w-28 text-center">
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className="text-white font-black text-[10px] sm:text-xs">WIN Odds</span>
+                      <span className="text-[8px] text-emerald-400 font-medium hidden sm:inline">1st place</span>
+                    </div>
+                  </th>
+                  <th className="py-2 px-1 sm:px-2 w-[20%] sm:w-28 text-center">
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className="text-white font-black text-[10px] sm:text-xs">PLACE Odds</span>
+                      <span className="text-[8px] text-[#e5b869] font-medium hidden sm:inline">Top 3 place</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-950/70 text-xs">
+                {race.horses.map((horse) => {
+                  const isWinner = race.winner_horse_id === horse.id;
+                  const isPlaced = race.place_horses_ids?.includes(horse.id);
 
-                    return (
-                      <tr
-                        key={horse.id}
-                        id={`horse-row-${horse.id}`}
-                        className={`hover:bg-slate-850/80 transition ${
-                          isWinner ? 'bg-amber-500/10' : ''
-                        }`}
-                      >
-                        {/* Column 1: No */}
-                        <td className="py-3 sm:py-4 px-2 sm:px-4 text-center align-middle">
-                          <div className="inline-flex items-center justify-center w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm bg-slate-950 border border-slate-800 text-amber-400 shadow-inner font-mono">
-                            {horse.horse_no}
-                          </div>
-                        </td>
+                  return (
+                    <tr
+                      key={horse.id}
+                      id={`horse-row-${horse.id}`}
+                      className={`hover:bg-[#0c1c14] transition-colors ${
+                        isWinner ? 'bg-amber-500/10' : ''
+                      }`}
+                    >
+                      {/* Column 1: Serial No & Draw Gate */}
+                      <td className="py-1.5 sm:py-2 px-1 sm:px-2.5 text-center align-middle">
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1">
+                          <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-[#040805] border border-emerald-900/60 text-[#e5b869] font-black text-[10px] sm:text-[11px] flex items-center justify-center font-mono shadow-inner">
+                            {horse.horse_no || horse.serial_no}
+                          </span>
+                          {horse.gate_no !== undefined && (
+                            <span className="text-[8px] sm:text-[9px] font-mono text-slate-400">
+                              D{horse.gate_no}
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                        {/* Column 2: Horse Name */}
-                        <td className="py-3 sm:py-4 px-2.5 sm:px-6 align-middle min-w-[130px]">
-                          <div className="flex items-center gap-2.5 sm:gap-3.5">
-                            <SilkIcon
-                              color={horse.silk_color}
-                              number={horse.horse_no}
-                              size="md"
-                            />
+                      {/* Column 2: Horse Info, Silk, Jockey, Trainer, Form */}
+                      <td className="py-1.5 sm:py-2 px-1 sm:px-3 align-middle overflow-hidden">
+                        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                          <SilkIcon
+                            color={horse.silk_color}
+                            number={horse.horse_no || horse.serial_no}
+                            size="sm"
+                          />
 
-                            <div className="space-y-0.5 sm:space-y-1 min-w-0">
-                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                <span className="font-extrabold text-white text-xs sm:text-base tracking-tight hover:text-rose-400 transition">
-                                  {horse.name}
+                          <div className="min-w-0 flex-1 leading-tight">
+                            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                              <span className="font-bold text-white text-xs sm:text-sm tracking-tight truncate">
+                                {horse.name}
+                              </span>
+                              {isWinner && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[9px] uppercase shadow">
+                                  🏆 1st
                                 </span>
-                                {isWinner && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] uppercase shadow">
-                                    <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Winner
-                                  </span>
-                                )}
-                                {!isWinner && isPlaced && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[9px] sm:text-[10px] uppercase">
-                                    Placed
-                                  </span>
-                                )}
-                              </div>
+                              )}
+                              {!isWinner && isPlaced && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[8px] sm:text-[9px] uppercase">
+                                  Place
+                                </span>
+                              )}
+                            </div>
 
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-slate-400">
-                                <span>J: <strong className="text-slate-200">{horse.jockey}</strong></span>
-                                <span>•</span>
-                                <span>T: <strong className="text-slate-300">{horse.trainer}</strong></span>
-                                {horse.form && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-amber-400 font-mono font-bold text-[10px] sm:text-[11px] bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                                      Form: {horse.form}
-                                    </span>
-                                  </>
-                                )}
-                                {horse.weight && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-slate-500 font-mono hidden sm:inline">{horse.weight}</span>
-                                  </>
-                                )}
-                              </div>
+                            <div className="flex items-center gap-x-1.5 text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
+                              <span className="truncate">J: <strong className="text-slate-300 font-semibold">{horse.jockey}</strong></span>
+                              <span className="text-emerald-900">•</span>
+                              <span className="truncate hidden sm:inline">T: <strong className="text-slate-300 font-semibold">{horse.trainer}</strong></span>
+                              {horse.form && (
+                                <>
+                                  <span className="text-emerald-900 hidden sm:inline">•</span>
+                                  <span className="text-[#e5b869] font-mono font-bold text-[9px] bg-[#1a170b] px-1 rounded border border-[#e5b869]/20 hidden sm:inline">
+                                    {horse.form}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Column 3: Win Odds (Clickable Button) */}
-                        <td className="py-3 sm:py-4 px-1.5 sm:px-6 text-center align-middle">
-                          <button
-                            id={`win-odds-btn-${horse.id}`}
-                            disabled={!isOpen}
-                            onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
-                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
-                              isOpen
-                                ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-emerald-900/40 hover:scale-[1.02]'
-                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                            }`}
-                          >
-                            <span className="block text-sm sm:text-base tracking-tight font-black font-mono">
-                              {formatOdds(horse.win_odds, oddsFormat)}
-                            </span>
-                            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider block font-bold opacity-90">
-                              WIN
-                            </span>
-                          </button>
-                        </td>
+                      {/* Column 3: WIN Odds Button */}
+                      <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
+                        <button
+                          id={`win-odds-btn-${horse.id}`}
+                          disabled={!isOpen}
+                          onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
+                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 cursor-pointer flex flex-col items-center justify-center leading-none ${
+                            isOpen
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02]'
+                              : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
+                          }`}
+                        >
+                          <span className="text-xs sm:text-sm font-mono font-black">
+                            {formatOdds(horse.win_odds, oddsFormat)}
+                          </span>
+                          <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                            WIN
+                          </span>
+                        </button>
+                      </td>
 
-                        {/* Column 4: Place Odds (Clickable Button) */}
-                        <td className="py-3 sm:py-4 px-1.5 sm:px-6 text-center align-middle">
-                          <button
-                            id={`place-odds-btn-${horse.id}`}
-                            disabled={!isOpen}
-                            onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
-                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
-                              isOpen
-                                ? 'bg-[#091510] hover:bg-[#18160c] text-[#e5b869] hover:text-[#f2d08a] border border-[#e5b869]/60 hover:border-[#e5b869] shadow-[0_0_10px_rgba(229,184,105,0.2)] hover:scale-[1.02]'
-                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                            }`}
-                          >
-                            <span className="block text-sm sm:text-base tracking-tight font-black font-mono">
-                              {formatOdds(horse.place_odds, oddsFormat)}
-                            </span>
-                            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider block font-bold opacity-90">
-                              PLACE
-                            </span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      {/* Column 4: PLACE Odds Button */}
+                      <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
+                        <button
+                          id={`place-odds-btn-${horse.id}`}
+                          disabled={!isOpen}
+                          onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
+                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 cursor-pointer flex flex-col items-center justify-center leading-none ${
+                            isOpen
+                              ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02]'
+                              : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
+                          }`}
+                        >
+                          <span className="text-xs sm:text-sm font-mono font-black">
+                            {formatOdds(horse.place_odds, oddsFormat)}
+                          </span>
+                          <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                            PLACE
+                          </span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* ---------------- TAB 2: 2D TURF SIMULATOR ---------------- */}
-      {activeTab === 'simulator' && (
-        <div className="animate-in fade-in">
-          <RaceSimulator race={race} />
-        </div>
-      )}
-
-      {/* ---------------- TAB 3: EXPERT FORM INSIGHTS ---------------- */}
+      {/* ---------------- TAB 2: EXPERT FORM INSIGHTS ---------------- */}
       {activeTab === 'insights' && (
-        <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-red-500" />
-            <h3 className="text-base font-black text-white">Official Turf Form Analysis</h3>
+        <div className="p-4 rounded-2xl bg-[#091510] border border-emerald-900/50 space-y-3 shadow-xl">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <h3 className="text-sm font-black text-white">Official Turf Form Analysis</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 space-y-1.5">
-              <span className="text-xs font-black uppercase text-amber-400">🔥 Primary Recommendation (Favorite)</span>
-              <h4 className="text-sm font-bold text-white">#{race.horses[0]?.horse_no} {race.horses[0]?.name}</h4>
-              <p className="text-slate-400">Jockey: {race.horses[0]?.jockey} • Trainer: {race.horses[0]?.trainer}</p>
-              <p className="text-slate-300 bg-slate-900 p-2.5 rounded-xl border border-slate-800 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-[#040906] border border-amber-500/30 space-y-1">
+              <span className="text-[10px] font-black uppercase text-amber-400">🔥 Favorite Pick</span>
+              <h4 className="text-xs font-bold text-white">#{race.horses[0]?.horse_no} {race.horses[0]?.name}</h4>
+              <p className="text-slate-400 text-[11px]">Jockey: {race.horses[0]?.jockey} • Trainer: {race.horses[0]?.trainer}</p>
+              <p className="text-slate-300 bg-[#091510] p-2 rounded-lg border border-emerald-950 text-[10px] mt-1">
                 Fastest closing split in trial gallops. High strike rate jockey aboard.
               </p>
             </div>
-            <div className="p-4 rounded-2xl bg-slate-950/90 border border-rose-500/30 space-y-1.5">
-              <span className="text-xs font-black uppercase text-rose-400">⚡ Value Proposition (Each-Way)</span>
-              <h4 className="text-sm font-bold text-white">#{race.horses[1]?.horse_no} {race.horses[1]?.name}</h4>
-              <p className="text-slate-400">Jockey: {race.horses[1]?.jockey} • Odds: {formatOdds(race.horses[1]?.place_odds || 2.0, oddsFormat)}</p>
-              <p className="text-slate-300 bg-slate-900 p-2.5 rounded-xl border border-slate-800 mt-2">
+            <div className="p-3 rounded-xl bg-[#040906] border border-emerald-500/30 space-y-1">
+              <span className="text-[10px] font-black uppercase text-emerald-400">⚡ Value Proposition</span>
+              <h4 className="text-xs font-bold text-white">#{race.horses[1]?.horse_no} {race.horses[1]?.name}</h4>
+              <p className="text-slate-400 text-[11px]">Jockey: {race.horses[1]?.jockey} • Odds: {formatOdds(race.horses[1]?.place_odds || 2.0, oddsFormat)}</p>
+              <p className="text-slate-300 bg-[#091510] p-2 rounded-lg border border-emerald-950 text-[10px] mt-1">
                 High consistency rating in top-3 placings across standard distances.
               </p>
             </div>
@@ -484,14 +438,14 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
         </div>
       )}
 
-      {/* ---------------- TAB 4: MY BETS FOR THIS RACE ---------------- */}
+      {/* ---------------- TAB 3: MY BETS FOR THIS RACE ---------------- */}
       {activeTab === 'mybets' && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {userBetsForRace.length === 0 ? (
-            <div className="text-center py-14 bg-slate-900/70 rounded-3xl border border-slate-800 p-6 shadow-inner">
-              <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-base font-bold text-slate-200">No bets placed on this race yet</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            <div className="text-center py-10 bg-[#091510]/80 rounded-2xl border border-emerald-900/40 p-5">
+              <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-slate-200">No bets placed on this race yet</h3>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
                 Click any Win or Place odds from the table above to open the Bet Slip.
               </p>
               <button
@@ -499,61 +453,61 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                   soundManager.playClick();
                   setActiveTab('runners');
                 }}
-                className="mt-4 px-5 py-2.5 rounded-2xl bg-rose-600 text-white font-black text-xs hover:bg-rose-500 transition cursor-pointer"
+                className="mt-3 px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black text-xs transition cursor-pointer"
               >
                 View 4-Column Odds Table
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {userBetsForRace.map((bet) => (
                 <div
                   key={bet.id}
-                  className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 space-y-3 shadow-xl"
+                  className="bg-[#091510] border border-emerald-900/50 rounded-2xl p-3 space-y-2 shadow-md"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-black text-xs flex items-center justify-center font-mono">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-black border border-emerald-900/60 text-amber-400 font-black text-[11px] flex items-center justify-center font-mono">
                         #{bet.horse_no}
                       </span>
-                      <h4 className="font-bold text-white text-base">{bet.horse_name}</h4>
+                      <h4 className="font-bold text-white text-xs sm:text-sm">{bet.horse_name}</h4>
                     </div>
 
                     {bet.status === 'PENDING' && (
-                      <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-black">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] font-black">
                         PENDING
                       </span>
                     )}
                     {bet.status === 'WON' && (
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-black">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black">
                         WON (+₹{bet.payout?.toLocaleString('en-IN')})
                       </span>
                     )}
                     {bet.status === 'LOST' && (
-                      <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-black">
+                      <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-black">
                         LOST
                       </span>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-2xl text-xs font-mono">
+                  <div className="grid grid-cols-3 gap-1.5 bg-[#040805] p-2 rounded-xl text-[10px] font-mono">
                     <div>
-                      <p className="text-slate-500 font-sans text-[11px]">Type</p>
+                      <p className="text-slate-500 text-[9px]">Type</p>
                       <p className="font-bold text-slate-200">{bet.bet_type}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500 font-sans text-[11px]">Locked Odds</p>
+                      <p className="text-slate-500 text-[9px]">Odds</p>
                       <p className="font-bold text-amber-400">{formatOdds(bet.odds, oddsFormat)}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500 font-sans text-[11px]">Stake</p>
+                      <p className="text-slate-500 text-[9px]">Stake</p>
                       <p className="font-bold text-white">₹{bet.stake.toLocaleString('en-IN')}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-800">
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-950">
                     <span className="text-slate-400">Potential Return:</span>
-                    <span className="font-black text-emerald-400 font-mono text-base">₹{bet.potential_win.toLocaleString('en-IN')}</span>
+                    <span className="font-black text-emerald-400 font-mono text-xs">₹{bet.potential_win.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               ))}
