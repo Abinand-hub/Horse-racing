@@ -320,9 +320,13 @@ export const MyBets: React.FC<MyBetsProps> = ({
                                 </span>
                               )}
                               {bet.status === 'WON' && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-sm">
-                                  <Trophy className="w-3 h-3" />
-                                  WON (+₹{bet.payout?.toLocaleString('en-IN')})
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-sm ${
+                                  bet.is_dead_heat
+                                    ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+                                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                }`}>
+                                  <Trophy className="w-3 h-3 text-amber-400" />
+                                  {bet.is_dead_heat ? `WON (Dead Heat) (+₹${bet.payout?.toLocaleString('en-IN')})` : `WON (+₹${bet.payout?.toLocaleString('en-IN')})`}
                                 </span>
                               )}
                               {bet.status === 'LOST' && (
@@ -333,6 +337,13 @@ export const MyBets: React.FC<MyBetsProps> = ({
                               )}
                             </div>
                           </div>
+
+                          {bet.is_dead_heat && bet.status === 'WON' && (
+                            <div className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-300 font-semibold flex items-center justify-between gap-2">
+                              <span>⚡ Settled as per Dead Heat Rule: 1/{bet.dead_heat_divider || 2} Stake Split across tied winners</span>
+                              <span className="font-mono text-[10px] bg-amber-500/20 px-2 py-0.5 rounded text-amber-200">Payout: ₹{bet.payout?.toLocaleString('en-IN')}</span>
+                            </div>
+                          )}
 
                           {/* Bottom Metrics Details Grid */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#020503] p-2.5 rounded-xl text-[11px] sm:text-xs font-mono border border-emerald-950/80">

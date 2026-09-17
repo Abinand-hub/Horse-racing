@@ -50,6 +50,11 @@ export interface Race {
   image_url?: string;
   winner_horse_id?: string | null;
   place_horses_ids?: string[]; // IDs of horses in 1st, 2nd, 3rd
+  position_1?: string[]; // IDs of horses tied for 1st place (Dead Heat)
+  position_2?: string[]; // IDs of horses tied for 2nd place
+  position_3?: string[]; // IDs of horses tied for 3rd place
+  is_dead_heat?: boolean;
+  dead_heat_note?: string;
   horses: Horse[];
   settled_at?: string | null;
 }
@@ -74,6 +79,8 @@ export interface Bet {
   potential_win: number;
   payout?: number;
   status: BetStatus;
+  is_dead_heat?: boolean;
+  dead_heat_divider?: number;
   placed_at: string;
   settled_at?: string | null;
 }

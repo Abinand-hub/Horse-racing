@@ -64,18 +64,39 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
             </div>
           ) : (
             resultedRaces.map((race) => {
-              const winner = race.horses.find((h) => h.id === race.winner_horse_id);
-              const second = race.place_horses_ids?.[1]
-                ? race.horses.find((h) => h.id === race.place_horses_ids?.[1])
-                : null;
-              const third = race.place_horses_ids?.[2]
-                ? race.horses.find((h) => h.id === race.place_horses_ids?.[2])
-                : null;
+              const isDeadHeat = !!(
+                race.is_dead_heat ||
+                (race.position_1 && race.position_1.length > 1) ||
+                (race.position_2 && race.position_2.length > 1) ||
+                (race.position_3 && race.position_3.length > 1)
+              );
+
+              const p1 = race.position_1 && race.position_1.length > 0
+                ? race.position_1.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean)
+                : race.winner_horse_id
+                ? [race.horses.find((h) => h.id === race.winner_horse_id)].filter(Boolean)
+                : [];
+
+              const p2 = race.position_2 && race.position_2.length > 0
+                ? race.position_2.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean)
+                : race.place_horses_ids?.[1]
+                ? [race.horses.find((h) => h.id === race.place_horses_ids?.[1])].filter(Boolean)
+                : [];
+
+              const p3 = race.position_3 && race.position_3.length > 0
+                ? race.position_3.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean)
+                : race.place_horses_ids?.[2]
+                ? [race.horses.find((h) => h.id === race.place_horses_ids?.[2])].filter(Boolean)
+                : [];
 
               return (
                 <div
                   key={race.id}
-                  className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
+                  className={`rounded-xl p-4 border space-y-3 transition ${
+                    isDeadHeat 
+                      ? 'bg-slate-950 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' 
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -83,6 +104,14 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
                         <span className="text-amber-400 font-bold">{race.venue}</span>
                         <span>•</span>
                         <span>{race.race_time}</span>
+                        {isDeadHeat && (
+                          <>
+                            <span>•</span>
+                            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-black text-[10px] uppercase border border-amber-500/40">
+                              🔥 Dead Heat
+                            </span>
+                          </>
+                        )}
                       </div>
                       <h4 className="font-bold text-white text-base mt-0.5">{race.name}</h4>
                     </div>
@@ -101,40 +130,48 @@ export const RecentResultsModal: React.FC<RecentResultsModalProps> = ({
 
                   {/* Placings podium */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    {winner && (
-                      <div className="bg-slate-900 rounded-lg p-2.5 border border-amber-500/30 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
-                          1st
+                    {p1.map((h, i) => (
+                      <div key={h?.id || i} className="bg-slate-900 rounded-lg p-2.5 border border-amber-500/40 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow">
+                          1st {p1.length > 1 ? 'DH' : ''}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-white break-words">#{winner.horse_no} {winner.name}</p>
-                          <p className="text-[11px] text-amber-400 font-mono">Win: {winner.win_odds.toFixed(2)}</p>
+                          <p className="font-bold text-white break-words">#{h?.horse_no || h?.serial_no} {h?.name}</p>
+                          <p className="text-[11px] text-amber-400 font-mono">Win: {h?.win_odds.toFixed(2)}</p>
                         </div>
                       </div>
-                    )}
-                    {second && (
-                      <div className="bg-slate-900 rounded-lg p-2.5 border border-slate-700 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-slate-400 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
-                          2nd
+                    ))}
+
+                    {p2.map((h, i) => (
+                      <div key={h?.id || i} className="bg-slate-900 rounded-lg p-2.5 border border-slate-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-slate-300 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
+                          2nd {p2.length > 1 ? 'DH' : ''}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-white break-words">#{second.horse_no} {second.name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">Place: {second.place_odds.toFixed(2)}</p>
+                          <p className="font-bold text-white break-words">#{h?.horse_no || h?.serial_no} {h?.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">Place: {h?.place_odds.toFixed(2)}</p>
                         </div>
                       </div>
-                    )}
-                    {third && (
-                      <div className="bg-slate-900 rounded-lg p-2.5 border border-slate-700 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-800 text-amber-200 font-black text-[10px] flex items-center justify-center shrink-0">
-                          3rd
+                    ))}
+
+                    {p3.map((h, i) => (
+                      <div key={h?.id || i} className="bg-slate-900 rounded-lg p-2.5 border border-slate-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-amber-800 text-amber-200 font-black text-[10px] flex items-center justify-center shrink-0">
+                          3rd {p3.length > 1 ? 'DH' : ''}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-white break-words">#{third.horse_no} {third.name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">Place: {third.place_odds.toFixed(2)}</p>
+                          <p className="font-bold text-white break-words">#{h?.horse_no || h?.serial_no} {h?.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">Place: {h?.place_odds.toFixed(2)}</p>
                         </div>
                       </div>
-                    )}
+                    ))}
                   </div>
+
+                  {isDeadHeat && (
+                    <div className="text-[10px] text-amber-300/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 font-medium">
+                      ⚡ Settled as per Dead Heat Rule (Proportional Stake Division)
+                    </div>
+                  )}
                 </div>
               );
             })

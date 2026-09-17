@@ -84,14 +84,29 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
   const race = currentRace;
 
-  const winnerHorse = race.winner_horse_id
-    ? race.horses.find((h) => h.id === race.winner_horse_id)
-    : null;
+  const isDeadHeat = !!(
+    race.is_dead_heat ||
+    (race.position_1 && race.position_1.length > 1) ||
+    (race.position_2 && race.position_2.length > 1) ||
+    (race.position_3 && race.position_3.length > 1)
+  );
 
-  const placeHorses = race.place_horses_ids
-    ? race.place_horses_ids
-        .map((id) => race.horses.find((h) => h.id === id))
-        .filter(Boolean) as Horse[]
+  const p1Horses = race.position_1 && race.position_1.length > 0
+    ? (race.position_1.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean) as Horse[])
+    : race.winner_horse_id
+    ? ([race.horses.find((h) => h.id === race.winner_horse_id)].filter(Boolean) as Horse[])
+    : [];
+
+  const p2Horses = race.position_2 && race.position_2.length > 0
+    ? (race.position_2.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean) as Horse[])
+    : race.place_horses_ids?.[1]
+    ? ([race.horses.find((h) => h.id === race.place_horses_ids[1])].filter(Boolean) as Horse[])
+    : [];
+
+  const p3Horses = race.position_3 && race.position_3.length > 0
+    ? (race.position_3.map((id) => race.horses.find((h) => h.id === id)).filter(Boolean) as Horse[])
+    : race.place_horses_ids?.[2]
+    ? ([race.horses.find((h) => h.id === race.place_horses_ids[2])].filter(Boolean) as Horse[])
     : [];
 
   const isOpen = race.status === 'OPEN' || race.status === 'UPCOMING' || race.status === 'LIVE';
@@ -143,9 +158,13 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             </span>
           )}
           {race.status === 'RESULTED' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
-              <CheckCircle2 className="w-2.5 h-2.5 text-blue-400" />
-              Resulted
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
+              isDeadHeat 
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+            }`}>
+              <CheckCircle2 className="w-2.5 h-2.5 text-amber-400" />
+              {isDeadHeat ? '🏁 Dead Heat Result' : 'Resulted'}
             </span>
           )}
         </div>
@@ -251,14 +270,43 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
       {/* ---------------- TAB 1: 4-COLUMN ODDS TABLE (ULTRA COMPACT - FITS 15-20 RUNNERS) ---------------- */}
       {activeTab === 'runners' && (
-        <div className="space-y-1.5">
-          {!isOpen && (
+        <div className="space-y-2">
+          {race.status === 'RESULTED' && (
+            <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg ${
+              isDeadHeat
+                ? 'bg-gradient-to-r from-[#1c1404] via-[#241a05] to-[#120e03] border-amber-500/60 text-amber-200'
+                : 'bg-[#091510] border-blue-500/40 text-blue-200'
+            }`}>
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm">
+                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="break-words">
+                    {isDeadHeat
+                      ? `Result: DEAD HEAT - 1st Place: ${p1Horses.map((h) => `No. ${h.horse_no || h.serial_no} ${h.name}`).join(' & ')}`
+                      : `Official Winner: No. ${p1Horses[0]?.horse_no || p1Horses[0]?.serial_no} ${p1Horses[0]?.name || ''}`}
+                  </span>
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-amber-300/80 font-medium">
+                  {isDeadHeat
+                    ? '⚡ Settled as per Dead Heat Rule (Stake divided proportionally across tied runners)'
+                    : 'Race resulted. Official payouts credited to winning tickets.'}
+                </p>
+              </div>
+              {isDeadHeat && (
+                <span className="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider self-start sm:self-auto shrink-0 shadow">
+                  Dead Heat Settlement
+                </span>
+              )}
+            </div>
+          )}
+
+          {!isOpen && race.status !== 'RESULTED' && (
             <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] flex items-center gap-1.5">
               <AlertCircle className="w-3 h-3 shrink-0" />
               <span>
                 {race.status === 'CLOSED'
                   ? 'Betting is closed. Runners are in-play.'
-                  : 'Race resulted. Payouts distributed.'}
+                  : 'Race completed.'}
               </span>
             </div>
           )}
@@ -290,8 +338,10 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
               </thead>
               <tbody className="divide-y divide-emerald-950/70">
                 {race.horses.map((horse) => {
-                  const isWinner = race.winner_horse_id === horse.id;
-                  const isPlaced = race.place_horses_ids?.includes(horse.id);
+                  const isP1 = p1Horses.some((h) => h.id === horse.id);
+                  const isP2 = p2Horses.some((h) => h.id === horse.id);
+                  const isP3 = p3Horses.some((h) => h.id === horse.id);
+                  const isWinner = isP1;
                   const isSuspended = horse.is_suspended || race.is_suspended;
 
                   return (
@@ -335,14 +385,23 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                                   SUSPENDED
                                 </span>
                               )}
-                              {isWinner && (
-                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[9px] uppercase shadow">
-                                  🏆 1st
+                              {isP1 && (
+                                <span className={`inline-flex items-center px-1.5 py-0.2 rounded font-black text-[8px] sm:text-[9px] uppercase shadow ${
+                                  p1Horses.length > 1
+                                    ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950'
+                                    : 'bg-amber-500 text-slate-950'
+                                }`}>
+                                  🏆 1st {p1Horses.length > 1 ? '(DH)' : ''}
                                 </span>
                               )}
-                              {!isWinner && isPlaced && (
-                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-[8px] sm:text-[9px] uppercase">
-                                  Place
+                              {isP2 && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-slate-300 text-slate-950 font-black text-[8px] sm:text-[9px] uppercase shadow">
+                                  🥈 2nd {p2Horses.length > 1 ? '(DH)' : ''}
+                                </span>
+                              )}
+                              {isP3 && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-amber-800 text-amber-200 font-black text-[8px] sm:text-[9px] uppercase shadow">
+                                  🥉 3rd {p3Horses.length > 1 ? '(DH)' : ''}
                                 </span>
                               )}
                             </div>
@@ -519,8 +578,12 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                       </span>
                     )}
                     {bet.status === 'WON' && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black">
-                        WON (+₹{bet.payout?.toLocaleString('en-IN')})
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${
+                        bet.is_dead_heat
+                          ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {bet.is_dead_heat ? `WON (Dead Heat 1/${bet.dead_heat_divider || 2}) (+₹${bet.payout?.toLocaleString('en-IN')})` : `WON (+₹${bet.payout?.toLocaleString('en-IN')})`}
                       </span>
                     )}
                     {bet.status === 'LOST' && (
@@ -529,6 +592,12 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {bet.is_dead_heat && bet.status === 'WON' && (
+                    <div className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300 font-semibold flex items-center gap-1">
+                      <span>⚡ Settled as per Dead Heat Rule: Stake divided across {bet.dead_heat_divider || 2} tied winners.</span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-3 gap-1.5 bg-[#040805] p-2 rounded-xl text-[10px] font-mono">
                     <div>

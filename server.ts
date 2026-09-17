@@ -1371,70 +1371,156 @@ app.put('/api/admin/horses/:id/odds', (req, res) => {
   return res.json({ success: true, horse: foundHorse });
 });
 
-// 5. SETTLE RACE & AUTO PAYOUT BETS (CORE REQUIREMENT)
-// On Resulted: Select Winner & Place horses -> System auto settles all bets (WON/LOST) and updates balance & exposure
+// 5. SETTLE RACE & AUTO PAYOUT BETS (CORE REQUIREMENT - WITH DEAD HEAT SUPPORT)
+// Supports multi-horse dead heat for 1st, 2nd, and 3rd place with Method A (Betfair / Industry Standard) stake division
 app.post('/api/admin/races/:id/settle', (req, res) => {
-  const { winner_horse_id, place_horses_ids } = req.body;
+  const { position_1, position_2, position_3, winner_horse_id, place_horses_ids } = req.body;
   const race = db.races.find((r) => r.id === req.params.id);
   if (!race) return res.status(404).json({ error: 'Race not found' });
 
-  if (!winner_horse_id) {
-    return res.status(400).json({ error: 'Winner horse ID is required to settle race' });
+  // Determine positions array
+  let p1: string[] = [];
+  let p2: string[] = [];
+  let p3: string[] = [];
+
+  if (Array.isArray(position_1) && position_1.length > 0) {
+    p1 = position_1.filter(Boolean);
+    p2 = Array.isArray(position_2) ? position_2.filter(Boolean) : [];
+    p3 = Array.isArray(position_3) ? position_3.filter(Boolean) : [];
+  } else if (winner_horse_id) {
+    p1 = [winner_horse_id];
+    const placeList = Array.isArray(place_horses_ids) ? place_horses_ids : [winner_horse_id];
+    p2 = placeList.filter(id => id !== winner_horse_id).slice(0, 1);
+    p3 = placeList.filter(id => id !== winner_horse_id).slice(1);
+  } else {
+    return res.status(400).json({ error: '1st Place winner horse is required to settle race' });
   }
 
-  const winnerHorse = race.horses.find((h) => h.id === winner_horse_id);
-  if (!winnerHorse) {
-    return res.status(400).json({ error: 'Invalid winner horse selected' });
+  if (p1.length === 0) {
+    return res.status(400).json({ error: 'At least one horse must be selected for 1st Place' });
   }
 
-  const placeList: string[] = Array.isArray(place_horses_ids) ? place_horses_ids : [winner_horse_id];
-  if (!placeList.includes(winner_horse_id)) {
-    placeList.unshift(winner_horse_id);
+  const isDeadHeatWin = p1.length > 1;
+  const isDeadHeatPlace = p2.length > 1 || p3.length > 1;
+  const isDeadHeat = isDeadHeatWin || isDeadHeatPlace;
+
+  // Place multipliers calculation (Total 3 place slots)
+  // For each horse, determine place qualification factor (0 to 1.0)
+  const placeFactorMap = new Map<string, number>();
+  let remainingSlots = 3;
+
+  // Tier 1 (1st Place)
+  if (p1.length >= 3) {
+    const factor = 3 / p1.length;
+    p1.forEach(hId => placeFactorMap.set(hId, factor));
+    remainingSlots = 0;
+  } else {
+    p1.forEach(hId => placeFactorMap.set(hId, 1.0));
+    remainingSlots -= p1.length;
   }
 
-  race.winner_horse_id = winner_horse_id;
-  race.place_horses_ids = placeList;
+  // Tier 2 (2nd Place)
+  if (remainingSlots > 0 && p2.length > 0) {
+    if (p2.length <= remainingSlots) {
+      p2.forEach(hId => placeFactorMap.set(hId, 1.0));
+      remainingSlots -= p2.length;
+    } else {
+      const factor = remainingSlots / p2.length;
+      p2.forEach(hId => placeFactorMap.set(hId, factor));
+      remainingSlots = 0;
+    }
+  }
+
+  // Tier 3 (3rd Place)
+  if (remainingSlots > 0 && p3.length > 0) {
+    if (p3.length <= remainingSlots) {
+      p3.forEach(hId => placeFactorMap.set(hId, 1.0));
+      remainingSlots -= p3.length;
+    } else {
+      const factor = remainingSlots / p3.length;
+      p3.forEach(hId => placeFactorMap.set(hId, factor));
+      remainingSlots = 0;
+    }
+  }
+
+  const placeAll = [...p1, ...p2, ...p3];
+  race.position_1 = p1;
+  race.position_2 = p2;
+  race.position_3 = p3;
+  race.winner_horse_id = p1[0] || null;
+  race.place_horses_ids = placeAll;
+  race.is_dead_heat = isDeadHeat;
+  race.dead_heat_note = isDeadHeatWin 
+    ? `DEAD HEAT FOR WIN (${p1.length} Horses Tied for 1st)` 
+    : isDeadHeatPlace 
+    ? `DEAD HEAT FOR PLACE` 
+    : undefined;
   race.status = 'RESULTED';
   race.settled_at = new Date().toISOString();
 
   // Find all pending bets for this race
-  const pendingBets = db.bets.filter((b) => b.race_id === race.id && b.status === 'PENDING');
+  const pendingBets = db.bets.filter((b) => (b.race_id === race.id || b.race_name === race.name) && b.status === 'PENDING');
   let settledCount = 0;
   let totalPayout = 0;
 
   for (const bet of pendingBets) {
     const betUser = db.users.find((u) => u.id === bet.user_id);
     let isWon = false;
+    let betPayout = 0;
+    let betIsDeadHeat = false;
+    let deadHeatDivider = 1;
 
     if (bet.bet_type === 'WIN') {
-      isWon = bet.horse_id === winner_horse_id;
+      if (p1.includes(bet.horse_id)) {
+        isWon = true;
+        if (p1.length > 1) {
+          betIsDeadHeat = true;
+          deadHeatDivider = p1.length;
+          // Method A: Half Stake Win (Divide stake by N winners)
+          betPayout = Math.round((bet.stake / p1.length) * bet.odds);
+        } else {
+          betPayout = Math.round(bet.stake * bet.odds);
+        }
+      }
     } else if (bet.bet_type === 'PLACE') {
-      isWon = placeList.includes(bet.horse_id);
+      const factor = placeFactorMap.get(bet.horse_id) || 0;
+      if (factor > 0) {
+        isWon = true;
+        if (factor < 1.0) {
+          betIsDeadHeat = true;
+          deadHeatDivider = Math.round(1 / factor);
+          betPayout = Math.round((bet.stake * factor) * bet.odds);
+        } else {
+          betPayout = Math.round(bet.stake * bet.odds);
+        }
+      }
     }
 
     bet.settled_at = new Date().toISOString();
 
     if (isWon) {
       bet.status = 'WON';
-      const payoutAmount = Math.round(bet.stake * bet.odds);
-      bet.payout = payoutAmount;
-      totalPayout += payoutAmount;
+      bet.payout = betPayout;
+      bet.is_dead_heat = betIsDeadHeat;
+      bet.dead_heat_divider = betIsDeadHeat ? deadHeatDivider : undefined;
+      totalPayout += betPayout;
 
       if (betUser) {
-        // Credit payout to balance
-        betUser.balance += payoutAmount;
-        // Release exposure
+        betUser.balance += betPayout;
         betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
 
-        // Record payout transaction
+        const winDesc = betIsDeadHeat 
+          ? `Payout WON (Dead Heat 1/${deadHeatDivider}): ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race.name} (₹${betPayout.toLocaleString('en-IN')})`
+          : `Payout WON: ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race.name} (Odds: ${bet.odds})`;
+
         const winTx: Transaction = {
           id: generateId('tx'),
           user_id: betUser.id,
           username: betUser.username,
           type: 'WIN',
-          amount: payoutAmount,
+          amount: betPayout,
           balance_after: betUser.balance,
-          description: `Payout WON: ${bet.bet_type} bet on ${bet.horse_name} in ${race.name} (Odds: ${bet.odds})`,
+          description: winDesc,
           created_at: new Date().toISOString(),
           reference_id: bet.id,
         };
@@ -1443,9 +1529,7 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
     } else {
       bet.status = 'LOST';
       bet.payout = 0;
-
       if (betUser) {
-        // Release exposure on lost bet
         betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
       }
     }
@@ -1454,9 +1538,14 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
 
   saveDatabase();
 
+  const winnerNames = p1.map(id => race.horses.find(h => h.id === id)?.name || id).join(' & ');
+  const message = isDeadHeatWin
+    ? `🔥 DEAD HEAT Result Declared! 1st Place tied between: ${winnerNames}. ${settledCount} bets settled as per Dead Heat rules (₹${totalPayout.toLocaleString('en-IN')} paid out).`
+    : `Race "${race.name}" settled with winner ${winnerNames}! ${settledCount} bets settled (₹${totalPayout.toLocaleString('en-IN')} paid out).`;
+
   return res.json({
     success: true,
-    message: `Race "${race.name}" settled! ${settledCount} bets settled (${totalPayout > 0 ? `₹${totalPayout} paid out` : 'no payouts'}).`,
+    message,
     race,
     settledCount,
     totalPayout,

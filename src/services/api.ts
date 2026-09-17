@@ -1416,12 +1416,42 @@ export const api = {
     }
   },
 
-  async settleRace(raceId: string, winner_horse_id: string, place_horses_ids: string[]): Promise<any> {
+  async settleRace(
+    raceId: string, 
+    positionsOrWinner: { position_1: string[]; position_2?: string[]; position_3?: string[] } | string, 
+    legacyPlaceIds?: string[]
+  ): Promise<any> {
+    // Parse positions
+    let p1: string[] = [];
+    let p2: string[] = [];
+    let p3: string[] = [];
+
+    if (typeof positionsOrWinner === 'object' && Array.isArray(positionsOrWinner.position_1)) {
+      p1 = positionsOrWinner.position_1.filter(Boolean);
+      p2 = (positionsOrWinner.position_2 || []).filter(Boolean);
+      p3 = (positionsOrWinner.position_3 || []).filter(Boolean);
+    } else if (typeof positionsOrWinner === 'string') {
+      p1 = [positionsOrWinner];
+      const placeList = Array.isArray(legacyPlaceIds) ? legacyPlaceIds : [positionsOrWinner];
+      p2 = placeList.filter(id => id !== positionsOrWinner).slice(0, 1);
+      p3 = placeList.filter(id => id !== positionsOrWinner).slice(1);
+    }
+
+    const isDeadHeatWin = p1.length > 1;
+    const isDeadHeatPlace = p2.length > 1 || p3.length > 1;
+    const isDeadHeat = isDeadHeatWin || isDeadHeatPlace;
+
     try {
       const res = await fetch(`${API_BASE}/admin/races/${raceId}/settle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ winner_horse_id, place_horses_ids }),
+        body: JSON.stringify({
+          position_1: p1,
+          position_2: p2,
+          position_3: p3,
+          winner_horse_id: p1[0] || '',
+          place_horses_ids: [...p1, ...p2, ...p3],
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1432,16 +1462,58 @@ export const api = {
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
     
-    const placeList: string[] = Array.isArray(place_horses_ids) && place_horses_ids.length > 0
-      ? [...place_horses_ids]
-      : [winner_horse_id];
-    if (!placeList.includes(winner_horse_id)) {
-      placeList.unshift(winner_horse_id);
+    // Place multipliers calculation (Total 3 place slots)
+    const placeFactorMap = new Map<string, number>();
+    let remainingSlots = 3;
+
+    // Tier 1 (1st Place)
+    if (p1.length >= 3) {
+      const factor = 3 / p1.length;
+      p1.forEach(hId => placeFactorMap.set(hId, factor));
+      remainingSlots = 0;
+    } else {
+      p1.forEach(hId => placeFactorMap.set(hId, 1.0));
+      remainingSlots -= p1.length;
     }
 
+    // Tier 2 (2nd Place)
+    if (remainingSlots > 0 && p2.length > 0) {
+      if (p2.length <= remainingSlots) {
+        p2.forEach(hId => placeFactorMap.set(hId, 1.0));
+        remainingSlots -= p2.length;
+      } else {
+        const factor = remainingSlots / p2.length;
+        p2.forEach(hId => placeFactorMap.set(hId, factor));
+        remainingSlots = 0;
+      }
+    }
+
+    // Tier 3 (3rd Place)
+    if (remainingSlots > 0 && p3.length > 0) {
+      if (p3.length <= remainingSlots) {
+        p3.forEach(hId => placeFactorMap.set(hId, 1.0));
+        remainingSlots -= p3.length;
+      } else {
+        const factor = remainingSlots / p3.length;
+        p3.forEach(hId => placeFactorMap.set(hId, factor));
+        remainingSlots = 0;
+      }
+    }
+
+    const placeList = [...p1, ...p2, ...p3];
+
     if (race) {
-      race.winner_horse_id = winner_horse_id;
+      race.position_1 = p1;
+      race.position_2 = p2;
+      race.position_3 = p3;
+      race.winner_horse_id = p1[0] || null;
       race.place_horses_ids = placeList;
+      race.is_dead_heat = isDeadHeat;
+      race.dead_heat_note = isDeadHeatWin 
+        ? `DEAD HEAT FOR WIN (${p1.length} Horses Tied for 1st)` 
+        : isDeadHeatPlace 
+        ? `DEAD HEAT FOR PLACE` 
+        : undefined;
       race.status = 'RESULTED';
       race.settled_at = new Date().toISOString();
       this.saveLocalRace(race);
@@ -1473,23 +1545,52 @@ export const api = {
       const isRaceMatch = bet.race_id === raceId || (race && bet.race_name === race.name);
       if (isRaceMatch && bet.status === 'PENDING') {
         let isWon = false;
+        let payoutAmount = 0;
+        let betIsDeadHeat = false;
+        let deadHeatDivider = 1;
+
         if (bet.bet_type === 'WIN') {
-          isWon = bet.horse_id === winner_horse_id;
+          if (p1.includes(bet.horse_id)) {
+            isWon = true;
+            if (p1.length > 1) {
+              betIsDeadHeat = true;
+              deadHeatDivider = p1.length;
+              // Method A - Betfair rule: (Stake / N) * Odds
+              payoutAmount = Math.round((bet.stake / p1.length) * bet.odds);
+            } else {
+              payoutAmount = Math.round(bet.stake * bet.odds);
+            }
+          }
         } else if (bet.bet_type === 'PLACE') {
-          isWon = placeList.includes(bet.horse_id);
+          const factor = placeFactorMap.get(bet.horse_id) || 0;
+          if (factor > 0) {
+            isWon = true;
+            if (factor < 1.0) {
+              betIsDeadHeat = true;
+              deadHeatDivider = Math.round(1 / factor);
+              payoutAmount = Math.round((bet.stake * factor) * bet.odds);
+            } else {
+              payoutAmount = Math.round(bet.stake * bet.odds);
+            }
+          }
         }
 
         bet.settled_at = new Date().toISOString();
 
         if (isWon) {
           bet.status = 'WON';
-          const payoutAmount = Math.round(bet.stake * bet.odds);
           bet.payout = payoutAmount;
+          bet.is_dead_heat = betIsDeadHeat;
+          bet.dead_heat_divider = betIsDeadHeat ? deadHeatDivider : undefined;
           totalPaidOut += payoutAmount;
 
           // Credit balance & release exposure
           currentUser.balance = (currentUser.balance ?? 0) + payoutAmount;
           currentUser.exposure = Math.max(0, (currentUser.exposure ?? 0) - bet.stake);
+
+          const winDesc = betIsDeadHeat
+            ? `Payout WON (Dead Heat 1/${deadHeatDivider}): ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race?.name || bet.race_name} (₹${payoutAmount.toLocaleString('en-IN')})`
+            : `Payout WON: ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race?.name || bet.race_name} (${bet.odds}x)`;
 
           // Log WIN transaction
           localTxs.unshift({
@@ -1498,7 +1599,7 @@ export const api = {
             type: 'WIN',
             amount: payoutAmount,
             balance_after: currentUser.balance,
-            description: `Payout WON: ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race?.name || bet.race_name} (${bet.odds}x)`,
+            description: winDesc,
             created_at: new Date().toISOString(),
             reference_id: bet.id,
           });
@@ -1519,11 +1620,14 @@ export const api = {
       localStorage.setItem('derby_custom_txs', JSON.stringify(localTxs));
     } catch {}
 
-    const winnerName = race?.horses?.find((h) => h.id === winner_horse_id)?.name || 'Winner';
+    const winnerNames = p1.map(id => race?.horses?.find((h) => h.id === id)?.name || id).join(' & ');
+    const message = isDeadHeatWin
+      ? `🔥 DEAD HEAT Result Declared! 1st Place: ${winnerNames}. ${settledCount} bets settled via Dead Heat Rules (₹${totalPaidOut.toLocaleString('en-IN')} paid out).`
+      : `Race "${race?.name || 'Fixture'}" resulted with winner ${winnerNames}! ${settledCount} bets settled (${totalPaidOut > 0 ? `₹${totalPaidOut.toLocaleString('en-IN')} paid out to wallet` : 'no winning bets'}).`;
 
     return { 
       success: true, 
-      message: `Race "${race?.name || 'Fixture'}" resulted with winner ${winnerName}! ${settledCount} bets settled (${totalPaidOut > 0 ? `₹${totalPaidOut.toLocaleString('en-IN')} paid out to wallet` : 'no winning bets'}).`,
+      message,
       settledCount,
       totalPaidOut
     };
