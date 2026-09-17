@@ -105,3 +105,60 @@ export interface BetSlipState {
   odds: number;
   stake: number;
 }
+
+export type DepositStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface DepositRequest {
+  id: string;
+  user_id: string;
+  username: string;
+  amount: number;
+  payment_method: string;
+  utr_number: string;
+  screenshot_url?: string;
+  status: DepositStatus;
+  created_at: string;
+  reviewed_at?: string | null;
+  admin_notes?: string;
+}
+
+export type WithdrawalStatus = 'PENDING' | 'IN_PROGRESS' | 'SUCCESSFUL' | 'REJECTED';
+
+export interface WithdrawalRequest {
+  id: string;
+  user_id: string;
+  username: string;
+  amount: number;
+  upi_id?: string;
+  bank_account?: string;
+  ifsc?: string;
+  account_holder?: string;
+  status: WithdrawalStatus;
+  created_at: string;
+  approved_at?: string | null;
+  completed_at?: string | null;
+  estimated_minutes?: number; // 120 minutes default
+  admin_notes?: string;
+}
+
+export type NotificationType = 
+  | 'DEPOSIT_APPROVED' 
+  | 'DEPOSIT_REJECTED' 
+  | 'WITHDRAWAL_IN_PROGRESS' 
+  | 'WITHDRAWAL_SUCCESSFUL' 
+  | 'WITHDRAWAL_REJECTED' 
+  | 'BET_WON' 
+  | 'GENERAL';
+
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  amount?: number;
+  reference_id?: string;
+  is_read: boolean;
+  created_at: string;
+}
+

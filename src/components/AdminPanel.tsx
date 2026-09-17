@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { soundManager } from '../utils/audio';
-import { Banner, Bet, Horse, Race, RaceStatus, User } from '../types';
+import { Banner, Bet, Horse, Race, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
 import { 
   Shield, 
   Trophy, 
@@ -25,7 +25,19 @@ import {
   Clock,
   RotateCcw,
   Flame,
-  Play
+  Play,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Copy,
+  Check,
+  CheckCheck,
+  Eye,
+  Smartphone,
+  Building2,
+  Timer,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -67,13 +79,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   banners,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'races' | 'odds' | 'add_race' | 'banners' | 'users' | 'bets'>('races');
+  const [activeTab, setActiveTab] = useState<'races' | 'odds' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials'>('races');
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [users, setUsers] = useState<User[]>([]);
   const [allBets, setAllBets] = useState<Bet[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Financial requests state
+  const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [financialSubTab, setFinancialSubTab] = useState<'DEPOSITS' | 'WITHDRAWALS'>('DEPOSITS');
+  const [depositStatusFilter, setDepositStatusFilter] = useState<DepositStatus | 'ALL'>('ALL');
+  const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<WithdrawalStatus | 'ALL'>('ALL');
+  const [previewScreenshot, setPreviewScreenshot] = useState<string | null>(null);
+  const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
   // Settlement dialog state
   const [settlingRace, setSettlingRace] = useState<Race | null>(null);
@@ -119,18 +141,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [balanceModalType, setBalanceModalType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
   const [balanceModalDesc, setBalanceModalDesc] = useState<string>('');
 
+  // Clock timer for live countdowns
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Load Admin Data
   const loadAdminData = async () => {
     try {
       setIsLoading(true);
-      const [statsData, usersData, betsData] = await Promise.all([
+      const [statsData, usersData, betsData, depositsData, withdrawalsData] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
         api.getAdminAllBets(),
+        api.getDepositRequests('ALL'),
+        api.getWithdrawalRequests('ALL'),
       ]);
       setStats(statsData);
       setUsers(usersData);
       setAllBets(betsData);
+      setDepositRequests(depositsData);
+      setWithdrawalRequests(withdrawalsData);
     } catch (err: any) {
       console.error('Error loading admin data:', err);
     } finally {
@@ -141,6 +175,98 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     loadAdminData();
   }, []);
+
+  // Financial Handlers
+  const handleApproveDeposit = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.approveDepositRequest(id);
+      soundManager.playPayout();
+      setActionMessage(`💰 ${res.message}`);
+      await loadAdminData();
+      await onRefreshData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to approve deposit');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRejectDeposit = async (id: string) => {
+    const reason = window.prompt('Enter rejection reason (optional):', 'UTR or payment screenshot could not be verified.');
+    if (reason === null) return;
+    try {
+      setIsLoading(true);
+      const res = await api.rejectDepositRequest(id, reason);
+      setActionMessage(`❌ ${res.message}`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to reject deposit');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleApproveWithdrawalToInProgress = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.approveWithdrawalToInProgress(id);
+      soundManager.playClick();
+      setActionMessage(`⏳ ${res.message}`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to approve withdrawal');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompleteWithdrawalToSuccessful = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.completeWithdrawalToSuccessful(id);
+      soundManager.playPayout();
+      setActionMessage(`✅ ${res.message}`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to complete withdrawal');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRejectWithdrawal = async (id: string) => {
+    const reason = window.prompt('Enter rejection reason (Funds will be refunded to user):', 'Payout details invalid or bank rejected transfer.');
+    if (reason === null) return;
+    try {
+      setIsLoading(true);
+      const res = await api.rejectWithdrawalRequest(id, reason);
+      setActionMessage(`↩️ ${res.message}`);
+      await loadAdminData();
+      await onRefreshData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to reject withdrawal');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopyUtr = (utr: string) => {
+    navigator.clipboard.writeText(utr);
+    setCopiedUtr(utr);
+    soundManager.playClick();
+    setTimeout(() => setCopiedUtr(null), 2000);
+  };
 
   const handleAdjustUserBalance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,7 +345,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleMakeMatchLive = async (race: Race) => {
+  const handleMakeRaceLive = async (race: Race) => {
     try {
       setIsLoading(true);
       await api.updateRaceStatus(race.id, 'LIVE');
@@ -237,7 +363,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleMakeMatchUpcoming = async (race: Race) => {
+  const handleMakeRaceUpcoming = async (race: Race) => {
     try {
       setIsLoading(true);
       await api.updateRaceStatus(race.id, 'UPCOMING');
@@ -621,6 +747,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
+          id="admin-tab-financials"
+          onClick={() => setActiveTab('financials')}
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+            activeTab === 'financials'
+              ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+              : 'text-amber-400 hover:text-white hover:bg-slate-800/80'
+          }`}
+        >
+          <Banknote className="w-3.5 h-3.5" />
+          <span>Financial Requests</span>
+          {(depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length) > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+              activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
+            }`}>
+              {depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length}
+            </span>
+          )}
+        </button>
+
+        <button
           id="admin-tab-bets"
           onClick={() => setActiveTab('bets')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
@@ -789,7 +935,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         ) : race.status === 'UPCOMING' || race.status === 'OPEN' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-bold uppercase tracking-wider">
                             <Clock className="w-3 h-3" />
-                            ⏱ UPCOMING MATCH
+                            ⏱ UPCOMING RACE
                           </span>
                         ) : race.status === 'DRAFT' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 border border-slate-600/50 text-[11px] font-bold uppercase tracking-wider">
@@ -810,17 +956,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   {/* Status & Action controls */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Make Match Live Button */}
+                    {/* Make Race Live Button */}
                     {race.status !== 'LIVE' && race.status !== 'RESULTED' && (
                       <button
                         id={`make-live-btn-${race.id}`}
-                        onClick={() => handleMakeMatchLive(race)}
+                        onClick={() => handleMakeRaceLive(race)}
                         disabled={isLoading}
                         className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-red-950/40 border border-red-400/40 animate-pulse active:scale-95"
-                        title="Make this match LIVE immediately on the user page!"
+                        title="Make this race LIVE immediately on the user page!"
                       >
                         <Flame className="w-3.5 h-3.5 text-amber-200" />
-                        <span>▶ Make Match LIVE</span>
+                        <span>▶ Make Race LIVE</span>
                       </button>
                     )}
 
@@ -838,9 +984,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </button>
                         <button
                           id={`move-upcoming-btn-${race.id}`}
-                          onClick={() => handleMakeMatchUpcoming(race)}
+                          onClick={() => handleMakeRaceUpcoming(race)}
                           className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                          title="Move match back to upcoming"
+                          title="Move race back to upcoming"
                         >
                           <Clock className="w-3 h-3 text-slate-400" />
                           <span>Move to Upcoming</span>
@@ -919,7 +1065,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 2: Live Odds Editor (Only LIVE In-Play Matches) */}
+      {/* TAB 2: Live Odds Editor (Only LIVE In-Play Races) */}
       {activeTab === 'odds' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1793,6 +1939,485 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: Financial Requests (Deposit Approvals & Withdrawal 120m Timer Workflow) */}
+      {activeTab === 'financials' && (
+        <div className="space-y-4">
+          {/* Sub-navigation & Header */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Banknote className="w-5 h-5 text-amber-400" />
+                  <span>Financial Requests & Verification Desk</span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Verify deposit UTR numbers & proof screenshots, approve auto-credits, manage withdrawal 120-min processing SLA and payout completion.
+                </p>
+              </div>
+              <button
+                onClick={loadAdminData}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer self-start sm:self-auto"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Requests</span>
+              </button>
+            </div>
+
+            {/* Sub-Tabs: Deposits vs Withdrawals */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
+              <button
+                id="admin-financial-subtab-deposits"
+                onClick={() => setFinancialSubTab('DEPOSITS')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  financialSubTab === 'DEPOSITS'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <ArrowDownLeft className="w-3.5 h-3.5" />
+                <span>Deposit Requests</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  financialSubTab === 'DEPOSITS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {depositRequests.filter(d => d.status === 'PENDING').length} Pending
+                </span>
+              </button>
+
+              <button
+                id="admin-financial-subtab-withdrawals"
+                onClick={() => setFinancialSubTab('WITHDRAWALS')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  financialSubTab === 'WITHDRAWALS'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Withdrawal Requests</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  financialSubTab === 'WITHDRAWALS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length} Active
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* SUB-PANEL 1: DEPOSIT REQUESTS */}
+          {financialSubTab === 'DEPOSITS' && (
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+              {/* Filter Tabs */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                  {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setDepositStatusFilter(st)}
+                      className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                        depositStatusFilter === st
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {st} ({st === 'ALL' ? depositRequests.length : depositRequests.filter(d => d.status === st).length})
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-400">
+                  Showing {depositRequests.filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).length} deposits
+                </span>
+              </div>
+
+              {/* Deposit List Cards */}
+              <div className="space-y-3">
+                {depositRequests
+                  .filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter)
+                  .map((dep) => (
+                    <div
+                      key={dep.id}
+                      className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                            <ArrowDownLeft className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-black text-white">
+                                ₹{dep.amount.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-[11px] text-slate-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                {dep.payment_method}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Bettor: <strong className="text-white">@{dep.username}</strong> <span className="text-slate-500">({dep.user_id})</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                          {dep.status === 'PENDING' && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>PENDING REVIEW</span>
+                            </span>
+                          )}
+                          {dep.status === 'APPROVED' && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>APPROVED & CREDITED</span>
+                            </span>
+                          )}
+                          {dep.status === 'REJECTED' && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>REJECTED</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        {/* UTR Number */}
+                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                          <span className="text-slate-400 block text-[11px] mb-1">12-Digit UTR / Transaction Ref:</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-mono font-bold text-amber-400 text-sm tracking-wider select-all">
+                              {dep.utr_number}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyUtr(dep.utr_number)}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1 text-[10px] font-semibold transition cursor-pointer"
+                              title="Copy UTR"
+                            >
+                              {copiedUtr === dep.utr_number ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  <span className="text-emerald-400">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Payment Screenshot Proof */}
+                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                          <div>
+                            <span className="text-slate-400 block text-[11px]">Payment Proof Screenshot:</span>
+                            <span className="text-[11px] text-slate-300 font-medium">
+                              {dep.screenshot_url ? 'Screenshot Proof Attached' : 'No Screenshot Attached'}
+                            </span>
+                          </div>
+                          {dep.screenshot_url ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewScreenshot(dep.screenshot_url || null)}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 text-xs font-semibold transition cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View Proof</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">UTR Only</span>
+                          )}
+                        </div>
+
+                        {/* Timestamps */}
+                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-0.5">
+                          <p>Submitted: <span className="text-slate-200">{new Date(dep.created_at).toLocaleString('en-IN')}</span></p>
+                          {dep.reviewed_at && (
+                            <p>Reviewed: <span className="text-slate-200">{new Date(dep.reviewed_at).toLocaleString('en-IN')}</span></p>
+                          )}
+                          {dep.admin_notes && (
+                            <p className="text-rose-400">Notes: {dep.admin_notes}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Controls for Pending Deposit */}
+                      {dep.status === 'PENDING' && (
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
+                          <button
+                            type="button"
+                            onClick={() => handleRejectDeposit(dep.id)}
+                            className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Reject</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleApproveDeposit(dep.id)}
+                            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
+                          >
+                            <Check className="w-4 h-4 stroke-[3]" />
+                            <span>Approve & Credit ₹{dep.amount.toLocaleString('en-IN')}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {depositRequests.filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).length === 0 && (
+                  <div className="p-8 text-center bg-slate-950 rounded-xl border border-slate-800 text-slate-400 text-xs">
+                    No deposit requests found under "{depositStatusFilter}".
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SUB-PANEL 2: WITHDRAWAL REQUESTS (120-MIN SLA WORKFLOW) */}
+          {financialSubTab === 'WITHDRAWALS' && (
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+              {/* Filter Tabs */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                  {(['ALL', 'PENDING', 'IN_PROGRESS', 'SUCCESSFUL', 'REJECTED'] as const).map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setWithdrawalStatusFilter(st)}
+                      className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                        withdrawalStatusFilter === st
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {st} ({st === 'ALL' ? withdrawalRequests.length : withdrawalRequests.filter(w => w.status === st).length})
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-400">
+                  Showing {withdrawalRequests.filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).length} withdrawals
+                </span>
+              </div>
+
+              {/* Withdrawal List Cards */}
+              <div className="space-y-3">
+                {withdrawalRequests
+                  .filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter)
+                  .map((wth) => {
+                    const startTime = new Date(wth.approved_at || wth.created_at).getTime();
+                    const elapsedMins = Math.floor((currentTime - startTime) / 60000);
+                    const remainingMins = Math.max(0, (wth.estimated_minutes || 120) - elapsedMins);
+                    const hrs = Math.floor(remainingMins / 60);
+                    const mins = remainingMins % 60;
+
+                    return (
+                      <div
+                        key={wth.id}
+                        className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                              <ArrowUpRight className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg font-black text-white">
+                                  ₹{wth.amount.toLocaleString('en-IN')}
+                                </span>
+                                <span className="text-[11px] text-slate-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                  {wth.upi_id ? 'UPI Fast Rail' : 'Bank IMPS'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-400">
+                                Bettor: <strong className="text-white">@{wth.username}</strong> <span className="text-slate-500">({wth.user_id})</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            {wth.status === 'PENDING' && (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>PENDING ADMIN APPROVAL</span>
+                              </span>
+                            )}
+                            {wth.status === 'IN_PROGRESS' && (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1 animate-pulse">
+                                <Timer className="w-3.5 h-3.5 animate-spin" />
+                                <span>IN PROGRESS (120m SLA)</span>
+                              </span>
+                            )}
+                            {wth.status === 'SUCCESSFUL' && (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>SUCCESSFUL & PAID</span>
+                              </span>
+                            )}
+                            {wth.status === 'REJECTED' && (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>REJECTED (REFUNDED)</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Payout Destination Card */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-slate-400 block text-[11px] mb-0.5">Payout Destination:</span>
+                            {wth.upi_id ? (
+                              <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                                <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="font-mono">{wth.upi_id}</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5 text-slate-200">
+                                <p className="font-bold flex items-center gap-1">
+                                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>{wth.bank_account}</span>
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  IFSC: <span className="font-mono text-white">{wth.ifsc}</span> | Holder: <span className="text-white">{wth.account_holder || wth.username}</span>
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 120-minute SLA Bar for In Progress */}
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">120-Minute Payout SLA:</span>
+                              {wth.status === 'IN_PROGRESS' ? (
+                                <span className="font-bold text-blue-300">
+                                  {hrs > 0 ? `${hrs}h ${mins}m left` : `${mins}m left`}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">{wth.status}</span>
+                              )}
+                            </div>
+                            {wth.status === 'IN_PROGRESS' && (
+                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${Math.min(100, Math.max(5, ((120 - remainingMins) / 120) * 100))}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Timestamps */}
+                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-0.5">
+                            <p>Requested: <span className="text-slate-200">{new Date(wth.created_at).toLocaleString('en-IN')}</span></p>
+                            {wth.approved_at && (
+                              <p>Approved: <span className="text-slate-200">{new Date(wth.approved_at).toLocaleString('en-IN')}</span></p>
+                            )}
+                            {wth.completed_at && (
+                              <p>Paid: <span className="text-emerald-400">{new Date(wth.completed_at).toLocaleString('en-IN')}</span></p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Controls for Withdrawal Status Transitions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
+                          {wth.status === 'PENDING' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectWithdrawal(wth.id)}
+                                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject & Refund</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleApproveWithdrawalToInProgress(wth.id)}
+                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                              >
+                                <Timer className="w-4 h-4" />
+                                <span>Approve (Start 120m Timer)</span>
+                              </button>
+                            </>
+                          )}
+
+                          {wth.status === 'IN_PROGRESS' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectWithdrawal(wth.id)}
+                                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject & Refund</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCompleteWithdrawalToSuccessful(wth.id)}
+                                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
+                              >
+                                <CheckCircle2 className="w-4 h-4 stroke-[3]" />
+                                <span>Mark Successful (Transferred)</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {withdrawalRequests.filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).length === 0 && (
+                  <div className="p-8 text-center bg-slate-950 rounded-xl border border-slate-800 text-slate-400 text-xs">
+                    No withdrawal requests found under "{withdrawalStatusFilter}".
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SCREENSHOT LIGHTBOX PREVIEW MODAL */}
+      {previewScreenshot && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in"
+          onClick={() => setPreviewScreenshot(null)}
+        >
+          <div 
+            className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span>Payment Proof Screenshot Preview</span>
+              </h4>
+              <button
+                onClick={() => setPreviewScreenshot(null)}
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-[75vh] overflow-auto rounded-xl bg-black/60 flex items-center justify-center p-2">
+              <img
+                src={previewScreenshot}
+                alt="Deposit Proof"
+                className="max-h-[70vh] w-auto object-contain rounded-lg shadow-lg"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './services/api';
-import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User } from './types';
+import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User, UserNotification } from './types';
 import { Header } from './components/Header';
 import { BannerSlider } from './components/BannerSlider';
 import { RaceList } from './components/RaceList';
@@ -15,6 +15,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { HelpModal } from './components/HelpModal';
 import { HowToPlayRules } from './components/HowToPlayRules';
 import { PersonalDetails } from './components/PersonalDetails';
+import { NotificationModal } from './components/NotificationModal';
 import { AuthModal } from './components/AuthModal';
 import { AdminPortal } from './components/AdminPortal';
 import { BottomNav } from './components/BottomNav';
@@ -39,6 +40,7 @@ export default function App() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [myBets, setMyBets] = useState<Bet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
   // Navigation & View state - Default home is How to Play & Rules
   const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('rules');
@@ -75,6 +77,7 @@ export default function App() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // Toast notifications
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -180,24 +183,36 @@ export default function App() {
     loadRacesAndBanners();
   }, []);
 
+  // Fetch user notifications
+  const loadNotifications = async () => {
+    if (!user?.id) return;
+    try {
+      const data = await api.getNotifications(user.id);
+      setNotifications(data);
+    } catch {}
+  };
+
   // Fetch user bets and statement
   const loadUserFinancials = async () => {
     if (!user) {
       setMyBets([]);
       setTransactions([]);
+      setNotifications([]);
       return;
     }
     try {
       setIsLoadingBets(true);
       setIsLoadingTxs(true);
-      const [betsData, txsData, freshUser] = await Promise.all([
+      const [betsData, txsData, freshUser, notifsData] = await Promise.all([
         api.getMyBets(user.id),
         api.getTransactions(user.id),
         api.getMe(user.id),
+        api.getNotifications(user.id),
       ]);
       setMyBets(betsData);
       setTransactions(txsData);
       setUser(freshUser);
+      setNotifications(notifsData);
     } catch (err: any) {
       console.error('Error loading financials:', err);
     } finally {
@@ -209,8 +224,21 @@ export default function App() {
   useEffect(() => {
     if (user?.id) {
       loadUserFinancials();
+      const interval = setInterval(loadNotifications, 12000);
+      return () => clearInterval(interval);
     }
   }, [user?.id]);
+
+  const handleMarkNotificationRead = async (id: string) => {
+    await api.markNotificationRead(id);
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    if (!user?.id) return;
+    await api.markAllNotificationsRead(user.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  };
 
   // Handle Bet Click on Odds button
   const handleOpenBetSlip = (horse: Horse, betType: BetType, odds: number) => {
@@ -251,24 +279,34 @@ export default function App() {
     loadUserFinancials();
   };
 
-  // Handle Deposit
-  const handleDeposit = async (amount: number, method: string) => {
+  // Handle Deposit (Submits pending deposit with UTR and screenshot proof)
+  const handleDeposit = async (amount: number, method: string, utr_number?: string, screenshot_url?: string) => {
     if (!user) throw new Error('User required');
-    const res = await api.deposit(user.id, amount, method);
-    setUser(res.user);
-    soundManager.playWinPayout();
-    triggerConfetti();
-    showToast(`₹${amount.toLocaleString('en-IN')} deposited successfully via ${method}!`);
+    const res = await api.submitDepositRequest({
+      userId: user.id,
+      amount,
+      paymentMethod: method,
+      utrNumber: utr_number || `UTR${Date.now()}`,
+      screenshotUrl: screenshot_url,
+    });
+    soundManager.playChip();
+    showToast(res.message);
     loadUserFinancials();
+    loadNotifications();
   };
 
-  // Handle Withdraw
-  const handleWithdraw = async (amount: number, details: { upi_id?: string; bank_account?: string }) => {
+  // Handle Withdraw (Submits pending withdrawal for Admin 120m SLA queue)
+  const handleWithdraw = async (amount: number, details: { upi_id?: string; bank_account?: string; ifsc?: string; account_holder?: string }) => {
     if (!user) throw new Error('User required');
-    const res = await api.withdraw(user.id, amount, details);
+    const res = await api.submitWithdrawalRequest({
+      userId: user.id,
+      amount,
+      details,
+    });
     setUser(res.user);
-    showToast(`Withdrawal of ₹${amount.toLocaleString('en-IN')} submitted!`);
+    showToast(res.message);
     loadUserFinancials();
+    loadNotifications();
   };
 
   const handleLogout = () => {
@@ -339,8 +377,13 @@ export default function App() {
         onOpenPersonalDetails={() => {
           window.location.hash = '#/personal_details';
         }}
+        onOpenNotifications={() => {
+          loadNotifications();
+          setIsNotificationsOpen(true);
+        }}
         activeTab={activeTab}
         pendingBetsCount={pendingBetsCount}
+        unreadNotificationsCount={notifications.filter(n => !n.is_read).length}
       />
 
       {/* Toast Notification Banner */}
@@ -430,7 +473,7 @@ export default function App() {
             />
           </div>
         ) : (
-          /* MATCH LOBBY: Direct race fixtures and live betting only (no banner, clean view) */
+          /* RACE LOBBY: Direct race fixtures and live betting only (no banner, clean view) */
           <RaceList
             races={races}
             onSelectRace={(raceId) => {
@@ -591,6 +634,15 @@ export default function App() {
       <HelpModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      {/* Activity Notifications Modal */}
+      <NotificationModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkNotificationRead}
+        onMarkAllAsRead={handleMarkAllNotificationsRead}
       />
 
       {/* Auth Modal (Sign Up with OTP + Login with Username/Password) */}

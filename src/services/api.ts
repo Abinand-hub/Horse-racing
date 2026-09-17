@@ -1,4 +1,18 @@
-import { Banner, Bet, BetType, Race, RaceStatus, Transaction, User } from '../types';
+import { 
+  Banner, 
+  Bet, 
+  BetType, 
+  Race, 
+  RaceStatus, 
+  Transaction, 
+  User,
+  DepositRequest,
+  DepositStatus,
+  WithdrawalRequest,
+  WithdrawalStatus,
+  UserNotification,
+  NotificationType
+} from '../types';
 import { DUMMY_BANNERS, DUMMY_BETS, DUMMY_RACES, DUMMY_USER } from '../data/dummyMatches';
 
 const API_BASE = '/api';
@@ -312,71 +326,133 @@ export const api = {
     return [...localBets, ...DUMMY_BETS];
   },
 
-  // Wallet
-  async deposit(userId: string, amount: number, payment_method: string): Promise<{ user: User; message: string }> {
+  // ----------------------------------------------------------------------
+  // NOTIFICATIONS ENGINE
+  // ----------------------------------------------------------------------
+  async getNotifications(userId: string): Promise<UserNotification[]> {
+    let localNotes: UserNotification[] = [];
     try {
-      const res = await fetch(`${API_BASE}/wallet/deposit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, amount, payment_method }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          localStorage.setItem('derby_user', JSON.stringify(data.user));
-        }
-        return data;
-      }
+      const raw = localStorage.getItem('derby_user_notifications');
+      if (raw) localNotes = JSON.parse(raw);
     } catch {}
 
+    if (localNotes.length === 0) {
+      // Seed default welcome notifications
+      localNotes = [
+        {
+          id: 'notif_welcome',
+          user_id: userId,
+          type: 'GENERAL',
+          title: 'Welcome to DerbyBet Turf! 🏇',
+          message: 'Explore live races, place WIN/PLACE selections, and track your wallet statements in real-time.',
+          is_read: false,
+          created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+        }
+      ];
+      try {
+        localStorage.setItem('derby_user_notifications', JSON.stringify(localNotes));
+      } catch {}
+    }
+
+    return localNotes.filter((n) => n.user_id === userId || !n.user_id || n.user_id === 'all');
+  },
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    try {
+      const raw = localStorage.getItem('derby_user_notifications');
+      if (raw) {
+        const list: UserNotification[] = JSON.parse(raw);
+        const item = list.find((n) => n.id === notificationId);
+        if (item) item.is_read = true;
+        localStorage.setItem('derby_user_notifications', JSON.stringify(list));
+      }
+    } catch {}
+  },
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    try {
+      const raw = localStorage.getItem('derby_user_notifications');
+      if (raw) {
+        const list: UserNotification[] = JSON.parse(raw);
+        for (const item of list) {
+          if (item.user_id === userId || !item.user_id || item.user_id === 'all') {
+            item.is_read = true;
+          }
+        }
+        localStorage.setItem('derby_user_notifications', JSON.stringify(list));
+      }
+    } catch {}
+  },
+
+  async sendNotification(notifData: Omit<UserNotification, 'id' | 'created_at' | 'is_read'>): Promise<UserNotification> {
+    const newNotif: UserNotification = {
+      ...notifData,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      const raw = localStorage.getItem('derby_user_notifications');
+      const list: UserNotification[] = raw ? JSON.parse(raw) : [];
+      list.unshift(newNotif);
+      localStorage.setItem('derby_user_notifications', JSON.stringify(list));
+    } catch {}
+
+    return newNotif;
+  },
+
+  // ----------------------------------------------------------------------
+  // DEPOSIT REQUESTS (USER SUBMISSION & ADMIN APPROVAL)
+  // ----------------------------------------------------------------------
+  async submitDepositRequest(params: {
+    userId: string;
+    amount: number;
+    payment_method: string;
+    utr_number: string;
+    screenshot_url?: string;
+  }): Promise<{ depositRequest: DepositRequest; message: string }> {
     let currentUser: User = DUMMY_USER;
     try {
       const saved = localStorage.getItem('derby_user');
       if (saved) currentUser = JSON.parse(saved);
     } catch {}
 
-    const updatedUser: User = {
-      ...currentUser,
-      balance: (currentUser.balance ?? 5000) + amount,
+    const newRequest: DepositRequest = {
+      id: `dep_${Date.now()}`,
+      user_id: params.userId,
+      username: currentUser.username || 'arjun_punters',
+      amount: params.amount,
+      payment_method: params.payment_method || 'UPI',
+      utr_number: params.utr_number,
+      screenshot_url: params.screenshot_url,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
     };
-    localStorage.setItem('derby_user', JSON.stringify(updatedUser));
 
     try {
-      const rawTx = localStorage.getItem('derby_custom_txs');
-      const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
-      txs.unshift({
-        id: `tx_${Date.now()}`,
-        user_id: userId,
-        type: 'DEPOSIT',
-        amount: amount,
-        balance_after: updatedUser.balance,
-        description: `Wallet Deposit via ${payment_method || 'Dummy Money / UPI'}`,
-        created_at: new Date().toISOString(),
-      });
-      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+      const raw = localStorage.getItem('derby_deposit_requests');
+      const list: DepositRequest[] = raw ? JSON.parse(raw) : [];
+      list.unshift(newRequest);
+      localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
     } catch {}
 
     return {
-      user: updatedUser,
-      message: 'Deposit successful!',
+      depositRequest: newRequest,
+      message: `Deposit request of ₹${params.amount.toLocaleString('en-IN')} submitted! Status is PENDING verification by Admin.`,
     };
   },
 
-  async withdraw(userId: string, amount: number, details: { upi_id?: string; bank_account?: string }): Promise<{ user: User; message: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/wallet/withdraw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, amount, ...details }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          localStorage.setItem('derby_user', JSON.stringify(data.user));
-        }
-        return data;
-      }
-    } catch {}
+  // Alias for backward compatibility
+  async deposit(userId: string, amount: number, payment_method: string, utr_number?: string, screenshot_url?: string): Promise<{ user: User; message: string }> {
+    const res = await this.submitDepositRequest({
+      userId,
+      amount,
+      payment_method,
+      utr_number: utr_number || `UTR${Date.now().toString().slice(-6)}`,
+      screenshot_url,
+    });
 
     let currentUser: User = DUMMY_USER;
     try {
@@ -384,30 +460,433 @@ export const api = {
       if (saved) currentUser = JSON.parse(saved);
     } catch {}
 
-    const updatedUser: User = {
-      ...currentUser,
-      balance: Math.max(0, (currentUser.balance ?? 5000) - amount),
+    return {
+      user: currentUser,
+      message: res.message,
     };
-    localStorage.setItem('derby_user', JSON.stringify(updatedUser));
+  },
 
+  async getDepositRequests(status?: DepositStatus | 'ALL'): Promise<DepositRequest[]> {
+    let list: DepositRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_deposit_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    if (list.length === 0) {
+      // Default seed demo requests
+      list = [
+        {
+          id: 'dep_01',
+          user_id: 'usr_arjun',
+          username: 'arjun_punters',
+          amount: 5000,
+          payment_method: 'UPI (PhonePe)',
+          utr_number: '329845729104',
+          screenshot_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
+          status: 'PENDING',
+          created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          reviewed_at: null,
+        },
+        {
+          id: 'dep_02',
+          user_id: 'usr_rahul',
+          username: 'rahul_derby',
+          amount: 10000,
+          payment_method: 'Google Pay',
+          utr_number: '482910394821',
+          screenshot_url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80',
+          status: 'APPROVED',
+          created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+          reviewed_at: new Date(Date.now() - 3600000 * 23).toISOString(),
+        }
+      ];
+      try {
+        localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
+      } catch {}
+    }
+
+    if (status && status !== 'ALL') {
+      return list.filter((r) => r.status === status);
+    }
+    return list;
+  },
+
+  async approveDepositRequest(depositId: string, adminNotes?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    let list: DepositRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_deposit_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    const req = list.find((d) => d.id === depositId);
+    if (!req) throw new Error('Deposit request not found');
+
+    if (req.status === 'APPROVED') {
+      return { success: true, message: 'Deposit request is already approved' };
+    }
+
+    req.status = 'APPROVED';
+    req.reviewed_at = new Date().toISOString();
+    if (adminNotes) req.admin_notes = adminNotes;
+
+    // Automatically credit user balance
+    let userToCredit: User = DUMMY_USER;
+    try {
+      const savedUser = localStorage.getItem('derby_user');
+      if (savedUser) userToCredit = JSON.parse(savedUser);
+    } catch {}
+
+    userToCredit.balance = (userToCredit.balance ?? 0) + req.amount;
+
+    // Save user & deposit requests
+    try {
+      localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
+      localStorage.setItem('derby_user', JSON.stringify(userToCredit));
+    } catch {}
+
+    // Add statement transaction
+    try {
+      const rawTxs = localStorage.getItem('derby_custom_txs');
+      const txs: Transaction[] = rawTxs ? JSON.parse(rawTxs) : [];
+      txs.unshift({
+        id: `tx_${Date.now()}_dep`,
+        user_id: req.user_id,
+        type: 'DEPOSIT',
+        amount: req.amount,
+        balance_after: userToCredit.balance,
+        description: `Deposit Approved via ${req.payment_method} (UTR: ${req.utr_number})`,
+        created_at: new Date().toISOString(),
+        reference_id: req.id,
+      });
+      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+    } catch {}
+
+    // Send notification to user
+    await this.sendNotification({
+      user_id: req.user_id,
+      type: 'DEPOSIT_APPROVED',
+      title: 'Deposit Approved & Credited! 🎉',
+      message: `Your deposit of ₹${req.amount.toLocaleString('en-IN')} (UTR: ${req.utr_number}) was approved. ₹${req.amount.toLocaleString('en-IN')} has been added to your wallet.`,
+      amount: req.amount,
+      reference_id: req.id,
+    });
+
+    return {
+      success: true,
+      message: `Deposit of ₹${req.amount.toLocaleString('en-IN')} approved! Balance credited automatically.`,
+      user: userToCredit,
+    };
+  },
+
+  async rejectDepositRequest(depositId: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    let list: DepositRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_deposit_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    const req = list.find((d) => d.id === depositId);
+    if (!req) throw new Error('Deposit request not found');
+
+    req.status = 'REJECTED';
+    req.reviewed_at = new Date().toISOString();
+    req.admin_notes = reason || 'UTR or proof could not be verified by Admin.';
+
+    try {
+      localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
+    } catch {}
+
+    // Send notification
+    await this.sendNotification({
+      user_id: req.user_id,
+      type: 'DEPOSIT_REJECTED',
+      title: 'Deposit Request Rejected ❌',
+      message: `Your deposit of ₹${req.amount.toLocaleString('en-IN')} (UTR: ${req.utr_number}) could not be verified: ${req.admin_notes}`,
+      amount: req.amount,
+      reference_id: req.id,
+    });
+
+    return {
+      success: true,
+      message: `Deposit request rejected. Notification dispatched to user.`,
+    };
+  },
+
+  // ----------------------------------------------------------------------
+  // WITHDRAWAL REQUESTS (USER SUBMISSION, 120-MIN TIMER & 3-STAGE STATUS)
+  // ----------------------------------------------------------------------
+  async submitWithdrawalRequest(params: {
+    userId: string;
+    amount: number;
+    details: {
+      upi_id?: string;
+      bank_account?: string;
+      ifsc?: string;
+      account_holder?: string;
+    };
+  }): Promise<{ withdrawalRequest: WithdrawalRequest; user: User; message: string }> {
+    let currentUser: User = DUMMY_USER;
+    try {
+      const saved = localStorage.getItem('derby_user');
+      if (saved) currentUser = JSON.parse(saved);
+    } catch {}
+
+    // Check withdrawable balance
+    const withdrawable = (currentUser.balance ?? 0) - (currentUser.exposure ?? 0);
+    if (withdrawable < params.amount) {
+      throw new Error(`Insufficient withdrawable balance. Available to withdraw: ₹${Math.max(0, withdrawable).toLocaleString('en-IN')}`);
+    }
+
+    // Deduct from balance immediately to lock amount
+    currentUser.balance = Math.max(0, (currentUser.balance ?? 0) - params.amount);
+    localStorage.setItem('derby_user', JSON.stringify(currentUser));
+
+    const newRequest: WithdrawalRequest = {
+      id: `wth_${Date.now()}`,
+      user_id: params.userId,
+      username: currentUser.username || 'arjun_punters',
+      amount: params.amount,
+      upi_id: params.details.upi_id,
+      bank_account: params.details.bank_account,
+      ifsc: params.details.ifsc,
+      account_holder: params.details.account_holder,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      approved_at: null,
+      completed_at: null,
+      estimated_minutes: 120,
+    };
+
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      const list: WithdrawalRequest[] = raw ? JSON.parse(raw) : [];
+      list.unshift(newRequest);
+      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+    } catch {}
+
+    // Log pending transaction in statement
     try {
       const rawTx = localStorage.getItem('derby_custom_txs');
       const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
       txs.unshift({
-        id: `tx_${Date.now()}`,
-        user_id: userId,
+        id: `tx_${Date.now()}_wth`,
+        user_id: params.userId,
         type: 'WITHDRAW',
-        amount: -amount,
-        balance_after: updatedUser.balance,
-        description: `Withdrawal request to ${details.upi_id || details.bank_account || 'Bank'}`,
+        amount: -params.amount,
+        balance_after: currentUser.balance,
+        description: `Withdrawal Request (Pending Verification) to ${params.details.upi_id || params.details.bank_account || 'Registered Bank'}`,
         created_at: new Date().toISOString(),
+        reference_id: newRequest.id,
       });
       localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
     } catch {}
 
     return {
-      user: updatedUser,
-      message: 'Withdrawal submitted successfully',
+      withdrawalRequest: newRequest,
+      user: currentUser,
+      message: `Withdrawal request of ₹${params.amount.toLocaleString('en-IN')} submitted! Status: PENDING Admin review.`,
+    };
+  },
+
+  // Backward compatibility alias
+  async withdraw(userId: string, amount: number, details: { upi_id?: string; bank_account?: string; ifsc?: string; account_holder?: string }): Promise<{ user: User; message: string }> {
+    const res = await this.submitWithdrawalRequest({
+      userId,
+      amount,
+      details,
+    });
+    return {
+      user: res.user,
+      message: res.message,
+    };
+  },
+
+  async getWithdrawalRequests(status?: WithdrawalStatus | 'ALL'): Promise<WithdrawalRequest[]> {
+    let list: WithdrawalRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    if (list.length === 0) {
+      // Default seed demo requests
+      list = [
+        {
+          id: 'wth_01',
+          user_id: 'usr_arjun',
+          username: 'arjun_punters',
+          amount: 3000,
+          upi_id: 'arjun@okaxis',
+          status: 'PENDING',
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+          approved_at: null,
+          completed_at: null,
+          estimated_minutes: 120,
+        },
+        {
+          id: 'wth_02',
+          user_id: 'usr_rahul',
+          username: 'rahul_derby',
+          amount: 2500,
+          bank_account: '98450123984',
+          ifsc: 'HDFC0001234',
+          account_holder: 'Rahul Varma',
+          status: 'IN_PROGRESS',
+          created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+          approved_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
+          completed_at: null,
+          estimated_minutes: 120,
+        },
+        {
+          id: 'wth_03',
+          user_id: 'usr_rahul',
+          username: 'rahul_derby',
+          amount: 4200,
+          upi_id: 'rahul@okhdfcbank',
+          status: 'SUCCESSFUL',
+          created_at: new Date(Date.now() - 3600000 * 26).toISOString(),
+          approved_at: new Date(Date.now() - 3600000 * 25).toISOString(),
+          completed_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+          estimated_minutes: 120,
+        }
+      ];
+      try {
+        localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+      } catch {}
+    }
+
+    if (status && status !== 'ALL') {
+      return list.filter((w) => w.status === status);
+    }
+    return list;
+  },
+
+  async approveWithdrawalToInProgress(withdrawalId: string): Promise<{ success: boolean; message: string }> {
+    let list: WithdrawalRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    const req = list.find((w) => w.id === withdrawalId);
+    if (!req) throw new Error('Withdrawal request not found');
+
+    req.status = 'IN_PROGRESS';
+    req.approved_at = new Date().toISOString();
+    req.estimated_minutes = 120;
+
+    try {
+      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+    } catch {}
+
+    // Send notification
+    await this.sendNotification({
+      user_id: req.user_id,
+      type: 'WITHDRAWAL_IN_PROGRESS',
+      title: 'Withdrawal Approved & In Progress ⏳',
+      message: `Your withdrawal of ₹${req.amount.toLocaleString('en-IN')} has been approved and is now IN PROGRESS. Estimated completion: 120 minutes from request time.`,
+      amount: req.amount,
+      reference_id: req.id,
+    });
+
+    return {
+      success: true,
+      message: `Withdrawal of ₹${req.amount.toLocaleString('en-IN')} marked as IN PROGRESS. 120-minute timer started.`,
+    };
+  },
+
+  async completeWithdrawalToSuccessful(withdrawalId: string): Promise<{ success: boolean; message: string }> {
+    let list: WithdrawalRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    const req = list.find((w) => w.id === withdrawalId);
+    if (!req) throw new Error('Withdrawal request not found');
+
+    req.status = 'SUCCESSFUL';
+    req.completed_at = new Date().toISOString();
+
+    try {
+      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+    } catch {}
+
+    // Send notification
+    await this.sendNotification({
+      user_id: req.user_id,
+      type: 'WITHDRAWAL_SUCCESSFUL',
+      title: 'Withdrawal Successful! ✅',
+      message: `₹${req.amount.toLocaleString('en-IN')} has been successfully transferred to your registered account (${req.upi_id || req.bank_account || 'Bank'}).`,
+      amount: req.amount,
+      reference_id: req.id,
+    });
+
+    return {
+      success: true,
+      message: `Withdrawal of ₹${req.amount.toLocaleString('en-IN')} marked as SUCCESSFUL / TRANSFERRED!`,
+    };
+  },
+
+  async rejectWithdrawalRequest(withdrawalId: string, reason?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    let list: WithdrawalRequest[] = [];
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      if (raw) list = JSON.parse(raw);
+    } catch {}
+
+    const req = list.find((w) => w.id === withdrawalId);
+    if (!req) throw new Error('Withdrawal request not found');
+
+    req.status = 'REJECTED';
+    req.admin_notes = reason || 'Rejected by Admin. Amount refunded back to wallet.';
+
+    // Refund amount back to user wallet
+    let currentUser: User = DUMMY_USER;
+    try {
+      const savedUser = localStorage.getItem('derby_user');
+      if (savedUser) currentUser = JSON.parse(savedUser);
+    } catch {}
+
+    currentUser.balance = (currentUser.balance ?? 0) + req.amount;
+
+    try {
+      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+      localStorage.setItem('derby_user', JSON.stringify(currentUser));
+    } catch {}
+
+    // Add refund transaction to statement
+    try {
+      const rawTx = localStorage.getItem('derby_custom_txs');
+      const txs: Transaction[] = rawTx ? JSON.parse(rawTx) : [];
+      txs.unshift({
+        id: `tx_${Date.now()}_ref`,
+        user_id: req.user_id,
+        type: 'REFUND',
+        amount: req.amount,
+        balance_after: currentUser.balance,
+        description: `Refund for Rejected Withdrawal: ${req.admin_notes}`,
+        created_at: new Date().toISOString(),
+        reference_id: req.id,
+      });
+      localStorage.setItem('derby_custom_txs', JSON.stringify(txs));
+    } catch {}
+
+    // Send notification
+    await this.sendNotification({
+      user_id: req.user_id,
+      type: 'WITHDRAWAL_REJECTED',
+      title: 'Withdrawal Rejected & Refunded ❌',
+      message: `Your withdrawal of ₹${req.amount.toLocaleString('en-IN')} was rejected (${req.admin_notes}). ₹${req.amount.toLocaleString('en-IN')} was refunded to your wallet.`,
+      amount: req.amount,
+      reference_id: req.id,
+    });
+
+    return {
+      success: true,
+      message: `Withdrawal rejected and ₹${req.amount.toLocaleString('en-IN')} refunded to user wallet.`,
+      user: currentUser,
     };
   },
 

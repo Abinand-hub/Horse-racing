@@ -14,7 +14,8 @@ import {
   Zap,
   Plus,
   Home,
-  BookOpen
+  BookOpen,
+  Bell
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -32,8 +33,10 @@ interface HeaderProps {
   onOpenMyBets: () => void;
   onOpenRules: () => void;
   onOpenPersonalDetails: () => void;
+  onOpenNotifications: () => void;
   activeTab: 'races' | 'rules' | 'mybets' | 'personal_details' | 'admin';
   pendingBetsCount: number;
+  unreadNotificationsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -51,8 +54,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMyBets,
   onOpenRules,
   onOpenPersonalDetails,
+  onOpenNotifications,
   activeTab,
   pendingBetsCount,
+  unreadNotificationsCount = 0,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -249,6 +254,24 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   </div>
 
+                  {/* Notification Bell Icon Button */}
+                  <button
+                    id="header-notification-btn"
+                    onClick={() => {
+                      soundManager.playClick();
+                      onOpenNotifications();
+                    }}
+                    className="relative w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#091510] border border-emerald-900/60 hover:border-emerald-500/80 text-emerald-400 hover:text-emerald-300 flex items-center justify-center transition cursor-pointer shadow-sm"
+                    title="Activity Notifications"
+                  >
+                    <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                    {unreadNotificationsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#e5b869] text-black font-black text-[9px] flex items-center justify-center shadow-md animate-bounce">
+                        {unreadNotificationsCount}
+                      </span>
+                    )}
+                  </button>
+
                   {/* Profile Avatar with Glowing Gold Border */}
                   <div className="relative" ref={dropdownRef}>
                     <button
@@ -279,6 +302,26 @@ export const Header: React.FC<HeaderProps> = ({
                             <span className="font-mono font-bold text-rose-400">₹{user.exposure.toLocaleString('en-IN')}</span>
                           </div>
                         </div>
+
+                        <button
+                          id="dropdown-notifications-btn"
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            soundManager.playClick();
+                            onOpenNotifications();
+                          }}
+                          className="w-full text-left px-3.5 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-slate-800 flex items-center justify-between transition cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Bell className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Notifications</span>
+                          </div>
+                          {unreadNotificationsCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-[#e5b869] text-black">
+                              {unreadNotificationsCount} new
+                            </span>
+                          )}
+                        </button>
 
                         <button
                           id="dropdown-personal-details-btn"
