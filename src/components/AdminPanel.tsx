@@ -973,7 +973,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Globe className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Race Centers & Days ({raceCenters.length})</span>
+          <span>Race Centers & Days ({(raceCenters || []).length})</span>
         </button>
 
         <button
@@ -1101,8 +1101,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 All Centers ({races.length})
               </button>
-              {raceCenters.map((cntr) => {
-                const centerCount = races.filter(r => 
+              {(raceCenters || []).map((cntr) => {
+                const centerCount = (races || []).filter(r => 
                   r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase()))
                 ).length;
                 return (
@@ -1813,7 +1813,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </p>
             </div>
             <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-mono font-bold text-xs border border-emerald-500/30 self-start sm:self-auto">
-              {raceCenters.filter(c => c.is_active).length} Active Centers
+              {(raceCenters || []).filter(c => c && c.is_active).length} Active Centers
             </span>
           </div>
 
@@ -1824,7 +1824,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                   <h3 className="text-sm font-black text-white flex items-center gap-2">
                     <Flag className="w-4 h-4 text-emerald-400" />
-                    <span>Level 1 - Race Centers ({raceCenters.length})</span>
+                    <span>Level 1 - Race Centers ({(raceCenters || []).length})</span>
                   </h3>
                   <span className="text-[10px] text-slate-400 font-mono">table: race_centers</span>
                 </div>
@@ -1878,8 +1878,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* Centers List */}
                 <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                  {raceCenters.map((center) => {
-                    const centerRaces = races.filter(r => r.center_id === center.id || (r.venue && r.venue.toLowerCase().includes(center.name.toLowerCase())));
+                  {(raceCenters || []).map((center) => {
+                    const centerRaces = (races || []).filter(r => r.center_id === center.id || (r.venue && r.venue.toLowerCase().includes(center.name.toLowerCase())));
                     return (
                       <div
                         key={center.id}
@@ -1925,7 +1925,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                   <h3 className="text-sm font-black text-white flex items-center gap-2">
                     <CalendarCheck className="w-4 h-4 text-[#e5b869]" />
-                    <span>Level 2 - Race Day Cards ({raceDays.length})</span>
+                    <span>Level 2 - Race Day Cards ({(raceDays || []).length})</span>
                   </h3>
                   <span className="text-[10px] text-slate-400 font-mono">table: race_days</span>
                 </div>
@@ -1942,7 +1942,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         onChange={(e) => setNewDayCenterId(e.target.value)}
                         className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold text-xs"
                       >
-                        {raceCenters.map(c => (
+                        {(raceCenters || []).map(c => (
                           <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
                         ))}
                       </select>
@@ -1980,9 +1980,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* Race Days List */}
                 <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                  {raceDays.map((day) => {
-                    const center = raceCenters.find(c => c.id === day.center_id);
-                    const dayRaces = races.filter(r => r.race_day_id === day.id || (day.center_id && r.center_id === day.center_id));
+                  {(raceDays || []).map((day) => {
+                    const center = (raceCenters || []).find(c => c.id === day.center_id);
+                    const dayRaces = (races || []).filter(r => r.race_day_id === day.id || (day.center_id && r.center_id === day.center_id));
 
                     return (
                       <div
@@ -2102,7 +2102,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
               >
-                {raceCenters.map(c => (
+                {(raceCenters || []).map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.code}) - {c.city}</option>
                 ))}
               </select>
@@ -2118,7 +2118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 onChange={(e) => setNewRaceDayId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
               >
-                {raceDays
+                {(raceDays || [])
                   .filter(d => !newRaceCenterId || d.center_id === newRaceCenterId)
                   .map(d => (
                     <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
@@ -3703,7 +3703,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
                   >
                     <option value="">-- Select Center --</option>
-                    {raceCenters.map(c => (
+                    {(raceCenters || []).map(c => (
                       <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
                     ))}
                   </select>
@@ -3719,7 +3719,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
                   >
                     <option value="">-- Select Race Day --</option>
-                    {raceDays
+                    {(raceDays || [])
                       .filter(d => !editRaceCenterId || d.center_id === editRaceCenterId)
                       .map(d => (
                         <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
