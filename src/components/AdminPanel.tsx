@@ -928,22 +928,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Metrics Banner */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
-            <p className="text-xs text-slate-400">Total Bettors</p>
-            <p className="text-xl font-black text-white mt-0.5">{stats.totalUsers}</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Bettors</p>
+            <p className="text-lg sm:text-2xl font-black text-white mt-1 font-mono">{stats.totalUsers}</p>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
-            <p className="text-xs text-slate-400">Platform Bets</p>
-            <p className="text-xl font-black text-indigo-400 mt-0.5">{stats.totalBets}</p>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
+            <p className="text-lg sm:text-2xl font-black text-indigo-400 mt-1 font-mono">{stats.totalBets}</p>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
-            <p className="text-xs text-slate-400">Total Turnover</p>
-            <p className="text-xl font-black text-emerald-400 mt-0.5">₹{stats.totalVolume.toLocaleString()}</p>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Turnover</p>
+            <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono truncate">₹{stats.totalVolume.toLocaleString()}</p>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
-            <p className="text-xs text-slate-400">Pending Bets In-Play</p>
-            <p className="text-xl font-black text-amber-400 mt-0.5">{stats.pendingBetsCount}</p>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Pending Bets In-Play</p>
+            <p className="text-lg sm:text-2xl font-black text-amber-400 mt-1 font-mono">{stats.pendingBetsCount}</p>
           </div>
         </div>
       )}
@@ -1293,14 +1293,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {/* Status & Action controls */}
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full md:w-auto">
                     {/* PRIMARY ACTION: OPEN FOR BETTING (Single Active Race) */}
                     {race.status !== 'OPEN_FOR_BETTING' && race.status !== 'RESULTED' && (
                       <button
                         id={`open-betting-btn-${race.id}`}
                         onClick={() => handleOpenRaceForBetting(race)}
                         disabled={isLoading}
-                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 border border-emerald-400/40 active:scale-95"
+                        className="col-span-2 sm:col-span-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/40 border border-emerald-400/40 active:scale-95"
                         title="Open this race for user betting (Automatically closes all other races in this center)"
                       >
                         <Play className="w-3.5 h-3.5 fill-current text-white" />
@@ -1313,7 +1313,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         id={`settle-live-race-btn-${race.id}`}
                         onClick={() => handleOpenSettle(race)}
-                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-950/40 border border-amber-300/50"
+                        className="col-span-2 sm:col-span-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40 border border-amber-300/50"
                         title="Declare official winner and settle all bets"
                       >
                         <Trophy className="w-3.5 h-3.5 text-black" />
@@ -1325,7 +1325,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         id={`re-settle-btn-${race.id}`}
                         onClick={() => handleOpenSettle(race)}
-                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                        className="col-span-2 sm:col-span-1 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         <Trophy className="w-3.5 h-3.5 text-blue-400" />
                         <span>View / Re-Settle</span>
@@ -1335,7 +1335,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       id={`edit-race-btn-${race.id}`}
                       onClick={() => handleOpenEdit(race)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
                       <span>Edit</span>
@@ -1344,7 +1344,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       id={`delete-race-btn-${race.id}`}
                       onClick={() => handleDeleteRace(race.id, race.name)}
-                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer"
+                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer flex items-center justify-center"
                       title="Delete race fixture"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

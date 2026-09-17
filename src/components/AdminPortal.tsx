@@ -83,46 +83,46 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // If Admin is Authenticated -> Render Full Admin Dashboard with Admin Header Bar
   if (isAdminLoggedIn) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Top Admin Status & Exit Bar */}
-        <div className="p-4 rounded-3xl bg-[#14080b] border border-red-500/40 flex flex-wrap items-center justify-between gap-3 shadow-2xl">
+        <div className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-[#14080b] border border-red-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-600/20 border border-red-500/50 flex items-center justify-center text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]">
-              <Shield className="w-5 h-5" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-red-600/20 border border-red-500/50 flex items-center justify-center text-red-500 shrink-0 shadow-[0_0_15px_rgba(239,68,68,0.4)]">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-white">DERBYBET TURF — ADMIN CONSOLE</h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h2 className="text-xs sm:text-base font-black text-white tracking-tight">DERBYBET TURF — ADMIN CONSOLE</h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Live Session
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
                 Logged in as <strong className="text-red-400 font-mono">@{sessionStorage.getItem('derby_admin_user') || 'admin'}</strong> • Full Administrative Privileges
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => {
                 soundManager.playClick();
                 window.location.hash = '#/';
                 onBack();
               }}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold border border-slate-800 flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 sm:px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold border border-slate-800 flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Public Turf View</span>
+              <span>Public View</span>
             </button>
 
             <button
               onClick={handleAdminLogout}
-              className="px-3.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold border border-red-500/40 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              className="px-3 sm:px-3.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold border border-red-500/40 flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
             >
               <LogOut className="w-4 h-4" />
-              <span>Sign Out Admin</span>
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
