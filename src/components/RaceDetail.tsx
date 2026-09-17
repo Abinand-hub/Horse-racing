@@ -109,9 +109,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
     ? ([race.horses.find((h) => h.id === race.place_horses_ids[2])].filter(Boolean) as Horse[])
     : [];
 
-  const isOpen = race.status === 'OPEN' || race.status === 'UPCOMING' || race.status === 'LIVE';
+  const isBettingOpen = (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN') && !race.is_suspended;
+  const isOpen = isBettingOpen;
 
   const handleOddsClick = (horse: Horse, betType: BetType, odds: number) => {
+    if (!isBettingOpen) return;
     soundManager.playChip();
     if (!isLoggedIn) {
       onOpenAuth();
@@ -139,22 +141,22 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
         {/* Live Status Badge */}
         <div className="flex items-center gap-1">
-          {race.status === 'LIVE' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-sm animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-              🔴 Live In-Play
+          {(race.status === 'LIVE' || race.status === 'OPEN_FOR_BETTING') && !race.is_suspended && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              🟢 OPEN FOR BETTING
             </span>
           )}
           {(race.status === 'OPEN' || race.status === 'UPCOMING') && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shadow-sm">
-              <Clock className="w-2.5 h-2.5 text-emerald-400" />
-              ⏱ Upcoming
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+              <Clock className="w-2.5 h-2.5 text-slate-400" />
+              ⏱ Upcoming Fixture
             </span>
           )}
-          {race.status === 'CLOSED' && (
+          {(race.status === 'CLOSED' || race.status === 'SUSPENDED' || race.is_suspended) && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
               <AlertCircle className="w-2.5 h-2.5" />
-              Closed
+              Betting Closed / Suspended
             </span>
           )}
           {race.status === 'RESULTED' && (
@@ -443,16 +445,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               Betting Paused
                             </span>
                           </div>
-                        ) : (
+                        ) : isBettingOpen ? (
                           <button
                             id={`win-odds-btn-${horse.id}`}
-                            disabled={!isOpen}
                             onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
-                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
-                              isOpen
-                                ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02] cursor-pointer'
-                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                            }`}
+                            className="w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02] cursor-pointer"
                           >
                             <span className="text-xs sm:text-sm font-mono font-black">
                               {formatOdds(horse.win_odds, oddsFormat)}
@@ -461,6 +458,19 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               WIN
                             </span>
                           </button>
+                        ) : (
+                          <div 
+                            id={`win-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 px-1 rounded-lg bg-slate-900/90 border border-slate-700/60 text-slate-400 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner opacity-75"
+                            title="Odds Suspended / Betting Closed for this race. Only the active race is open for live betting."
+                          >
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 leading-tight">
+                              Odds Suspended
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                              Betting Closed
+                            </span>
+                          </div>
                         )}
                       </td>
 
@@ -480,16 +490,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               Betting Paused
                             </span>
                           </div>
-                        ) : (
+                        ) : isBettingOpen ? (
                           <button
                             id={`place-odds-btn-${horse.id}`}
-                            disabled={!isOpen}
                             onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
-                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
-                              isOpen
-                                ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02] cursor-pointer'
-                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                            }`}
+                            className="w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02] cursor-pointer"
                           >
                             <span className="text-xs sm:text-sm font-mono font-black">
                               {formatOdds(horse.place_odds, oddsFormat)}
@@ -498,6 +503,19 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               PLACE
                             </span>
                           </button>
+                        ) : (
+                          <div 
+                            id={`place-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 px-1 rounded-lg bg-slate-900/90 border border-slate-700/60 text-slate-400 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner opacity-75"
+                            title="Odds Suspended / Betting Closed for this race. Only the active race is open for live betting."
+                          >
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 leading-tight">
+                              Odds Suspended
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                              Betting Closed
+                            </span>
+                          </div>
                         )}
                       </td>
                     </tr>

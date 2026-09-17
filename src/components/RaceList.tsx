@@ -34,6 +34,19 @@ interface RaceListProps {
   onOpenSearch?: () => void;
 }
 
+const RACE_CENTERS_MASTER = [
+  { id: 'all', name: 'ALL CENTERS', code: 'ALL' },
+  { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS' },
+  { id: 'cntr_bangalore', name: 'BANGALORE', code: 'BTC' },
+  { id: 'cntr_ooty', name: 'OOTY', code: 'OOT' },
+  { id: 'cntr_madras', name: 'MADRAS', code: 'MRC' },
+  { id: 'cntr_hyderabad', name: 'HYDERABAD', code: 'HRC' },
+  { id: 'cntr_kolkata', name: 'KOLKATA', code: 'RCTC' },
+  { id: 'cntr_delhi', name: 'DELHI', code: 'DRC' },
+  { id: 'cntr_pune', name: 'PUNE', code: 'PRC' },
+  { id: 'cntr_mumbai', name: 'MUMBAI', code: 'RWITC' },
+];
+
 export const RaceList: React.FC<RaceListProps> = ({
   races,
   onSelectRace,
@@ -44,7 +57,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 }) => {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedVenue, setSelectedVenue] = useState<string>('all');
+  const [selectedCenter, setSelectedCenter] = useState<string>('all');
   const [showAllNewRacing, setShowAllNewRacing] = useState(false);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
@@ -52,8 +65,6 @@ export const RaceList: React.FC<RaceListProps> = ({
     soundManager.playClick();
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
-
-  const uniqueVenues: string[] = Array.from(new Set(races.map((r) => r.venue))).filter(Boolean) as string[];
 
   const filteredRaces = races.filter((race) => {
     const matchesSearch =
@@ -63,15 +74,19 @@ export const RaceList: React.FC<RaceListProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (selectedVenue !== 'all' && race.venue.toLowerCase() !== selectedVenue.toLowerCase()) {
-      return false;
+    if (selectedCenter !== 'all') {
+      const centerNameKey = selectedCenter.replace('cntr_', '');
+      const matchesCenter = 
+        race.center_id === selectedCenter || 
+        (race.venue && race.venue.toLowerCase().includes(centerNameKey));
+      if (!matchesCenter) return false;
     }
 
     if (filterStatus === 'upcoming') {
-      return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
+      return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'OPEN_FOR_BETTING' || race.status === 'DRAFT';
     }
     if (filterStatus === 'live') {
-      return race.status === 'LIVE';
+      return race.status === 'LIVE' || race.status === 'OPEN_FOR_BETTING';
     }
     if (filterStatus === 'resulted') {
       return race.status === 'RESULTED' || race.status === 'CLOSED';
@@ -82,17 +97,18 @@ export const RaceList: React.FC<RaceListProps> = ({
   const getStatusBadge = (status: RaceStatus) => {
     switch (status) {
       case 'LIVE':
+      case 'OPEN_FOR_BETTING':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-xs font-black uppercase tracking-wider shadow-sm animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-            🔴 LIVE IN-PLAY
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            🟢 LIVE / OPEN FOR BETTING
           </span>
         );
       case 'OPEN':
       case 'UPCOMING':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-black uppercase tracking-wider shadow-sm">
-            <Clock className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700 text-xs font-bold uppercase tracking-wider">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
             ⏱ Upcoming
           </span>
         );
@@ -103,10 +119,11 @@ export const RaceList: React.FC<RaceListProps> = ({
           </span>
         );
       case 'CLOSED':
+      case 'SUSPENDED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
             <AlertCircle className="w-3.5 h-3.5" />
-            Closed / Running
+            Betting Closed
           </span>
         );
       case 'RESULTED':
@@ -126,10 +143,62 @@ export const RaceList: React.FC<RaceListProps> = ({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       
-      {/* ---------------- TOP BANNER / SEARCH BAR (Responsive for PC / Laptop / Mobile) ---------------- */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      {/* ---------------- SCREEN 1: RACE CENTER TABS (MYSORE, BANGALORE, OOTY, MADRAS...) ---------------- */}
+      <div className="space-y-2 bg-[#06100b] p-3 rounded-2xl border border-emerald-900/60 shadow-lg">
+        <div className="flex items-center justify-between text-xs px-1">
+          <span className="flex items-center gap-1.5 text-emerald-400 font-black">
+            <MapPin className="w-4 h-4 text-emerald-400" />
+            <span>Select Race Center (Venues):</span>
+          </span>
+          <span className="text-[11px] text-slate-400">
+            {races.filter(r => r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE').length > 0 
+              ? '🟢 1 Active race open for betting'
+              : 'All centers scheduled'}
+          </span>
+        </div>
+
+        {/* Center horizontal pill bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+          {RACE_CENTERS_MASTER.map((cntr) => {
+            const isSelected = selectedCenter === cntr.id;
+            const centerRaces = cntr.id === 'all' 
+              ? races 
+              : races.filter(r => r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())));
+            const hasLive = centerRaces.some(r => r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE');
+
+            return (
+              <button
+                key={cntr.id}
+                id={`center-tab-${cntr.id}`}
+                onClick={() => {
+                  soundManager.playClick();
+                  setSelectedCenter(cntr.id);
+                }}
+                className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
+                    : hasLive
+                    ? 'bg-[#0b1c14] text-emerald-300 border-emerald-500/50 hover:bg-[#10291d]'
+                    : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white hover:border-emerald-800'
+                }`}
+              >
+                {hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+                <span>{cntr.name}</span>
+                <span className={`text-[10px] font-mono px-1 rounded ${
+                  isSelected ? 'bg-slate-950/30 text-slate-950' : 'bg-slate-900 text-slate-400'
+                }`}>
+                  {centerRaces.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ---------------- TOP BANNER / SEARCH BAR ---------------- */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search input */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-emerald-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -137,8 +206,8 @@ export const RaceList: React.FC<RaceListProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search upcoming races (e.g. Bangalore Derby, Pune, Mumbai)..."
-            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#091510] border border-emerald-900/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-[#e5b869]/70 transition shadow-inner"
+            placeholder="Search runners, jockeys, race numbers (e.g. Speed Princess, Mysore)..."
+            className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-[#091510] border border-emerald-900/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 transition shadow-inner"
           />
           {searchQuery && (
             <button
@@ -158,14 +227,14 @@ export const RaceList: React.FC<RaceListProps> = ({
               soundManager.playClick();
               onChangeFilter('upcoming');
             }}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               filterStatus === 'upcoming'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Upcoming Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+            <span>Upcoming ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
           </button>
 
           <button
@@ -174,14 +243,14 @@ export const RaceList: React.FC<RaceListProps> = ({
               soundManager.playClick();
               onChangeFilter('live');
             }}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               filterStatus === 'live'
-                ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white font-black shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse'
-                : 'text-rose-400 hover:text-rose-200 hover:bg-rose-950/40'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse'
+                : 'text-emerald-400 hover:text-emerald-200 hover:bg-emerald-950/40'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-            <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE').length})</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>🔴 Live & Open ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
           </button>
 
           <button
@@ -190,14 +259,14 @@ export const RaceList: React.FC<RaceListProps> = ({
               soundManager.playClick();
               onChangeFilter('resulted');
             }}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               filterStatus === 'resulted'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
             }`}
           >
             <Trophy className="w-3.5 h-3.5" />
-            <span>Completed Races ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+            <span>Completed ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
           </button>
 
           <button
@@ -206,7 +275,7 @@ export const RaceList: React.FC<RaceListProps> = ({
               soundManager.playClick();
               onChangeFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
               filterStatus === 'all'
                 ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                 : 'text-slate-300 hover:text-white hover:bg-emerald-950/40'
@@ -325,69 +394,64 @@ export const RaceList: React.FC<RaceListProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Races List View (Dynamic by Tab) */}
+          {/* Section 2: Screen 2 - Center Race List View (Sequence of Races) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between pb-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-emerald-900/40">
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  {filterStatus === 'live' ? (
+                  {selectedCenter !== 'all' ? (
+                    <>
+                      <MapPin className="w-5 h-5 text-emerald-400" />
+                      <span>{RACE_CENTERS_MASTER.find(c => c.id === selectedCenter)?.name || 'Center'} - Today's Race Fixtures</span>
+                    </>
+                  ) : filterStatus === 'live' ? (
                     <>
                       <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
-                      <span>Live In-Play Races (List View)</span>
+                      <span>Live In-Play Races</span>
                     </>
                   ) : filterStatus === 'resulted' ? (
                     <>
                       <Trophy className="w-5 h-5 text-[#e5b869]" />
-                      <span>Completed & Resulted Races</span>
-                    </>
-                  ) : filterStatus === 'all' ? (
-                    <>
-                      <Calendar className="w-5 h-5 text-emerald-400" />
-                      <span>All Racing Fixtures</span>
+                      <span>Completed Races</span>
                     </>
                   ) : (
                     <>
-                      <Calendar className="w-5 h-5 text-amber-400" />
-                      <span>Upcoming Races (List View)</span>
+                      <Calendar className="w-5 h-5 text-emerald-400" />
+                      <span>Upcoming Races (Center Schedule)</span>
                     </>
                   )}
                 </h2>
                 <p className="text-xs text-slate-400">
-                  SRS Format: <span className="text-slate-300 font-mono">Venue - Race Name - Time - Date</span>
+                  {selectedCenter !== 'all'
+                    ? 'Only 1 active race is open for live betting at a time. Click any race to inspect runners.'
+                    : 'Select a race center above or filter by live / upcoming'}
                 </p>
               </div>
 
-              {uniqueVenues.length > 0 && (
-                <select
-                  value={selectedVenue}
-                  onChange={(e) => setSelectedVenue(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 rounded-xl px-3 py-1.5 focus:outline-none focus:border-rose-500"
-                >
-                  <option value="all">All Tracks</option>
-                  {uniqueVenues.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              )}
+              <div className="text-xs text-emerald-400 font-bold self-start sm:self-auto flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>{filteredRaces.length} Races on Card</span>
+              </div>
             </div>
 
             {isLoading ? (
               <div className="py-16 text-center text-slate-500">
-                <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 <p className="text-xs font-semibold">Loading race fixtures...</p>
               </div>
             ) : filteredRaces.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/60 rounded-3xl border border-slate-800">
                 <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm font-bold text-slate-300">No races found</p>
-                <p className="text-xs text-slate-500 mt-1">Try changing filter status or clear search.</p>
+                <p className="text-sm font-bold text-slate-300">No races found for this selection</p>
+                <p className="text-xs text-slate-500 mt-1">Try selecting "ALL CENTERS" or switching tabs.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {filteredRaces.map((race) => {
                   const winnerHorse = race.winner_horse_id
                     ? race.horses.find((h) => h.id === race.winner_horse_id)
                     : null;
+                  const isActiveBetting = (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE') && !race.is_suspended;
 
                   return (
                     <div
@@ -397,12 +461,25 @@ export const RaceList: React.FC<RaceListProps> = ({
                         soundManager.playClick();
                         onSelectRace(race.id);
                       }}
-                      className="group bg-[#091510]/95 hover:bg-[#0c1c15] rounded-3xl border-2 border-emerald-900/60 hover:border-[#e5b869]/80 p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer"
+                      className={`group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer ${
+                        isActiveBetting
+                          ? 'border-2 border-emerald-500/90 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-emerald-950/60 via-[#07170e] to-[#07100a] scale-[1.01]'
+                          : 'border border-slate-800/80 bg-[#091510]/70 opacity-85 hover:opacity-100 hover:border-slate-700'
+                      }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         {/* Main Title & Format */}
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2 text-xs">
+                            {race.race_no && (
+                              <span className={`px-2.5 py-0.5 rounded-lg font-mono font-black text-[11px] border ${
+                                isActiveBetting
+                                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-sm'
+                                  : 'bg-slate-900 text-slate-300 border-slate-700'
+                              }`}>
+                                RACE #{race.race_no}
+                              </span>
+                            )}
                             <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/40">
                               <MapPin className="w-3.5 h-3.5" />
                               {race.venue}
@@ -410,7 +487,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                             <span className="text-emerald-900">•</span>
                             <span className="text-slate-300 font-mono font-semibold flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              {race.race_time} - {race.date_str}
+                              {race.race_time} - {race.date_str || 'Today'}
                             </span>
                             {race.distance && (
                               <>
@@ -420,19 +497,21 @@ export const RaceList: React.FC<RaceListProps> = ({
                             )}
                           </div>
 
-                          <h3 className="text-base sm:text-lg font-black text-white group-hover:text-[#e5b869] transition">
+                          <h3 className={`text-base sm:text-lg font-black transition ${
+                            isActiveBetting ? 'text-white' : 'text-slate-200 group-hover:text-white'
+                          }`}>
                             {race.name}
                           </h3>
 
                           {race.status === 'RESULTED' && winnerHorse && (
                             <p className="text-xs text-blue-300 flex items-center gap-1.5">
                               <Trophy className="w-3.5 h-3.5 text-[#e5b869]" />
-                              Winner: <strong>#{winnerHorse.horse_no} {winnerHorse.name}</strong>
+                              Winner: <strong>#{winnerHorse.horse_no || winnerHorse.serial_no} {winnerHorse.name}</strong>
                             </p>
                           )}
                         </div>
 
-                        {/* Status & View Button */}
+                        {/* Status & Action Button */}
                         <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
                           <div className="text-left sm:text-right">
                             <div className="text-xs text-slate-400 mb-1">
@@ -443,9 +522,13 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           <button
                             id={`race-view-btn-${race.id}`}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#0e241b] border border-emerald-700/60 group-hover:bg-gradient-to-r group-hover:from-[#d4af37] group-hover:to-[#e5b869] text-emerald-300 group-hover:text-black font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
+                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
+                              isActiveBetting
+                                ? 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black shadow-emerald-950/60 animate-pulse'
+                                : 'bg-[#0e241b] hover:bg-[#133024] text-emerald-300 hover:text-white border border-emerald-800/60'
+                            }`}
                           >
-                            <span>Open Market</span>
+                            <span>{isActiveBetting ? '⚡ BET NOW' : 'View Card'}</span>
                             <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
                           </button>
                         </div>
@@ -455,29 +538,37 @@ export const RaceList: React.FC<RaceListProps> = ({
                       {race.horses.length > 0 && race.status !== 'RESULTED' && (
                         <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
                           <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
-                            Top Runners:
+                            Field Preview:
                           </span>
                           {race.horses.slice(0, 4).map((h) => (
                             <div
                               key={h.id}
-                              className="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded-xl border border-emerald-900/60 whitespace-nowrap"
+                              className={`flex items-center gap-2 px-2.5 py-1 rounded-xl border whitespace-nowrap ${
+                                isActiveBetting 
+                                  ? 'bg-slate-950 border-emerald-500/40' 
+                                  : 'bg-slate-950/70 border-slate-800'
+                              }`}
                             >
                               <SilkIcon
                                 color={h.silk_color}
-                                number={h.horse_no}
+                                number={h.horse_no || h.serial_no}
                                 size="sm"
                               />
                               <span className="font-bold text-slate-200 truncate max-w-[100px]">
                                 {h.name}
                               </span>
-                              <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-300 font-bold font-mono text-[11px] border border-rose-500/30">
-                                {formatOdds(h.win_odds, oddsFormat)}
+                              <span className={`px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] border ${
+                                isActiveBetting
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : 'bg-slate-900 text-slate-400 border-slate-800'
+                              }`}>
+                                {isActiveBetting ? formatOdds(h.win_odds, oddsFormat) : 'Card'}
                               </span>
                             </div>
                           ))}
                           {race.horses.length > 4 && (
                             <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
-                              +{race.horses.length - 4} more
+                              +{race.horses.length - 4} more runners
                             </span>
                           )}
                         </div>

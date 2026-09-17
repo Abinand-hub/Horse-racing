@@ -3,6 +3,8 @@ import {
   Bet, 
   BetType, 
   Race, 
+  RaceCenter,
+  RaceDay,
   RaceStatus, 
   Transaction, 
   User,
@@ -17,12 +19,27 @@ import { DUMMY_BANNERS, DUMMY_BETS, DUMMY_RACES, DUMMY_USER } from '../data/dumm
 
 const API_BASE = '/api';
 
+export const DEFAULT_RACE_CENTERS: RaceCenter[] = [
+  { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS', city: 'Mysore', is_active: true, order: 1 },
+  { id: 'cntr_bangalore', name: 'BANGALORE', code: 'BTC', city: 'Bangalore', is_active: true, order: 2 },
+  { id: 'cntr_ooty', name: 'OOTY', code: 'OOT', city: 'Ooty', is_active: true, order: 3 },
+  { id: 'cntr_madras', name: 'MADRAS', code: 'MRC', city: 'Chennai', is_active: true, order: 4 },
+  { id: 'cntr_kolkata', name: 'KOLKATA', code: 'CAL', city: 'Kolkata', is_active: true, order: 5 },
+  { id: 'cntr_delhi', name: 'DELHI', code: 'DEL', city: 'Delhi', is_active: true, order: 6 },
+  { id: 'cntr_hyderabad', name: 'HYDERABAD', code: 'HYD', city: 'Hyderabad', is_active: true, order: 7 },
+  { id: 'cntr_pune', name: 'PUNE', code: 'PUN', city: 'Pune', is_active: true, order: 8 },
+  { id: 'cntr_mumbai', name: 'MUMBAI', code: 'MUM', city: 'Mumbai', is_active: true, order: 9 },
+];
+
 // ----------------------------------------------------------------------
 // REALTIME ODDS SYNC SERVICE (WebSocket / BroadcastChannel / EventTarget)
 // ----------------------------------------------------------------------
 export interface OddsStatusUpdatePayload {
-  event: 'odds_status_update' | 'SUSPEND_HORSE' | 'RESUME_HORSE' | 'SUSPEND_ALL' | 'RESUME_ALL';
+  event: 'odds_status_update' | 'SUSPEND_HORSE' | 'RESUME_HORSE' | 'SUSPEND_ALL' | 'RESUME_ALL' | 'RACE_STATUS_CHANGED';
   race_id: string;
+  race_day_id?: string;
+  center_id?: string;
+  open_race_id?: string;
   horse_id?: string;
   is_suspended?: boolean;
   win_odds?: number;
@@ -204,9 +221,255 @@ export const api = {
     }
   },
 
-  logout() {
-    localStorage.removeItem('derby_token');
-    localStorage.removeItem('derby_user');
+  // ----------------------------------------------------
+  // RACE CENTERS (Level 1)
+  // ----------------------------------------------------
+  async getRaceCenters(all?: boolean): Promise<RaceCenter[]> {
+    try {
+      const res = await fetch(`${API_BASE}/race-centers${all ? '?all=true' : ''}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.centers) && data.centers.length > 0) {
+          localStorage.setItem('derby_race_centers', JSON.stringify(data.centers));
+          return data.centers;
+        }
+      }
+    } catch (e) {
+      console.warn('API getRaceCenters failed, using fallback:', e);
+    }
+
+    try {
+      const cached = localStorage.getItem('derby_race_centers');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+
+    return DEFAULT_RACE_CENTERS;
+  },
+
+  async createRaceCenter(data: Partial<RaceCenter>): Promise<{ success: boolean; message: string; center: RaceCenter }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/race-centers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to create Race Center');
+      return resData;
+    } catch (e: any) {
+      const newCenter: RaceCenter = {
+        id: `cntr_${Date.now()}`,
+        name: (data.name || '').toUpperCase().trim(),
+        code: (data.code || '').toUpperCase().trim(),
+        city: data.city || data.name,
+        is_active: data.is_active !== undefined ? data.is_active : true,
+        order: DEFAULT_RACE_CENTERS.length + 1,
+        created_at: new Date().toISOString(),
+      };
+      const centers = await this.getRaceCenters(true);
+      centers.push(newCenter);
+      localStorage.setItem('derby_race_centers', JSON.stringify(centers));
+      return { success: true, message: `Race Center "${newCenter.name}" created!`, center: newCenter };
+    }
+  },
+
+  async updateRaceCenter(id: string, data: Partial<RaceCenter>): Promise<{ success: boolean; message: string; center: RaceCenter }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/race-centers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to update Race Center');
+      return resData;
+    } catch (e: any) {
+      const centers = await this.getRaceCenters(true);
+      const c = centers.find(center => center.id === id);
+      if (c) {
+        Object.assign(c, data);
+        localStorage.setItem('derby_race_centers', JSON.stringify(centers));
+        return { success: true, message: `Race Center "${c.name}" updated!`, center: c };
+      }
+      throw new Error('Race Center not found');
+    }
+  },
+
+  // ----------------------------------------------------
+  // RACE DAYS (Level 2)
+  // ----------------------------------------------------
+  async getRaceDays(center?: string, date?: string): Promise<RaceDay[]> {
+    try {
+      const query = new URLSearchParams();
+      if (center) query.set('center', center);
+      if (date) query.set('date', date);
+      const res = await fetch(`${API_BASE}/race-days?${query.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.race_days)) {
+          localStorage.setItem('derby_race_days', JSON.stringify(data.race_days));
+          return data.race_days;
+        }
+      }
+    } catch (e) {
+      console.warn('API getRaceDays failed, using fallback:', e);
+    }
+
+    try {
+      const cached = localStorage.getItem('derby_race_days');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+
+    return [
+      { id: 'day_mys_today', center_id: 'cntr_mysore', center_name: 'MYSORE', race_date: '2026-09-17', title: 'Mysore - 17th Sep 2026', status: 'PUBLISHED', races_count: 6 },
+      { id: 'day_btc_today', center_id: 'cntr_bangalore', center_name: 'BANGALORE', race_date: '2026-09-17', title: 'Bangalore - 17th Sep 2026', status: 'PUBLISHED', races_count: 6 },
+      { id: 'day_oot_today', center_id: 'cntr_ooty', center_name: 'OOTY', race_date: '2026-09-17', title: 'Ooty - 17th Sep 2026', status: 'PUBLISHED', races_count: 3 },
+      { id: 'day_mrc_today', center_id: 'cntr_madras', center_name: 'MADRAS', race_date: '2026-09-17', title: 'Madras - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+      { id: 'day_hyd_today', center_id: 'cntr_hyderabad', center_name: 'HYDERABAD', race_date: '2026-09-17', title: 'Hyderabad - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+      { id: 'day_cal_today', center_id: 'cntr_kolkata', center_name: 'KOLKATA', race_date: '2026-09-17', title: 'Kolkata - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+      { id: 'day_del_today', center_id: 'cntr_delhi', center_name: 'DELHI', race_date: '2026-09-17', title: 'Delhi - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+      { id: 'day_pun_today', center_id: 'cntr_pune', center_name: 'PUNE', race_date: '2026-09-17', title: 'Pune - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+      { id: 'day_mum_today', center_id: 'cntr_mumbai', center_name: 'MUMBAI', race_date: '2026-09-17', title: 'Mumbai - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
+    ];
+  },
+
+  async getRaceDay(center?: string, date?: string): Promise<{ center: RaceCenter; race_day: RaceDay; races: Race[] }> {
+    try {
+      const query = new URLSearchParams();
+      if (center) query.set('center', center);
+      if (date) query.set('date', date);
+      const res = await fetch(`${API_BASE}/race-day?${query.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.races) {
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('API getRaceDay failed, using fallback:', e);
+    }
+
+    const centers = await this.getRaceCenters();
+    const targetCenter = centers.find(c => c.name.toLowerCase() === (center || 'bangalore').toLowerCase() || c.id === center) || centers[0];
+    const days = await this.getRaceDays(targetCenter.id);
+    const targetDay = days.find(d => d.center_id === targetCenter.id) || days[0];
+    const allRaces = await this.getRaces('all');
+    const filteredRaces = allRaces.filter(r => 
+      (targetDay && r.race_day_id === targetDay.id) || 
+      (targetCenter && r.center_id === targetCenter.id) ||
+      (targetCenter && r.venue.toLowerCase().includes(targetCenter.name.toLowerCase()))
+    );
+
+    return {
+      center: targetCenter,
+      race_day: targetDay,
+      races: filteredRaces.length > 0 ? filteredRaces : allRaces.slice(0, 4),
+    };
+  },
+
+  async createRaceDay(data: Partial<RaceDay>): Promise<{ success: boolean; message: string; race_day: RaceDay }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/race-days`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to create Race Day');
+      return resData;
+    } catch (e: any) {
+      const newDay: RaceDay = {
+        id: `day_${Date.now()}`,
+        center_id: data.center_id || 'cntr_bangalore',
+        center_name: data.center_name || 'BANGALORE',
+        race_date: data.race_date || new Date().toISOString().split('T')[0],
+        title: data.title || `${data.center_name || 'Center'} - ${data.race_date || 'Today'}`,
+        status: data.status || 'PUBLISHED',
+        races_count: 0,
+        created_at: new Date().toISOString(),
+      };
+      const days = await this.getRaceDays();
+      days.unshift(newDay);
+      localStorage.setItem('derby_race_days', JSON.stringify(days));
+      return { success: true, message: `Race Day "${newDay.title}" created!`, race_day: newDay };
+    }
+  },
+
+  async publishRaceDay(id: string): Promise<{ success: boolean; message: string; race_day: RaceDay }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/race-days/${id}/publish`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to publish race day');
+      return data;
+    } catch (e: any) {
+      const days = await this.getRaceDays();
+      const d = days.find(day => day.id === id);
+      if (d) {
+        d.status = 'PUBLISHED';
+        localStorage.setItem('derby_race_days', JSON.stringify(days));
+        return { success: true, message: `Race Day "${d.title}" published!`, race_day: d };
+      }
+      throw new Error('Race day not found');
+    }
+  },
+
+  // ----------------------------------------------------
+  // LEVEL 3 RACE BETTING ACTIVATION (Single Active Race)
+  // ----------------------------------------------------
+  async openRaceForBetting(raceId: string): Promise<{ success: boolean; message: string; race: Race; races: Race[] }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/open-betting`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to open race for betting');
+
+      realtimeOdds.broadcast({
+        event: 'RACE_STATUS_CHANGED',
+        race_id: raceId,
+        race_day_id: data.race?.race_day_id,
+        center_id: data.race?.center_id,
+        open_race_id: raceId,
+        race: data.race,
+        timestamp: Date.now(),
+      });
+
+      return data;
+    } catch (e: any) {
+      console.warn('API openRaceForBetting fallback:', e);
+      const allRaces = await this.getRaces('all');
+      const target = allRaces.find(r => r.id === raceId);
+      if (target) {
+        allRaces.forEach(r => {
+          if (r.venue === target.venue || r.center_id === target.center_id) {
+            if (r.id === target.id) {
+              r.status = 'OPEN_FOR_BETTING';
+              r.is_suspended = false;
+            } else if (r.status !== 'RESULTED') {
+              r.status = 'CLOSED';
+              r.is_suspended = true;
+            }
+          }
+        });
+        localStorage.setItem('derby_custom_races', JSON.stringify(allRaces));
+        realtimeOdds.broadcast({
+          event: 'RACE_STATUS_CHANGED',
+          race_id: raceId,
+          race_day_id: target.race_day_id,
+          center_id: target.center_id,
+          open_race_id: raceId,
+          race: target,
+          timestamp: Date.now(),
+        });
+        return {
+          success: true,
+          message: `Race #${target.race_no || ''} ${target.name} is now OPEN FOR BETTING!`,
+          race: target,
+          races: allRaces,
+        };
+      }
+      throw new Error('Race not found');
+    }
   },
 
   // Races

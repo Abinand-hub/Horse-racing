@@ -1,7 +1,30 @@
 export type BetType = 'WIN' | 'PLACE';
 export type BetStatus = 'PENDING' | 'WON' | 'LOST';
-export type RaceStatus = 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED';
+export type RaceStatus = 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED' | 'OPEN_FOR_BETTING' | 'SUSPENDED';
 export type TransactionType = 'DEPOSIT' | 'WITHDRAW' | 'BET' | 'WIN' | 'REFUND';
+
+// Level 1: Race Center Master
+export interface RaceCenter {
+  id: string;
+  name: string; // e.g., 'MYSORE', 'BANGALORE', 'OOTY', 'MADRAS', 'KOLKATA', 'DELHI', 'HYDERABAD', 'PUNE', 'MUMBAI'
+  code: string; // e.g., 'MYS', 'BTC', 'OOT', 'MRC', 'CAL', 'DEL', 'HYD', 'PUN', 'MUM'
+  city?: string;
+  is_active: boolean;
+  order?: number;
+  created_at?: string;
+}
+
+// Level 2: Race Day / Race Card Fixture
+export interface RaceDay {
+  id: string;
+  center_id: string;
+  center_name: string;
+  race_date: string; // e.g. '2026-09-17' or '17th Sep 2026'
+  title: string; // e.g. 'Mysore - 17th Sep 2026'
+  status: 'DRAFT' | 'PUBLISHED';
+  races_count?: number;
+  created_at?: string;
+}
 
 export interface User {
   id: string;
@@ -35,14 +58,19 @@ export interface Horse {
   is_suspended?: boolean;
 }
 
+// Level 3: Race Entity inside a Race Day
 export interface Race {
   id: string;
-  name: string; // Name of the race / cup
-  race_no?: number | string; // Race number (e.g. Race 7)
+  race_day_id?: string;
+  center_id?: string;
+  name: string; // Name of the race / cup (e.g. XYZ Plate)
+  race_no?: number | string; // Race number (1 to 10)
+  race_number?: number | string; // Alias for race_no
   venue: string;
-  race_time: string; // Time (e.g. 1:45 PM)
+  race_time: string; // Time (e.g. 1:30 PM)
   date_str: string;
-  distance: string; // Distance (e.g. 1600m)
+  distance: string; // Distance (e.g. 1200M)
+  number_of_runners?: number;
   going?: string;
   class_grade?: string;
   status: RaceStatus;

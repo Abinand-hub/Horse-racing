@@ -42,20 +42,50 @@ interface Horse {
   weight?: string;
 }
 
+interface RaceCenter {
+  id: string;
+  name: string;
+  code: string;
+  city?: string;
+  is_active: boolean;
+  order?: number;
+  created_at?: string;
+}
+
+interface RaceDay {
+  id: string;
+  center_id: string;
+  center_name: string;
+  race_date: string;
+  title: string;
+  status: 'DRAFT' | 'PUBLISHED';
+  races_count?: number;
+  created_at?: string;
+}
+
 interface Race {
   id: string;
+  race_day_id?: string;
+  center_id?: string;
   name: string; // Name of the race / cup
   race_no?: number | string; // Race number
+  race_number?: number | string;
   venue: string;
   race_time: string; // Time
   date_str: string;
   distance: string; // Distance
-  going: string;
-  class_grade: string;
-  status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'RESULTED';
+  going?: string;
+  class_grade?: string;
+  status: 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED' | 'OPEN_FOR_BETTING' | 'SUSPENDED';
+  is_suspended?: boolean;
   image_url?: string;
   winner_horse_id: string | null;
   place_horses_ids: string[];
+  position_1?: string[];
+  position_2?: string[];
+  position_3?: string[];
+  is_dead_heat?: boolean;
+  dead_heat_note?: string;
   horses: Horse[];
   settled_at: string | null;
 }
@@ -80,6 +110,8 @@ interface Bet {
   potential_win: number;
   payout: number;
   status: 'PENDING' | 'WON' | 'LOST';
+  is_dead_heat?: boolean;
+  dead_heat_divider?: number;
   placed_at: string;
   settled_at: string | null;
 }
@@ -108,6 +140,8 @@ interface Banner {
 
 interface DBData {
   users: User[];
+  race_centers: RaceCenter[];
+  race_days: RaceDay[];
   races: Race[];
   bets: Bet[];
   transactions: Transaction[];
@@ -146,18 +180,124 @@ const defaultData: DBData = {
       created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     },
   ],
+  race_centers: [
+    { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS', city: 'Mysore', is_active: true, order: 1, created_at: new Date().toISOString() },
+    { id: 'cntr_bangalore', name: 'BANGALORE', code: 'BTC', city: 'Bangalore', is_active: true, order: 2, created_at: new Date().toISOString() },
+    { id: 'cntr_ooty', name: 'OOTY', code: 'OOT', city: 'Ooty', is_active: true, order: 3, created_at: new Date().toISOString() },
+    { id: 'cntr_madras', name: 'MADRAS', code: 'MRC', city: 'Chennai', is_active: true, order: 4, created_at: new Date().toISOString() },
+    { id: 'cntr_kolkata', name: 'KOLKATA', code: 'CAL', city: 'Kolkata', is_active: true, order: 5, created_at: new Date().toISOString() },
+    { id: 'cntr_delhi', name: 'DELHI', code: 'DEL', city: 'Delhi', is_active: true, order: 6, created_at: new Date().toISOString() },
+    { id: 'cntr_hyderabad', name: 'HYDERABAD', code: 'HYD', city: 'Hyderabad', is_active: true, order: 7, created_at: new Date().toISOString() },
+    { id: 'cntr_pune', name: 'PUNE', code: 'PUN', city: 'Pune', is_active: true, order: 8, created_at: new Date().toISOString() },
+    { id: 'cntr_mumbai', name: 'MUMBAI', code: 'MUM', city: 'Mumbai', is_active: true, order: 9, created_at: new Date().toISOString() },
+  ],
+  race_days: [
+    {
+      id: 'day_mys_today',
+      center_id: 'cntr_mysore',
+      center_name: 'MYSORE',
+      race_date: '2026-09-17',
+      title: 'Mysore - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 6,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_btc_today',
+      center_id: 'cntr_bangalore',
+      center_name: 'BANGALORE',
+      race_date: '2026-09-17',
+      title: 'Bangalore - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 6,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_oot_today',
+      center_id: 'cntr_ooty',
+      center_name: 'OOTY',
+      race_date: '2026-09-17',
+      title: 'Ooty - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 3,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_mrc_today',
+      center_id: 'cntr_madras',
+      center_name: 'MADRAS',
+      race_date: '2026-09-17',
+      title: 'Madras - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_hyd_today',
+      center_id: 'cntr_hyderabad',
+      center_name: 'HYDERABAD',
+      race_date: '2026-09-17',
+      title: 'Hyderabad - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_cal_today',
+      center_id: 'cntr_kolkata',
+      center_name: 'KOLKATA',
+      race_date: '2026-09-17',
+      title: 'Kolkata - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_del_today',
+      center_id: 'cntr_delhi',
+      center_name: 'DELHI',
+      race_date: '2026-09-17',
+      title: 'Delhi - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_pun_today',
+      center_id: 'cntr_pune',
+      center_name: 'PUNE',
+      race_date: '2026-09-17',
+      title: 'Pune - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'day_mum_today',
+      center_id: 'cntr_mumbai',
+      center_name: 'MUMBAI',
+      race_date: '2026-09-17',
+      title: 'Mumbai - 17th Sep 2026',
+      status: 'PUBLISHED',
+      races_count: 4,
+      created_at: new Date().toISOString(),
+    },
+  ],
   races: [
     {
       id: 'race_sfc_07',
+      center_id: 'cntr_bangalore',
+      race_day_id: 'day_btc_today',
       name: 'The Star Future Cup',
-      race_no: 7,
+      race_no: 2,
+      race_number: 2,
       venue: 'Bangalore Turf Club',
       race_time: '1:45 PM',
-      date_str: 'Today, 5th Sep',
+      date_str: 'Today, 17th Sep',
       distance: '1600m',
       going: 'Good',
       class_grade: 'Grade 2 • 3yo Terms',
-      status: 'OPEN',
+      status: 'OPEN_FOR_BETTING',
       winner_horse_id: null,
       place_horses_ids: [],
       settled_at: null,
@@ -691,17 +831,42 @@ function loadDatabase() {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       db = JSON.parse(content);
       
+      // Ensure race_centers and race_days exist
+      if (!db.race_centers || db.race_centers.length === 0) {
+        db.race_centers = defaultData.race_centers;
+      }
+      if (!db.race_days || db.race_days.length === 0) {
+        db.race_days = defaultData.race_days;
+      }
+
       // Ensure Star Future Cup race exists
       if (!db.races.some((r) => r.id === 'race_sfc_07')) {
         const sfcRace = defaultData.races.find((r) => r.id === 'race_sfc_07');
         if (sfcRace) db.races.unshift(sfcRace);
       }
 
-      // Ensure every horse has serial_no, gate_no and every race has image_url
+      // Ensure every horse has serial_no, gate_no and every race has image_url, center_id, race_day_id
       const sampleImages = ['/images/race_action.jpg', '/images/jockey_hero.jpg', '/images/horse_runner.jpg'];
       db.races.forEach((r, rIdx) => {
         if (!r.image_url) {
           r.image_url = sampleImages[rIdx % sampleImages.length];
+        }
+        if (!r.center_id) {
+          const v = (r.venue || r.name || '').toLowerCase();
+          if (v.includes('mysore')) r.center_id = 'cntr_mysore';
+          else if (v.includes('bangalore') || v.includes('btc')) r.center_id = 'cntr_bangalore';
+          else if (v.includes('ooty')) r.center_id = 'cntr_ooty';
+          else if (v.includes('madras') || v.includes('chennai') || v.includes('guindy')) r.center_id = 'cntr_madras';
+          else if (v.includes('kolkata') || v.includes('calcutta')) r.center_id = 'cntr_kolkata';
+          else if (v.includes('delhi')) r.center_id = 'cntr_delhi';
+          else if (v.includes('hyderabad')) r.center_id = 'cntr_hyderabad';
+          else if (v.includes('pune')) r.center_id = 'cntr_pune';
+          else if (v.includes('mumbai') || v.includes('mahalaxmi')) r.center_id = 'cntr_mumbai';
+          else r.center_id = 'cntr_bangalore';
+        }
+        if (!r.race_day_id) {
+          const centerDay = db.race_days.find((d) => d.center_id === r.center_id);
+          r.race_day_id = centerDay ? centerDay.id : 'day_btc_today';
         }
         r.horses.forEach((h, idx) => {
           if (h.serial_no === undefined) h.serial_no = h.horse_no || (idx + 1);
@@ -909,18 +1074,198 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 // ----------------------------------------------------
-// RACES APIS
+// RACE CENTERS APIS (Level 1 Master Setup)
 // ----------------------------------------------------
 
-// GET /api/races?status=open (or upcoming, resulted, draft, all)
+// GET /api/race-centers
+app.get('/api/race-centers', (req, res) => {
+  const showAll = req.query.all === 'true';
+  const centers = showAll ? db.race_centers : db.race_centers.filter((c) => c.is_active);
+  return res.json({ success: true, centers });
+});
+
+// POST /api/admin/race-centers (Add new race center)
+app.post('/api/admin/race-centers', (req, res) => {
+  const { name, code, city, is_active } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: 'Center Name and Code are required' });
+  }
+
+  const existing = db.race_centers.find(
+    (c) => c.name.toLowerCase() === String(name).trim().toLowerCase() || c.code.toLowerCase() === String(code).trim().toLowerCase()
+  );
+  if (existing) {
+    return res.status(400).json({ error: `Race Center "${name}" or code "${code}" already exists` });
+  }
+
+  const newCenter: RaceCenter = {
+    id: generateId('cntr'),
+    name: String(name).trim().toUpperCase(),
+    code: String(code).trim().toUpperCase(),
+    city: city ? String(city).trim() : String(name).trim(),
+    is_active: is_active !== undefined ? Boolean(is_active) : true,
+    order: db.race_centers.length + 1,
+    created_at: new Date().toISOString(),
+  };
+
+  db.race_centers.push(newCenter);
+  saveDatabase();
+  return res.json({ success: true, message: `Race Center "${newCenter.name}" added successfully!`, center: newCenter });
+});
+
+// PUT /api/admin/race-centers/:id
+app.put('/api/admin/race-centers/:id', (req, res) => {
+  const center = db.race_centers.find((c) => c.id === req.params.id);
+  if (!center) return res.status(404).json({ error: 'Race Center not found' });
+
+  if (req.body.name) center.name = String(req.body.name).trim().toUpperCase();
+  if (req.body.code) center.code = String(req.body.code).trim().toUpperCase();
+  if (req.body.city !== undefined) center.city = String(req.body.city).trim();
+  if (req.body.is_active !== undefined) center.is_active = Boolean(req.body.is_active);
+  if (req.body.order !== undefined) center.order = Number(req.body.order);
+
+  saveDatabase();
+  return res.json({ success: true, message: `Race Center "${center.name}" updated!`, center });
+});
+
+// ----------------------------------------------------
+// RACE DAYS / RACE CARDS APIS (Level 2 Master Setup)
+// ----------------------------------------------------
+
+// GET /api/race-days (Supports ?center=mysore&date=today or ?center_id=...&date=...)
+app.get('/api/race-days', (req, res) => {
+  const centerQuery = (req.query.center as string || '').toLowerCase().trim();
+  const centerIdQuery = req.query.center_id as string;
+  const dateQuery = (req.query.date as string || '').toLowerCase().trim();
+
+  let days = [...db.race_days];
+
+  if (centerIdQuery) {
+    days = days.filter((d) => d.center_id === centerIdQuery);
+  } else if (centerQuery && centerQuery !== 'all') {
+    const center = db.race_centers.find((c) => 
+      c.name.toLowerCase() === centerQuery || 
+      c.code.toLowerCase() === centerQuery || 
+      c.id.toLowerCase() === centerQuery
+    );
+    if (center) {
+      days = days.filter((d) => d.center_id === center.id);
+    } else {
+      days = days.filter((d) => d.center_name.toLowerCase().includes(centerQuery));
+    }
+  }
+
+  // Count active races for each race day
+  days = days.map((d) => ({
+    ...d,
+    races_count: db.races.filter((r) => r.race_day_id === d.id || r.center_id === d.center_id).length,
+  }));
+
+  return res.json({ success: true, race_days: days });
+});
+
+// GET /api/race-day (Alias for GET /api/race-days?center=...&date=...)
+app.get('/api/race-day', (req, res) => {
+  const centerQuery = (req.query.center as string || '').toLowerCase().trim();
+  const centerIdQuery = req.query.center_id as string;
+
+  let center = centerIdQuery ? db.race_centers.find((c) => c.id === centerIdQuery) : null;
+  if (!center && centerQuery) {
+    center = db.race_centers.find((c) => 
+      c.name.toLowerCase() === centerQuery || 
+      c.code.toLowerCase() === centerQuery ||
+      c.id.toLowerCase() === centerQuery
+    );
+  }
+
+  const raceDay = db.race_days.find((d) => 
+    (center && d.center_id === center.id) ||
+    (centerQuery && d.center_name.toLowerCase().includes(centerQuery))
+  ) || db.race_days[0];
+
+  const targetCenter = center || db.race_centers.find((c) => c.id === raceDay?.center_id) || db.race_centers[0];
+
+  const races = db.races.filter((r) => 
+    (raceDay && r.race_day_id === raceDay.id) || 
+    (targetCenter && r.center_id === targetCenter.id) ||
+    (targetCenter && r.venue.toLowerCase().includes(targetCenter.name.toLowerCase()))
+  );
+
+  return res.json({ 
+    success: true, 
+    center: targetCenter, 
+    race_day: raceDay, 
+    races 
+  });
+});
+
+// POST /api/admin/race-days
+app.post('/api/admin/race-days', (req, res) => {
+  const { center_id, race_date, title, status } = req.body;
+  const center = db.race_centers.find((c) => c.id === center_id);
+  if (!center) return res.status(404).json({ error: 'Selected Race Center not found' });
+
+  const newRaceDay: RaceDay = {
+    id: generateId('day'),
+    center_id: center.id,
+    center_name: center.name,
+    race_date: race_date || new Date().toISOString().split('T')[0],
+    title: title || `${center.name} - ${race_date || 'Today'}`,
+    status: status || 'PUBLISHED',
+    races_count: 0,
+    created_at: new Date().toISOString(),
+  };
+
+  db.race_days.unshift(newRaceDay);
+  saveDatabase();
+  return res.json({ success: true, message: `Race Card "${newRaceDay.title}" created successfully!`, race_day: newRaceDay });
+});
+
+// POST /api/admin/race-days/:id/publish
+app.post('/api/admin/race-days/:id/publish', (req, res) => {
+  const raceDay = db.race_days.find((d) => d.id === req.params.id);
+  if (!raceDay) return res.status(404).json({ error: 'Race Day not found' });
+  raceDay.status = 'PUBLISHED';
+  saveDatabase();
+  return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
+});
+
+// ----------------------------------------------------
+// RACES APIS (Level 3 Master Setup & Betting Activation)
+// ----------------------------------------------------
+
+// GET /api/races?status=open (or upcoming, resulted, draft, all, center_id=..., race_day_id=...)
 app.get('/api/races', (req, res) => {
   const statusFilter = (req.query.status as string || '').toLowerCase();
+  const centerId = req.query.center_id as string;
+  const raceDayId = req.query.race_day_id as string;
+  const centerQuery = (req.query.center as string || '').toLowerCase().trim();
+
   let races = [...db.races];
 
-  if (statusFilter === 'open') {
-    races = races.filter((r) => r.status === 'OPEN');
+  if (centerId) {
+    races = races.filter((r) => r.center_id === centerId);
+  } else if (centerQuery && centerQuery !== 'all') {
+    const center = db.race_centers.find((c) => 
+      c.name.toLowerCase() === centerQuery || 
+      c.code.toLowerCase() === centerQuery || 
+      c.id.toLowerCase() === centerQuery
+    );
+    if (center) {
+      races = races.filter((r) => r.center_id === center.id || r.venue.toLowerCase().includes(center.name.toLowerCase()));
+    }
+  }
+
+  if (raceDayId) {
+    races = races.filter((r) => r.race_day_id === raceDayId);
+  }
+
+  if (statusFilter === 'open' || statusFilter === 'open_for_betting') {
+    races = races.filter((r) => r.status === 'OPEN' || r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE');
   } else if (statusFilter === 'upcoming') {
-    races = races.filter((r) => r.status === 'OPEN' || r.status === 'CLOSED');
+    races = races.filter((r) => r.status === 'OPEN' || r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE' || r.status === 'UPCOMING' || r.status === 'CLOSED');
+  } else if (statusFilter === 'live') {
+    races = races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING');
   } else if (statusFilter === 'resulted') {
     races = races.filter((r) => r.status === 'RESULTED');
   } else if (statusFilter === 'draft') {
@@ -941,19 +1286,59 @@ app.get('/api/races/:id', (req, res) => {
   return res.json({ success: true, race });
 });
 
+// POST /api/admin/races/:id/open-betting
+// Activates target race as OPEN_FOR_BETTING, automatically CLOSES all other races in this center/day (Single Active Race)
+app.post('/api/admin/races/:id/open-betting', (req, res) => {
+  const targetRace = db.races.find((r) => r.id === req.params.id);
+  if (!targetRace) return res.status(404).json({ error: 'Race not found' });
+
+  // 1. Close all other races in the same center or race day (unless already resulted)
+  const centerId = targetRace.center_id;
+  const raceDayId = targetRace.race_day_id;
+
+  db.races.forEach((r) => {
+    const isSameDayOrCenter = (raceDayId && r.race_day_id === raceDayId) || 
+                              (centerId && r.center_id === centerId) || 
+                              (r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase());
+    if (r.id !== targetRace.id && isSameDayOrCenter) {
+      if (r.status !== 'RESULTED') {
+        r.status = 'CLOSED';
+        r.is_suspended = true;
+      }
+    }
+  });
+
+  // 2. Open target race
+  targetRace.status = 'OPEN_FOR_BETTING';
+  targetRace.is_suspended = false;
+  targetRace.horses.forEach((h) => {
+    h.is_suspended = false;
+  });
+
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Race #${targetRace.race_no || ''} "${targetRace.name}" is now OPEN FOR BETTING! All other races in ${targetRace.venue} are now closed.`,
+    race: targetRace,
+    races: db.races,
+  });
+});
+
 // POST /api/admin/races/:id/publish (1-Click Publish to Live Betting)
 app.post('/api/admin/races/:id/publish', (req, res) => {
   const race = db.races.find((r) => r.id === req.params.id);
   if (!race) {
     return res.status(404).json({ error: 'Race not found' });
   }
-  race.status = 'OPEN';
+  race.status = 'OPEN_FOR_BETTING';
+  race.is_suspended = false;
   saveDatabase();
   return res.json({ success: true, message: `Race "${race.name}" published live for user betting!`, race });
 });
 
 // ----------------------------------------------------
-// BETS APIS
+// BETS APIS (With Strict Server-Side Security Validation)
 // ----------------------------------------------------
 
 // POST /api/bets/place
@@ -982,14 +1367,31 @@ app.post('/api/bets/place', (req, res) => {
     return res.status(404).json({ error: 'Race not found' });
   }
 
-  // Allow betting for OPEN, UPCOMING, LIVE, DRAFT (only block if CLOSED or RESULTED)
-  if (race.status === 'CLOSED' || race.status === 'RESULTED') {
-    return res.status(400).json({ error: `Cannot place bet. Race is currently ${race.status}. Betting is closed for this race.` });
+  // 🔒 CRITICAL SECURITY CHECK: Only allow bet if race status is OPEN_FOR_BETTING, LIVE, or OPEN
+  const isBettingOpen = race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN';
+  if (!isBettingOpen) {
+    return res.status(400).json({
+      error: `Betting is not open for this race (${race.name} is ${race.status}). Only the currently active race allows betting.`
+    });
+  }
+
+  // Check if race betting is suspended
+  if (race.is_suspended) {
+    return res.status(400).json({
+      error: 'Betting is currently suspended for this race. Please wait for odds to resume.'
+    });
   }
 
   const horse = race.horses.find((h) => h.id === horse_id);
   if (!horse) {
     return res.status(404).json({ error: 'Selected horse not found in this race' });
+  }
+
+  // Check if individual runner betting is suspended
+  if (horse.is_suspended) {
+    return res.status(400).json({
+      error: `Betting is suspended for #${horse.horse_no} ${horse.name}. Odds are currently locked.`
+    });
   }
 
   // Check balance >= stake

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { soundManager } from '../utils/audio';
-import { Banner, Bet, Horse, Race, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
+import { Banner, Bet, Horse, Race, RaceCenter, RaceDay, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
 import { 
   Shield, 
   Trophy, 
@@ -37,7 +37,11 @@ import {
   Building2,
   Timer,
   CreditCard,
-  Banknote
+  Banknote,
+  Layers,
+  Globe,
+  CalendarCheck,
+  Flag
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -79,8 +83,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   banners,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'races' | 'odds' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials'>('races');
+  const [activeTab, setActiveTab] = useState<'races' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials'>('races');
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
+  const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
+  
+  // Masters: Level 1 (Centers) & Level 2 (Race Days) state
+  const [raceCenters, setRaceCenters] = useState<RaceCenter[]>([]);
+  const [raceDays, setRaceDays] = useState<RaceDay[]>([]);
+  const [newCenterName, setNewCenterName] = useState('');
+  const [newCenterCode, setNewCenterCode] = useState('');
+  const [newCenterCity, setNewCenterCity] = useState('');
+  const [newDayCenterId, setNewDayCenterId] = useState('');
+  const [newDayDate, setNewDayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newDayTitle, setNewDayTitle] = useState('');
+
   const [users, setUsers] = useState<User[]>([]);
   const [allBets, setAllBets] = useState<Bet[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -105,6 +121,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Add Race Form state (Manual Entry)
   const [newRaceName, setNewRaceName] = useState(HANDWRITTEN_SHEET_PRESET.name);
   const [newRaceNo, setNewRaceNo] = useState<number | string>(HANDWRITTEN_SHEET_PRESET.race_no);
+  const [newRaceCenterId, setNewRaceCenterId] = useState('cntr_bangalore');
+  const [newRaceDayId, setNewRaceDayId] = useState('day_btc_today');
   const [newVenue, setNewVenue] = useState(HANDWRITTEN_SHEET_PRESET.venue);
   const [newTime, setNewTime] = useState(HANDWRITTEN_SHEET_PRESET.race_time);
   const [newDistance, setNewDistance] = useState(HANDWRITTEN_SHEET_PRESET.distance);
@@ -118,6 +136,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingRace, setEditingRace] = useState<Race | null>(null);
   const [editRaceName, setEditRaceName] = useState('');
   const [editRaceNo, setEditRaceNo] = useState<number | string>('');
+  const [editRaceCenterId, setEditRaceCenterId] = useState('');
+  const [editRaceDayId, setEditRaceDayId] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editDistance, setEditDistance] = useState('');
@@ -152,18 +172,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const loadAdminData = async () => {
     try {
       setIsLoading(true);
-      const [statsData, usersData, betsData, depositsData, withdrawalsData] = await Promise.all([
+      const [statsData, usersData, betsData, depositsData, withdrawalsData, centersData, daysData] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
         api.getAdminAllBets(),
         api.getDepositRequests('ALL'),
         api.getWithdrawalRequests('ALL'),
+        api.getRaceCenters(true),
+        api.getRaceDays(),
       ]);
       setStats(statsData);
       setUsers(usersData);
       setAllBets(betsData);
       setDepositRequests(depositsData);
       setWithdrawalRequests(withdrawalsData);
+      setRaceCenters(centersData);
+      setRaceDays(daysData);
+      if (!newDayCenterId && centersData.length > 0) {
+        setNewDayCenterId(centersData[0].id);
+      }
     } catch (err: any) {
       console.error('Error loading admin data:', err);
     } finally {
@@ -358,6 +385,117 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // Level 1: Add Race Center Handler
+  const handleCreateCenter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCenterName.trim() || !newCenterCode.trim()) {
+      setActionMessage('Please enter center name and code');
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const res = await api.createRaceCenter({
+        name: newCenterName,
+        code: newCenterCode,
+        city: newCenterCity || newCenterName,
+        is_active: true,
+      });
+      soundManager.playClick();
+      setActionMessage(`🏟 ${res.message}`);
+      setNewCenterName('');
+      setNewCenterCode('');
+      setNewCenterCity('');
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to create center');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleCenter = async (center: RaceCenter) => {
+    try {
+      setIsLoading(true);
+      await api.updateRaceCenter(center.id, { is_active: !center.is_active });
+      soundManager.playClick();
+      setActionMessage(`⚡ Center ${center.name} is now ${!center.is_active ? 'ACTIVE' : 'INACTIVE'}`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to update center');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Level 2: Create Race Day Handler
+  const handleCreateRaceDay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const center = raceCenters.find((c) => c.id === newDayCenterId);
+    if (!center) {
+      setActionMessage('Please select a valid Race Center');
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const title = newDayTitle.trim() || `${center.name} - ${newDayDate}`;
+      const res = await api.createRaceDay({
+        center_id: center.id,
+        center_name: center.name,
+        race_date: newDayDate,
+        title,
+        status: 'PUBLISHED',
+      });
+      soundManager.playClick();
+      setActionMessage(`📅 ${res.message}`);
+      setNewDayTitle('');
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to create race day');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePublishRaceDay = async (dayId: string) => {
+    try {
+      setIsLoading(true);
+      const res = await api.publishRaceDay(dayId);
+      soundManager.playClick();
+      setActionMessage(`🚀 ${res.message}`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to publish race day');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Level 3: Open Race For Betting (Single active race per center/day)
+  const handleOpenRaceForBetting = async (race: Race) => {
+    try {
+      setIsLoading(true);
+      const res = await api.openRaceForBetting(race.id);
+      soundManager.playClick();
+      setActionMessage(`🟢 Race #${race.race_no || ''} "${race.name}" is now OPEN FOR BETTING! All other races in this center are closed.`);
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to open race for betting');
+      setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Temporary odds storage for live editing
   const [tempOdds, setTempOdds] = useState<Record<string, { win_odds: number | string; place_odds: number | string }>>({});
 
@@ -539,6 +677,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await api.createRace({
         name: newRaceName.trim(),
         race_no: newRaceNo ? Number(newRaceNo) : undefined,
+        center_id: newRaceCenterId || undefined,
+        race_day_id: newRaceDayId || undefined,
         venue: newVenue || 'Bangalore Turf Club',
         race_time: newTime || '14:30',
         date_str: 'Today, 5th Sep',
@@ -575,6 +715,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingRace(race);
     setEditRaceName(race.name);
     setEditRaceNo(race.race_no || '');
+    setEditRaceCenterId(race.center_id || '');
+    setEditRaceDayId(race.race_day_id || '');
     setEditVenue(race.venue);
     setEditTime(race.race_time);
     setEditDistance(race.distance);
@@ -612,6 +754,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await api.updateRace(editingRace.id, {
         name: editRaceName,
         race_no: editRaceNo ? Number(editRaceNo) : undefined,
+        center_id: editRaceCenterId || undefined,
+        race_day_id: editRaceDayId || undefined,
         venue: editVenue,
         race_time: editTime,
         date_str: editingRace.date_str || 'Today, 5th Sep',
@@ -631,8 +775,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to update race');
       setTimeout(() => setActionMessage(null), 3500);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -822,6 +964,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
+          id="admin-tab-masters"
+          onClick={() => setActiveTab('masters')}
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+            activeTab === 'masters'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm font-black'
+              : 'text-emerald-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Race Centers & Days ({raceCenters.length})</span>
+        </button>
+
+        <button
           id="admin-tab-odds"
           onClick={() => setActiveTab('odds')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
@@ -831,7 +986,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Sliders className="w-3.5 h-3.5 text-rose-400" />
-          <span>Live Odds Editor ({races.filter((r) => r.status === 'LIVE').length})</span>
+          <span>Live Odds Editor ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
         </button>
 
         <button
@@ -913,7 +1068,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white">Race Control & Status Dispatch</h2>
-              <p className="text-xs text-slate-400">Manage upcoming races, launch LIVE races, or declare official results</p>
+              <p className="text-xs text-slate-400">Manage upcoming races, activate LIVE races with 1-active race rule, or declare official results</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -923,6 +1078,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ Add Race Fixture</span>
               </button>
+            </div>
+          </div>
+
+          {/* Sub-Filter: Center Selector Pills */}
+          <div className="space-y-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Filter by Race Center:</span>
+              </span>
+              <span className="text-[10px] text-slate-500">Only 1 race can be OPEN per center at a time</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
+              <button
+                onClick={() => setSelectedCenterFilter('all')}
+                className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
+                  selectedCenterFilter === 'all'
+                    ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                }`}
+              >
+                All Centers ({races.length})
+              </button>
+              {raceCenters.map((cntr) => {
+                const centerCount = races.filter(r => 
+                  r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase()))
+                ).length;
+                return (
+                  <button
+                    key={cntr.id}
+                    onClick={() => setSelectedCenterFilter(cntr.id)}
+                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
+                      selectedCenterFilter === cntr.id
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <span>{cntr.name}</span>
+                    <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -940,7 +1137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Clock className="w-3.5 h-3.5 text-emerald-300" />
-              <span>⏱ Upcoming Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+              <span>⏱ Upcoming ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'OPEN_FOR_BETTING' || r.status === 'DRAFT').length})</span>
             </button>
 
             <button
@@ -955,7 +1152,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE').length})</span>
+              <span>🔴 Live & Open ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
             </button>
 
             <button
@@ -970,7 +1167,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Trophy className="w-3.5 h-3.5" />
-              <span>🏁 Completed Races ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+              <span>🏁 Completed ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
             </button>
 
             <button
@@ -991,11 +1188,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="space-y-4">
             {races
               .filter((race) => {
+                if (selectedCenterFilter !== 'all') {
+                  const matchesCenter = race.center_id === selectedCenterFilter || 
+                    (race.venue && race.venue.toLowerCase().includes(selectedCenterFilter.replace('cntr_', '')));
+                  if (!matchesCenter) return false;
+                }
                 if (adminRaceFilter === 'upcoming') {
-                  return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
+                  return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'OPEN_FOR_BETTING' || race.status === 'DRAFT';
                 }
                 if (adminRaceFilter === 'live') {
-                  return race.status === 'LIVE';
+                  return race.status === 'LIVE' || race.status === 'OPEN_FOR_BETTING';
                 }
                 if (adminRaceFilter === 'resulted') {
                   return race.status === 'RESULTED' || race.status === 'CLOSED';
@@ -1005,7 +1207,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               .map((race) => (
               <div
                 key={race.id}
-                className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-3 shadow-sm hover:border-slate-700 transition"
+                className={`bg-slate-900 rounded-2xl border p-4 sm:p-5 space-y-3 shadow-sm transition ${
+                  race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE'
+                    ? 'border-emerald-500/70 bg-gradient-to-br from-emerald-950/25 via-slate-900 to-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                    : 'border-slate-800 hover:border-slate-700'
+                }`}
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-3.5">
@@ -1054,7 +1260,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <h3 className="text-base font-bold text-white">
                           {race.name}
                         </h3>
-                        {race.status === 'LIVE' ? (
+                        {race.status === 'OPEN_FOR_BETTING' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 text-[11px] font-black uppercase tracking-wider animate-pulse shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            🟢 OPEN FOR BETTING (LIVE)
+                          </span>
+                        ) : race.status === 'LIVE' ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[11px] font-black uppercase tracking-wider animate-pulse">
                             <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                             🔴 LIVE IN-PLAY
@@ -1083,42 +1294,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   {/* Status & Action controls */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Make Race Live Button */}
-                    {race.status !== 'LIVE' && race.status !== 'RESULTED' && (
+                    {/* PRIMARY ACTION: OPEN FOR BETTING (Single Active Race) */}
+                    {race.status !== 'OPEN_FOR_BETTING' && race.status !== 'RESULTED' && (
                       <button
-                        id={`make-live-btn-${race.id}`}
-                        onClick={() => handleMakeRaceLive(race)}
+                        id={`open-betting-btn-${race.id}`}
+                        onClick={() => handleOpenRaceForBetting(race)}
                         disabled={isLoading}
-                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-red-950/40 border border-red-400/40 animate-pulse active:scale-95"
-                        title="Make this race LIVE immediately on the user page!"
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 border border-emerald-400/40 active:scale-95"
+                        title="Open this race for user betting (Automatically closes all other races in this center)"
                       >
-                        <Flame className="w-3.5 h-3.5 text-amber-200" />
-                        <span>▶ Make Race LIVE</span>
+                        <Play className="w-3.5 h-3.5 fill-current text-white" />
+                        <span>▶ OPEN FOR BETTING</span>
                       </button>
                     )}
 
-                    {/* If LIVE: Settle Button + Move to Upcoming Button */}
-                    {race.status === 'LIVE' && (
-                      <>
-                        <button
-                          id={`settle-live-race-btn-${race.id}`}
-                          onClick={() => handleOpenSettle(race)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-950/40 border border-amber-300/50"
-                          title="Declare official winner and settle all bets"
-                        >
-                          <Trophy className="w-3.5 h-3.5 text-black" />
-                          <span>🏁 Settle & Declare Winner</span>
-                        </button>
-                        <button
-                          id={`move-upcoming-btn-${race.id}`}
-                          onClick={() => handleMakeRaceUpcoming(race)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                          title="Move race back to upcoming"
-                        >
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>Move to Upcoming</span>
-                        </button>
-                      </>
+                    {/* Settle Button */}
+                    {(race.status === 'LIVE' || race.status === 'OPEN_FOR_BETTING' || race.status === 'CLOSED') && (
+                      <button
+                        id={`settle-live-race-btn-${race.id}`}
+                        onClick={() => handleOpenSettle(race)}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-950/40 border border-amber-300/50"
+                        title="Declare official winner and settle all bets"
+                      >
+                        <Trophy className="w-3.5 h-3.5 text-black" />
+                        <span>🏁 Settle Winner</span>
+                      </button>
                     )}
 
                     {race.status === 'RESULTED' && (
@@ -1598,6 +1798,251 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {/* TAB 2.5: Masters (Level 1 Race Centers & Level 2 Race Days) */}
+      {activeTab === 'masters' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 p-4 rounded-2xl border border-emerald-900/40">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5 text-emerald-400" />
+                <span>Masters Management: Race Centers & Race Days</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Set up 3-Level hierarchy: <strong>Level 1 (Race Centers)</strong> ➔ <strong>Level 2 (Race Day Cards)</strong> ➔ <strong>Level 3 (Races)</strong>
+              </p>
+            </div>
+            <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-mono font-bold text-xs border border-emerald-500/30 self-start sm:self-auto">
+              {raceCenters.filter(c => c.is_active).length} Active Centers
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* LEVEL 1: RACE CENTERS (5 COLS) */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <Flag className="w-4 h-4 text-emerald-400" />
+                    <span>Level 1 - Race Centers ({raceCenters.length})</span>
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">table: race_centers</span>
+                </div>
+
+                {/* Add Center Form */}
+                <form onSubmit={handleCreateCenter} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+                  <span className="text-[11px] font-bold text-emerald-400 block">+ Add New Race Center</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Center Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. MYSORE"
+                        value={newCenterName}
+                        onChange={(e) => setNewCenterName(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Code *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. MYS"
+                        value={newCenterCode}
+                        onChange={(e) => setNewCenterCode(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">City / Region</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Mysore, Karnataka"
+                      value={newCenterCity}
+                      onChange={(e) => setNewCenterCity(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1 shadow"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Race Center</span>
+                  </button>
+                </form>
+
+                {/* Centers List */}
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  {raceCenters.map((center) => {
+                    const centerRaces = races.filter(r => r.center_id === center.id || (r.venue && r.venue.toLowerCase().includes(center.name.toLowerCase())));
+                    return (
+                      <div
+                        key={center.id}
+                        className={`p-2.5 rounded-xl border transition flex items-center justify-between gap-2 text-xs ${
+                          center.is_active
+                            ? 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                            : 'bg-slate-950/50 border-slate-900 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-black text-[10px] border border-emerald-500/30">
+                            {center.code}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-white truncate">{center.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{center.city} • {centerRaces.length} races</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCenter(center)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold font-mono transition cursor-pointer border ${
+                              center.is_active
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40'
+                                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                            }`}
+                          >
+                            {center.is_active ? 'ACTIVE' : 'INACTIVE'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* LEVEL 2: RACE DAYS / RACE CARDS (7 COLS) */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <CalendarCheck className="w-4 h-4 text-[#e5b869]" />
+                    <span>Level 2 - Race Day Cards ({raceDays.length})</span>
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">table: race_days</span>
+                </div>
+
+                {/* Create Race Day Form */}
+                <form onSubmit={handleCreateDay} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+                  <span className="text-[11px] font-bold text-amber-400 block">+ Create New Race Day Card (Fixture Date)</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Select Center *</label>
+                      <select
+                        required
+                        value={newDayCenterId}
+                        onChange={(e) => setNewDayCenterId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold text-xs"
+                      >
+                        {raceCenters.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Race Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={newDayDate}
+                        onChange={(e) => setNewDayDate(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-0.5">Card Title (e.g. Mysore - 17th Sep 2026)</label>
+                    <input
+                      type="text"
+                      placeholder="Optional custom title (leave blank for auto)"
+                      value={newDayTitle}
+                      onChange={(e) => setNewDayTitle(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 font-black text-xs transition cursor-pointer flex items-center justify-center gap-1 shadow"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create & Publish Race Card</span>
+                  </button>
+                </form>
+
+                {/* Race Days List */}
+                <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                  {raceDays.map((day) => {
+                    const center = raceCenters.find(c => c.id === day.center_id);
+                    const dayRaces = races.filter(r => r.race_day_id === day.id || (day.center_id && r.center_id === day.center_id));
+
+                    return (
+                      <div
+                        key={day.id}
+                        className="p-3 rounded-xl border border-slate-800 bg-slate-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-slate-700 transition"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white text-sm">{day.title}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                              day.status === 'PUBLISHED'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}>
+                              {day.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                            <span className="text-amber-400 font-semibold">{center?.name || 'Center'}</span>
+                            <span>•</span>
+                            <span className="font-mono text-slate-300">{day.race_date}</span>
+                            <span>•</span>
+                            <span className="text-emerald-400 font-bold">{dayRaces.length} races on card</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {day.status === 'DRAFT' && (
+                            <button
+                              type="button"
+                              onClick={() => handlePublishDay(day.id)}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
+                            >
+                              Publish
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewRaceCenterId(day.center_id);
+                              setNewRaceDayId(day.id);
+                              if (center) setNewVenue(`${center.name} Turf Club`);
+                              setActiveTab('add_race');
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add Race to Day</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 3: Add New Race (Full Manual Entry Form) */}
       {activeTab === 'add_race' && (
         <form onSubmit={handleCreateRace} className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-5 max-w-4xl">
@@ -1605,10 +2050,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Plus className="w-4 h-4 text-indigo-400" />
-                Manual Race & Runner Entry
+                Manual Race & Runner Entry (Level 3)
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Enter race details and all horse fields (Serial No, Gate No, Horse Name, Jockey, Trainer) manually
+                Assign to Race Center & Race Day card, then enter runner details and odds manually
               </p>
             </div>
 
@@ -1634,6 +2079,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
+          {/* Race Master Hierarchy Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-950 rounded-xl border border-emerald-900/40">
+            <div>
+              <label className="block text-xs text-slate-300 font-semibold mb-1">
+                Level 1: Race Center (Master) <span className="text-rose-400">*</span>
+              </label>
+              <select
+                id="new-race-center-select"
+                value={newRaceCenterId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewRaceCenterId(val);
+                  const center = raceCenters.find(c => c.id === val);
+                  if (center) {
+                    setNewVenue(`${center.name} Turf Club`);
+                  }
+                  const matchingDays = raceDays.filter(d => d.center_id === val);
+                  if (matchingDays.length > 0) {
+                    setNewRaceDayId(matchingDays[0].id);
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
+              >
+                {raceCenters.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.code}) - {c.city}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-semibold mb-1">
+                Level 2: Race Day / Card
+              </label>
+              <select
+                id="new-race-day-select"
+                value={newRaceDayId}
+                onChange={(e) => setNewRaceDayId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
+              >
+                {raceDays
+                  .filter(d => !newRaceCenterId || d.center_id === newRaceCenterId)
+                  .map(d => (
+                    <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
           {/* Race Master Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
@@ -1653,14 +2146,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div>
               <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Race Number
+                Race Number (1-10)
               </label>
               <input
                 id="new-race-no"
                 type="number"
                 value={newRaceNo}
                 onChange={(e) => setNewRaceNo(e.target.value)}
-                placeholder="e.g. 7"
+                placeholder="e.g. 1"
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500"
               />
             </div>
@@ -1675,7 +2168,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={newTime}
                 onChange={(e) => setNewTime(e.target.value)}
-                placeholder="e.g. 1:45 PM"
+                placeholder="e.g. 1:30 PM"
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
               />
             </div>
@@ -1690,7 +2183,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={newDistance}
                 onChange={(e) => setNewDistance(e.target.value)}
-                placeholder="e.g. 1600m"
+                placeholder="e.g. 1200M"
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
               />
             </div>
@@ -3193,6 +3686,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <form onSubmit={handleSaveEditRace} className="space-y-4">
+              {/* Race Master Hierarchy & Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 p-4 rounded-xl border border-emerald-900/40">
+                <div>
+                  <label className="block text-xs text-slate-300 font-semibold mb-1">
+                    Level 1: Race Center <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={editRaceCenterId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditRaceCenterId(val);
+                      const center = raceCenters.find(c => c.id === val);
+                      if (center) setEditVenue(`${center.name} Turf Club`);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">-- Select Center --</option>
+                    {raceCenters.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-300 font-semibold mb-1">
+                    Level 2: Race Day / Card
+                  </label>
+                  <select
+                    value={editRaceDayId}
+                    onChange={(e) => setEditRaceDayId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">-- Select Race Day --</option>
+                    {raceDays
+                      .filter(d => !editRaceCenterId || d.center_id === editRaceCenterId)
+                      .map(d => (
+                        <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Race Master Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <div className="sm:col-span-2">
