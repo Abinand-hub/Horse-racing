@@ -84,10 +84,10 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl group">
+    <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl group">
       <div 
         onClick={handleBannerClick}
-        className="relative h-48 sm:h-64 md:h-72 lg:h-80 w-full cursor-pointer overflow-hidden"
+        className="relative h-44 sm:h-60 md:h-72 lg:h-80 w-full cursor-pointer overflow-hidden"
       >
         {/* Cinematic Horse Racing Background Image */}
         <img
@@ -104,26 +104,26 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent opacity-80" />
 
         {/* Content Box */}
-        <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-12 max-w-2xl space-y-2">
+        <div className="relative z-10 h-full flex flex-col justify-center px-4 sm:px-8 md:px-12 max-w-2xl space-y-1.5 sm:space-y-2">
           {current.tag && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] sm:text-xs font-black tracking-wider uppercase w-fit backdrop-blur-md shadow">
-              <Flame className="w-3.5 h-3.5 text-rose-500 fill-current" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] sm:text-xs font-black tracking-wider uppercase w-fit backdrop-blur-md shadow">
+              <Flame className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-500 fill-current" />
               {current.tag}
             </div>
           )}
 
-          <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight drop-shadow-lg leading-tight">
+          <h2 className="text-base sm:text-2xl md:text-3xl lg:text-4xl font-black text-white tracking-tight drop-shadow-lg leading-tight">
             {current.title}
           </h2>
 
-          <p className="text-xs sm:text-sm lg:text-base text-slate-300 line-clamp-2 max-w-lg leading-relaxed drop-shadow">
+          <p className="text-[11px] sm:text-sm lg:text-base text-slate-300 line-clamp-2 max-w-lg leading-relaxed drop-shadow">
             {current.subtitle}
           </p>
 
-          <div className="pt-2">
-            <span className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-rose-600/30 group-hover:from-rose-500 group-hover:to-red-500 group-hover:scale-105 transition-all">
+          <div className="pt-1 sm:pt-2">
+            <span className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 text-white font-black text-[11px] sm:text-sm shadow-xl shadow-rose-600/30 group-hover:from-rose-500 group-hover:to-red-500 group-hover:scale-105 transition-all">
               Explore Fixture
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </span>
           </div>
         </div>

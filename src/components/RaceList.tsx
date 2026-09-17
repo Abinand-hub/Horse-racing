@@ -439,7 +439,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group relative overflow-hidden rounded-3xl min-h-[230px] sm:min-h-[260px] md:min-h-[280px] flex flex-col justify-between p-4 sm:p-5 shadow-2xl cursor-pointer border-2 border-emerald-500/40 transition-all duration-300 hover:border-emerald-300 hover:scale-[1.008] hover:shadow-[0_0_30px_rgba(16,185,129,0.35)]"
+                          className="group relative overflow-hidden rounded-2xl sm:rounded-3xl min-h-[205px] sm:min-h-[250px] md:min-h-[275px] flex flex-col justify-between p-3.5 sm:p-5 shadow-2xl cursor-pointer border-2 border-emerald-500/40 transition-all duration-300 hover:border-emerald-300 hover:scale-[1.008] hover:shadow-[0_0_30px_rgba(16,185,129,0.35)]"
                         >
                           {/* Full-Bleed Cinematic Background Image */}
                           <img
@@ -454,59 +454,59 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           {/* Top Row: Live Pill Badge + Favorite Heart Button */}
                           <div className="relative z-10 flex items-center justify-between gap-2">
-                            <span className="px-3.5 py-1.5 rounded-full bg-rose-600/90 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
-                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                              <span className="w-2 h-2 rounded-full bg-white" />
+                            <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-rose-600/90 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
+                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
+                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white" />
                               <span>LIVE IN-PLAY</span>
                             </span>
 
                             <button
                               type="button"
                               onClick={(e) => toggleFavorite(race.id, e)}
-                              className={`w-9 h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
                                 favorites[race.id]
                                   ? 'bg-rose-500 text-white border-rose-400 shadow-lg'
                                   : 'bg-black/40 text-slate-300 border-white/20 hover:bg-black/60 hover:text-white'
                               }`}
                             >
-                              <Heart className={`w-4 h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
+                              <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
                             </button>
                           </div>
 
                           {/* Bottom Overlay Content */}
-                          <div className="relative z-10 space-y-2 pt-12">
+                          <div className="relative z-10 space-y-1.5 sm:space-y-2 pt-8 sm:pt-12">
                             {/* Race Title */}
                             <div className="flex items-center justify-between gap-2">
-                              <h3 className="text-lg sm:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md">
+                              <h3 className="text-base sm:text-xl md:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md leading-snug">
                                 {race.name}
                               </h3>
                               {race.race_no && (
-                                <span className="px-2.5 py-0.5 rounded-lg font-mono font-black text-xs bg-emerald-500 text-slate-950 border border-emerald-300 shadow shrink-0">
-                                  RACE #{race.race_no}
+                                <span className="px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg font-mono font-black text-[10px] sm:text-xs bg-emerald-500 text-slate-950 border border-emerald-300 shadow shrink-0">
+                                  #{race.race_no}
                                 </span>
                               )}
                             </div>
 
                             {/* Middle Line: Location & Distance */}
-                            <div className="flex items-center justify-between text-xs sm:text-sm font-semibold pt-0.5">
-                              <span className="flex items-center gap-1.5 text-rose-300 font-bold">
-                                <MapPin className="w-4 h-4 text-rose-400" />
+                            <div className="flex items-center justify-between text-[11px] sm:text-sm font-semibold pt-0.5">
+                              <span className="flex items-center gap-1.5 text-rose-300 font-bold truncate max-w-[200px] sm:max-w-none">
+                                <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 shrink-0" />
                                 <span>{race.venue}</span>
                               </span>
                               {race.distance && (
-                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase">
+                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase shrink-0">
                                   {race.distance}
                                 </span>
                               )}
                             </div>
 
                             {/* Bottom Line: Post Time & Runners Count */}
-                            <div className="flex items-center justify-between text-xs sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
+                            <div className="flex items-center justify-between text-[11px] sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
                               <span className="flex items-center gap-1.5 font-mono text-slate-300">
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
                                 <span>{race.race_time} - {race.date_str || 'Today, 5th Sep'}</span>
                               </span>
-                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono">
+                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono shrink-0">
                                 <span>{race.horses.length} Runners</span>
                                 <span>→</span>
                               </span>
@@ -515,29 +515,29 @@ export const RaceList: React.FC<RaceListProps> = ({
                             {/* Quick Runners & Live Odds Strip */}
                             {race.horses.length > 0 && (
                               <div className="pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 text-xs scrollbar-none">
-                                <span className="text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
+                                <span className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
                                   Live Odds:
                                 </span>
                                 {race.horses.slice(0, 5).map((h) => (
                                   <div
                                     key={h.id}
-                                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-white/15 bg-black/60 backdrop-blur-md whitespace-nowrap shadow-inner"
+                                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl border border-white/15 bg-black/60 backdrop-blur-md whitespace-nowrap shadow-inner"
                                   >
                                     <SilkIcon
                                       color={h.silk_color}
                                       number={h.horse_no || h.serial_no}
                                       size="sm"
                                     />
-                                    <span className="font-bold text-slate-200 truncate max-w-[110px]">
+                                    <span className="font-bold text-slate-200 truncate max-w-[85px] sm:max-w-[110px] text-[11px] sm:text-xs">
                                       {h.name}
                                     </span>
-                                    <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[11px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                                    <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[10px] sm:text-[11px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
                                       {formatOdds(h.win_odds, oddsFormat)}
                                     </span>
                                   </div>
                                 ))}
                                 {race.horses.length > 5 && (
-                                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
+                                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
                                     +{race.horses.length - 5} more
                                   </span>
                                 )}
@@ -585,7 +585,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group relative overflow-hidden rounded-3xl min-h-[230px] sm:min-h-[260px] md:min-h-[280px] flex flex-col justify-between p-4 sm:p-5 shadow-xl cursor-pointer border-2 border-emerald-700/60 transition-all duration-300 hover:border-emerald-400 hover:scale-[1.008] hover:shadow-[0_0_25px_rgba(16,185,129,0.25)]"
+                          className="group relative overflow-hidden rounded-2xl sm:rounded-3xl min-h-[205px] sm:min-h-[250px] md:min-h-[275px] flex flex-col justify-between p-3.5 sm:p-5 shadow-xl cursor-pointer border-2 border-emerald-700/60 transition-all duration-300 hover:border-emerald-400 hover:scale-[1.008] hover:shadow-[0_0_25px_rgba(16,185,129,0.25)]"
                         >
                           {/* Full-Bleed Background Image */}
                           <img
@@ -600,58 +600,58 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           {/* Top Row: Upcoming Badge + Favorite Button */}
                           <div className="relative z-10 flex items-center justify-between gap-2">
-                            <span className="px-3.5 py-1.5 rounded-full bg-slate-900/90 text-emerald-300 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md backdrop-blur-md border border-emerald-500/40">
-                              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-slate-900/90 text-emerald-300 font-bold text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md backdrop-blur-md border border-emerald-500/40">
+                              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
                               <span>⏱ UPCOMING</span>
                             </span>
 
                             <button
                               type="button"
                               onClick={(e) => toggleFavorite(race.id, e)}
-                              className={`w-9 h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
                                 favorites[race.id]
                                   ? 'bg-rose-500 text-white border-rose-400 shadow-lg'
                                   : 'bg-black/40 text-slate-300 border-white/20 hover:bg-black/60 hover:text-white'
                               }`}
                             >
-                              <Heart className={`w-4 h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
+                              <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
                             </button>
                           </div>
 
                           {/* Bottom Overlay Content */}
-                          <div className="relative z-10 space-y-2 pt-12">
+                          <div className="relative z-10 space-y-1.5 sm:space-y-2 pt-8 sm:pt-12">
                             {/* Race Title */}
                             <div className="flex items-center justify-between gap-2">
-                              <h3 className="text-lg sm:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md">
+                              <h3 className="text-base sm:text-xl md:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md leading-snug">
                                 {race.name}
                               </h3>
                               {race.race_no && (
-                                <span className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-xs bg-slate-900/90 text-slate-200 border border-slate-700 shadow shrink-0">
+                                <span className="px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg font-mono font-bold text-[10px] sm:text-xs bg-slate-900/90 text-slate-200 border border-slate-700 shadow shrink-0">
                                   RACE #{race.race_no}
                                 </span>
                               )}
                             </div>
 
                             {/* Middle Line: Location & Distance */}
-                            <div className="flex items-center justify-between text-xs sm:text-sm font-semibold pt-0.5">
-                              <span className="flex items-center gap-1.5 text-[#e5b869] font-bold">
-                                <MapPin className="w-4 h-4 text-[#e5b869]" />
+                            <div className="flex items-center justify-between text-[11px] sm:text-sm font-semibold pt-0.5">
+                              <span className="flex items-center gap-1.5 text-[#e5b869] font-bold truncate max-w-[200px] sm:max-w-none">
+                                <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#e5b869] shrink-0" />
                                 <span>{race.venue}</span>
                               </span>
                               {race.distance && (
-                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase">
+                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase shrink-0">
                                   {race.distance}
                                 </span>
                               )}
                             </div>
 
                             {/* Bottom Line: Post Time & Runners Count */}
-                            <div className="flex items-center justify-between text-xs sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
+                            <div className="flex items-center justify-between text-[11px] sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
                               <span className="flex items-center gap-1.5 font-mono text-slate-300">
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
                                 <span>{race.race_time} - {race.date_str || 'Today, 5th Sep'}</span>
                               </span>
-                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono">
+                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono shrink-0">
                                 <span>{race.horses.length} Runners</span>
                                 <span>→</span>
                               </span>
@@ -660,29 +660,29 @@ export const RaceList: React.FC<RaceListProps> = ({
                             {/* Runner Preview Strip */}
                             {race.horses.length > 0 && (
                               <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 text-xs scrollbar-none">
-                                <span className="text-[10px] uppercase font-black text-slate-400 whitespace-nowrap">
+                                <span className="text-[9px] sm:text-[10px] uppercase font-black text-slate-400 whitespace-nowrap">
                                   Runners:
                                 </span>
                                 {race.horses.slice(0, 4).map((h) => (
                                   <div
                                     key={h.id}
-                                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-white/10 bg-black/60 backdrop-blur-md whitespace-nowrap"
+                                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl border border-white/10 bg-black/60 backdrop-blur-md whitespace-nowrap"
                                   >
                                     <SilkIcon
                                       color={h.silk_color}
                                       number={h.horse_no || h.serial_no}
                                       size="sm"
                                     />
-                                    <span className="font-bold text-slate-200 truncate max-w-[100px]">
+                                    <span className="font-bold text-slate-200 truncate max-w-[85px] sm:max-w-[100px] text-[11px] sm:text-xs">
                                       {h.name}
                                     </span>
-                                    <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
+                                    <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[10px] sm:text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
                                       {formatOdds(h.win_odds, oddsFormat)}
                                     </span>
                                   </div>
                                 ))}
                                 {race.horses.length > 4 && (
-                                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
+                                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
                                     +{race.horses.length - 4} more
                                   </span>
                                 )}
