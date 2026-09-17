@@ -756,9 +756,12 @@ export const api = {
   async submitDepositRequest(params: {
     userId: string;
     amount: number;
-    payment_method: string;
-    utr_number: string;
+    payment_method?: string;
+    paymentMethod?: string;
+    utr_number?: string;
+    utrNumber?: string;
     screenshot_url?: string;
+    screenshotUrl?: string;
   }): Promise<{ depositRequest: DepositRequest; message: string }> {
     let currentUser: User = DUMMY_USER;
     try {
@@ -766,14 +769,18 @@ export const api = {
       if (saved) currentUser = JSON.parse(saved);
     } catch {}
 
+    const method = params.payment_method || params.paymentMethod || 'UPI';
+    const utr = params.utr_number || params.utrNumber || `UTR${Date.now().toString().slice(-6)}`;
+    const proofUrl = params.screenshot_url || params.screenshotUrl;
+
     const newRequest: DepositRequest = {
       id: `dep_${Date.now()}`,
       user_id: params.userId,
       username: currentUser.username || 'arjun_punters',
       amount: params.amount,
-      payment_method: params.payment_method || 'UPI',
-      utr_number: params.utr_number,
-      screenshot_url: params.screenshot_url,
+      payment_method: method,
+      utr_number: utr,
+      screenshot_url: proofUrl,
       status: 'PENDING',
       created_at: new Date().toISOString(),
       reviewed_at: null,
@@ -790,6 +797,13 @@ export const api = {
       depositRequest: newRequest,
       message: `Deposit request of ₹${params.amount.toLocaleString('en-IN')} submitted! Status is PENDING verification by Admin.`,
     };
+  },
+
+  logout(): void {
+    try {
+      localStorage.removeItem('derby_token');
+      localStorage.removeItem('derby_user');
+    } catch {}
   },
 
   // Alias for backward compatibility

@@ -40,6 +40,7 @@ interface Horse {
   silk_color: string;
   form?: string;
   weight?: string;
+  is_suspended?: boolean;
 }
 
 interface RaceCenter {

@@ -38,6 +38,7 @@ export interface User {
   balance: number;
   exposure: number;
   profile_photo?: string;
+  password_hash?: string;
   created_at: string;
 }
 

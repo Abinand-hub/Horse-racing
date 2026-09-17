@@ -207,7 +207,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       setIsLoading(true);
       const res = await api.approveDepositRequest(id);
-      soundManager.playPayout();
+      soundManager.playWinPayout();
       setActionMessage(`💰 ${res.message}`);
       await loadAdminData();
       await onRefreshData();
@@ -257,7 +257,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       setIsLoading(true);
       const res = await api.completeWithdrawalToSuccessful(id);
-      soundManager.playPayout();
+      soundManager.playWinPayout();
       setActionMessage(`✅ ${res.message}`);
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 4000);
@@ -1931,7 +1931,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 {/* Create Race Day Form */}
-                <form onSubmit={handleCreateDay} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+                <form onSubmit={handleCreateRaceDay} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2.5 text-xs">
                   <span className="text-[11px] font-bold text-amber-400 block">+ Create New Race Day Card (Fixture Date)</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
@@ -2013,7 +2013,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {day.status === 'DRAFT' && (
                             <button
                               type="button"
-                              onClick={() => handlePublishDay(day.id)}
+                              onClick={() => handlePublishRaceDay(day.id)}
                               className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
                             >
                               Publish
