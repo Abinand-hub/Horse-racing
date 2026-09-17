@@ -35,7 +35,7 @@ export const DEFAULT_RACE_CENTERS: RaceCenter[] = [
 // REALTIME ODDS SYNC SERVICE (WebSocket / BroadcastChannel / EventTarget)
 // ----------------------------------------------------------------------
 export interface OddsStatusUpdatePayload {
-  event: 'odds_status_update' | 'SUSPEND_HORSE' | 'RESUME_HORSE' | 'SUSPEND_ALL' | 'RESUME_ALL' | 'RACE_STATUS_CHANGED';
+  event: 'odds_status_update' | 'ODDS_UPDATED' | 'SUSPEND_HORSE' | 'RESUME_HORSE' | 'SUSPEND_ALL' | 'RESUME_ALL' | 'RACE_STATUS_CHANGED';
   race_id: string;
   race_day_id?: string;
   center_id?: string;

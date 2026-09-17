@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Horse, Race, RaceStatus } from '../types';
 import { SilkIcon } from './SilkIcon';
 import { OddsFormat, formatOdds } from '../utils/odds';
