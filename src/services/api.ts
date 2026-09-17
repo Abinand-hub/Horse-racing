@@ -1192,6 +1192,33 @@ export const api = {
     }
   },
 
+  async toggleHorseSuspend(raceId: string, horseId: string): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    const horse = race.horses.find((h) => h.id === horseId);
+    if (horse) {
+      horse.is_suspended = !horse.is_suspended;
+      this.saveLocalRace(race);
+    }
+    return race;
+  },
+
+  async toggleRaceSuspendAll(raceId: string, forceState?: boolean): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    const shouldSuspend = forceState !== undefined ? forceState : !race.horses.every((h) => h.is_suspended);
+    race.is_suspended = shouldSuspend;
+    for (const h of race.horses) {
+      h.is_suspended = shouldSuspend;
+    }
+    this.saveLocalRace(race);
+    return race;
+  },
+
   async settleRace(raceId: string, winner_horse_id: string, place_horses_ids: string[]): Promise<any> {
     try {
       const res = await fetch(`${API_BASE}/admin/races/${raceId}/settle`, {

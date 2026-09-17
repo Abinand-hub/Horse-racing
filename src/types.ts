@@ -32,6 +32,7 @@ export interface Horse {
   silk_color?: string;
   form?: string;
   weight?: string;
+  is_suspended?: boolean;
 }
 
 export interface Race {
@@ -45,6 +46,7 @@ export interface Race {
   going?: string;
   class_grade?: string;
   status: RaceStatus;
+  is_suspended?: boolean;
   image_url?: string;
   winner_horse_id?: string | null;
   place_horses_ids?: string[]; // IDs of horses in 1st, 2nd, 3rd

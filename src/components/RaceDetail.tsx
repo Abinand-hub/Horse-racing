@@ -245,19 +245,20 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                 {race.horses.map((horse) => {
                   const isWinner = race.winner_horse_id === horse.id;
                   const isPlaced = race.place_horses_ids?.includes(horse.id);
+                  const isSuspended = horse.is_suspended || race.is_suspended;
 
                   return (
                     <tr
                       key={horse.id}
                       id={`horse-row-${horse.id}`}
                       className={`hover:bg-[#0c1c14] transition-colors ${
-                        isWinner ? 'bg-amber-500/10' : ''
+                        isWinner ? 'bg-amber-500/10' : isSuspended ? 'bg-rose-950/15 opacity-75' : ''
                       }`}
                     >
                       {/* Column 1: Serial No & Draw Gate */}
                       <td className="py-2 px-1 sm:px-2 text-center align-middle">
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1">
-                          <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-[#040805] border border-emerald-900/60 text-[#e5b869] font-black text-[10px] sm:text-[11px] flex items-center justify-center font-mono shadow-inner">
+                          <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-[#040805] border border-emerald-500/30 text-[#e5b869] font-black text-[10px] sm:text-[11px] flex items-center justify-center font-mono shadow-inner">
                             {horse.horse_no || horse.serial_no}
                           </span>
                           {horse.gate_no !== undefined && (
@@ -282,6 +283,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               <span className="font-bold text-white text-xs sm:text-sm tracking-tight break-words">
                                 {horse.name}
                               </span>
+                              {isSuspended && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[8px] sm:text-[9px] font-black uppercase">
+                                  SUSPENDED
+                                </span>
+                              )}
                               {isWinner && (
                                 <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[9px] uppercase shadow">
                                   🏆 1st
@@ -319,20 +325,31 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
                         <button
                           id={`win-odds-btn-${horse.id}`}
-                          disabled={!isOpen}
+                          disabled={!isOpen || isSuspended}
                           onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
-                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 cursor-pointer flex flex-col items-center justify-center leading-none ${
-                            isOpen
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02]'
+                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
+                            isSuspended
+                              ? 'bg-rose-950/40 text-rose-400 border border-rose-500/40 cursor-not-allowed opacity-90'
+                              : isOpen
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02] cursor-pointer'
                               : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                           }`}
                         >
-                          <span className="text-xs sm:text-sm font-mono font-black">
-                            {formatOdds(horse.win_odds, oddsFormat)}
-                          </span>
-                          <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
-                            WIN
-                          </span>
+                          {isSuspended ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-mono font-black text-rose-300">SUSP</span>
+                              <span className="text-[7px] uppercase tracking-wider block font-bold text-rose-400 mt-0.5">LOCKED</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs sm:text-sm font-mono font-black">
+                                {formatOdds(horse.win_odds, oddsFormat)}
+                              </span>
+                              <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                                WIN
+                              </span>
+                            </>
+                          )}
                         </button>
                       </td>
 
@@ -340,20 +357,31 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
                         <button
                           id={`place-odds-btn-${horse.id}`}
-                          disabled={!isOpen}
+                          disabled={!isOpen || isSuspended}
                           onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
-                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 cursor-pointer flex flex-col items-center justify-center leading-none ${
-                            isOpen
-                              ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02]'
+                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
+                            isSuspended
+                              ? 'bg-rose-950/40 text-rose-400 border border-rose-500/40 cursor-not-allowed opacity-90'
+                              : isOpen
+                              ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02] cursor-pointer'
                               : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
                           }`}
                         >
-                          <span className="text-xs sm:text-sm font-mono font-black">
-                            {formatOdds(horse.place_odds, oddsFormat)}
-                          </span>
-                          <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
-                            PLACE
-                          </span>
+                          {isSuspended ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-mono font-black text-rose-300">SUSP</span>
+                              <span className="text-[7px] uppercase tracking-wider block font-bold text-rose-400 mt-0.5">LOCKED</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs sm:text-sm font-mono font-black">
+                                {formatOdds(horse.place_odds, oddsFormat)}
+                              </span>
+                              <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                                PLACE
+                              </span>
+                            </>
+                          )}
                         </button>
                       </td>
                     </tr>

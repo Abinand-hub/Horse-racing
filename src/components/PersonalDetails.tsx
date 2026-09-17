@@ -61,7 +61,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
         </div>
         <h2 className="text-lg sm:text-xl font-bold text-white">Sign In to View Personal Details</h2>
         <p className="text-xs text-slate-400">
-          Access your personal profile, registration credentials, wallet statement, and contest stats.
+          Access your personal profile, registration credentials, wallet statement, and race stats.
         </p>
         <button
           onClick={onOpenAuth}
@@ -287,13 +287,13 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
         </div>
       </div>
 
-      {/* ---------------- 3. SECTION: CONTESTS & FINANCIAL ACTIVITY ---------------- */}
+      {/* ---------------- 3. SECTION: RACES & FINANCIAL ACTIVITY ---------------- */}
       <div className="bg-[#091510] rounded-2xl border border-emerald-900/60 p-4 sm:p-6 shadow-xl space-y-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)] shrink-0" />
             <h2 className="text-sm sm:text-base font-black text-white tracking-tight">
-              Contests & Financial Activity
+              Races & Financial Activity
             </h2>
           </div>
           <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
@@ -303,11 +303,11 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
 
         {/* 4 Metric Cards in Responsive Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
-          {/* 1. CONTESTS PLAYED */}
+          {/* 1. RACES CONTESTED */}
           <div className="bg-[#040805] rounded-xl border border-emerald-900/40 p-3 sm:p-4 shadow-md space-y-1 relative">
             <div className="flex items-center justify-between">
               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                CONTESTS PLAYED
+                RACES CONTESTED
               </p>
               <Trophy className="w-3.5 h-3.5 text-[#e5b869] shrink-0" />
             </div>
@@ -317,11 +317,11 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
             <p className="text-[10px] text-slate-500 font-medium">Total selections</p>
           </div>
 
-          {/* 2. CONTEST WON */}
+          {/* 2. RACES WON */}
           <div className="bg-[#040805] rounded-xl border border-emerald-900/40 p-3 sm:p-4 shadow-md space-y-1 relative">
             <div className="flex items-center justify-between">
               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                CONTEST WON
+                RACES WON
               </p>
               <Award className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             </div>

@@ -397,13 +397,13 @@ export const RaceList: React.FC<RaceListProps> = ({
                         soundManager.playClick();
                         onSelectRace(race.id);
                       }}
-                      className="group bg-[#091510]/95 hover:bg-[#0c1c15] rounded-3xl border border-emerald-900/40 hover:border-[#e5b869]/60 p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer"
+                      className="group bg-[#091510]/95 hover:bg-[#0c1c15] rounded-3xl border-2 border-emerald-900/60 hover:border-[#e5b869]/80 p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         {/* Main Title & Format */}
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/30">
+                            <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/40">
                               <MapPin className="w-3.5 h-3.5" />
                               {race.venue}
                             </span>
@@ -443,7 +443,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           <button
                             id={`race-view-btn-${race.id}`}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#0e241b] border border-emerald-700/40 group-hover:bg-gradient-to-r group-hover:from-[#d4af37] group-hover:to-[#e5b869] text-emerald-300 group-hover:text-black font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
+                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#0e241b] border border-emerald-700/60 group-hover:bg-gradient-to-r group-hover:from-[#d4af37] group-hover:to-[#e5b869] text-emerald-300 group-hover:text-black font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
                           >
                             <span>Open Market</span>
                             <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
@@ -453,14 +453,14 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                       {/* Quick Runners & Odds Strip */}
                       {race.horses.length > 0 && race.status !== 'RESULTED' && (
-                        <div className="mt-3 pt-3 border-t border-emerald-900/30 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                        <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
                           <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
                             Top Runners:
                           </span>
                           {race.horses.slice(0, 4).map((h) => (
                             <div
                               key={h.id}
-                              className="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800/80 whitespace-nowrap"
+                              className="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded-xl border border-emerald-900/60 whitespace-nowrap"
                             >
                               <SilkIcon
                                 color={h.silk_color}
@@ -470,7 +470,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                               <span className="font-bold text-slate-200 truncate max-w-[100px]">
                                 {h.name}
                               </span>
-                              <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-300 font-bold font-mono text-[11px] border border-rose-500/20">
+                              <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-300 font-bold font-mono text-[11px] border border-rose-500/30">
                                 {formatOdds(h.win_odds, oddsFormat)}
                               </span>
                             </div>
@@ -495,7 +495,7 @@ export const RaceList: React.FC<RaceListProps> = ({
         <div className="lg:col-span-4 space-y-5">
           
           {/* Market Movers Card */}
-          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-3">
+          <div className="rounded-3xl bg-slate-900 border-2 border-emerald-900/60 p-5 shadow-xl space-y-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-rose-500" />
               <h3 className="text-sm font-black text-white uppercase tracking-wider">
@@ -503,7 +503,7 @@ export const RaceList: React.FC<RaceListProps> = ({
               </h3>
             </div>
             <div className="space-y-2.5 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-white">Speed Princess</p>
                   <p className="text-[11px] text-slate-400">Bangalore Race 3</p>
@@ -513,7 +513,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                 </span>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-white">Royal Commander</p>
                   <p className="text-[11px] text-slate-400">Mumbai Race 5</p>
@@ -523,7 +523,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                 </span>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-white">Fire Blade</p>
                   <p className="text-[11px] text-slate-400">Pune Race 2</p>
@@ -536,7 +536,7 @@ export const RaceList: React.FC<RaceListProps> = ({
           </div>
 
           {/* Turf Expert Punter Insights Card */}
-          <div className="rounded-3xl bg-gradient-to-br from-[#1a0c10] via-slate-900 to-slate-900 border border-red-500/30 p-5 shadow-xl space-y-3">
+          <div className="rounded-3xl bg-gradient-to-br from-[#1a0c10] via-slate-900 to-slate-900 border-2 border-red-500/40 p-5 shadow-xl space-y-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-red-400" />
               <h3 className="text-sm font-black text-white uppercase tracking-wider">
@@ -546,7 +546,7 @@ export const RaceList: React.FC<RaceListProps> = ({
             <p className="text-xs text-slate-300">
               Form rating confidence score <strong>94%</strong> on good turf track conditions.
             </p>
-            <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/20 space-y-1">
+            <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/30 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-white">Bangalore Derby</span>
                 <span className="text-xs font-mono font-bold text-emerald-400">Odds 2.50</span>
@@ -557,7 +557,7 @@ export const RaceList: React.FC<RaceListProps> = ({
           </div>
 
           {/* Quick Racing Rules & Integrity */}
-          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-2.5 text-xs text-slate-400">
+          <div className="rounded-3xl bg-slate-900 border-2 border-emerald-900/60 p-5 shadow-xl space-y-2.5 text-xs text-slate-400">
             <div className="flex items-center gap-2 text-white font-bold">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Official Exchange Rules</span>

@@ -111,10 +111,10 @@ export const MyBets: React.FC<MyBetsProps> = ({
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
             <Trophy className="w-5 h-5 text-[#e5b869]" />
-            <span>My Contest Selections</span>
+            <span>My Race Selections</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            Click any contest card below to open and view your multiple runner odds & bets
+            Click any race card below to open and view your multiple runner odds & bets
           </p>
         </div>
 
@@ -149,15 +149,15 @@ export const MyBets: React.FC<MyBetsProps> = ({
       {isLoading ? (
         <div className="py-16 text-center text-slate-400">
           <div className="w-8 h-8 border-2 border-[#e5b869] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm font-semibold">Loading your contest selections...</p>
+          <p className="text-sm font-semibold">Loading your race selections...</p>
         </div>
       ) : groupedContests.length === 0 ? (
         <div className="py-16 text-center bg-[#07100b] rounded-3xl border border-emerald-900/50 p-8 shadow-inner space-y-3">
           <Coins className="w-12 h-12 text-slate-600 mx-auto" />
-          <h3 className="text-base font-bold text-slate-300">No contest selections found</h3>
+          <h3 className="text-base font-bold text-slate-300">No race selections found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {filter === 'ALL'
-              ? 'You have not contested in any race yet. Choose a race from the Race Lobby to make your selections.'
+              ? 'You have not placed bets in any race yet. Choose a race from the Race Lobby to make your selections.'
               : `You do not have any ${filter === 'PENDING' ? 'in-play' : filter.toLowerCase()} selections.`}
           </p>
           {onGoToLobby && (
@@ -279,10 +279,10 @@ export const MyBets: React.FC<MyBetsProps> = ({
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 pb-1 flex items-center justify-between">
                       <span className="flex items-center gap-1 text-[#e5b869]">
                         <Sparkles className="w-3.5 h-3.5 text-[#e5b869]" />
-                        <span>Multiple Odds & Slips Placed in this Contest</span>
+                        <span>Multiple Odds & Slips Placed in this Race</span>
                       </span>
                       <span className="text-emerald-400 font-mono text-[9px] bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                        {contestGroup.bets.length} Active Contests
+                        {contestGroup.bets.length} Active {contestGroup.bets.length === 1 ? 'Selection' : 'Selections'}
                       </span>
                     </div>
 

@@ -96,6 +96,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [previewScreenshot, setPreviewScreenshot] = useState<string | null>(null);
   const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  const [selectedOddsRaceId, setSelectedOddsRaceId] = useState<string>('');
 
   // Settlement dialog state
   const [settlingRace, setSettlingRace] = useState<Race | null>(null);
@@ -342,6 +343,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to update odds');
       setTimeout(() => setActionMessage(null), 3000);
+    }
+  };
+
+  const handleToggleHorseSuspend = async (raceId: string, horseId: string) => {
+    try {
+      const updatedRace = await api.toggleHorseSuspend(raceId, horseId);
+      soundManager.playClick();
+      if (updatedRace) {
+        const horse = updatedRace.horses.find((h) => h.id === horseId);
+        setActionMessage(`🏇 Runner #${horse?.serial_no || horse?.horse_no} ${horse?.name} is now ${horse?.is_suspended ? 'SUSPENDED 🚫' : 'ACTIVE ✅'}`);
+      }
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to toggle suspension');
+    }
+  };
+
+  const handleToggleRaceSuspendAll = async (raceId: string, forceState?: boolean) => {
+    try {
+      const updatedRace = await api.toggleRaceSuspendAll(raceId, forceState);
+      soundManager.playClick();
+      if (updatedRace) {
+        setActionMessage(`⚡ Race "${updatedRace.name}" market: ${updatedRace.is_suspended ? 'ALL RUNNERS SUSPENDED 🚫' : 'ALL RUNNERS ACTIVE ✅'}`);
+      }
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to toggle race suspension');
     }
   };
 
@@ -1065,138 +1097,378 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 2: Live Odds Editor (Only LIVE In-Play Races) */}
+      {/* TAB 2: Live Odds Editor (Handwritten Sheet System) */}
       {activeTab === 'odds' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-rose-400" />
-                <span>Live Odds Editor</span>
+                <span>Live Odds Management System</span>
                 <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
-                  🔴 LIVE ONLY ({races.filter((r) => r.status === 'LIVE').length})
+                  Handwritten Layout Live
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Modify Win and Place odds in real time for in-play races currently running
+                Directly manage and update Win/Place live odds and suspend runners in real-time
               </p>
             </div>
+
+            {/* Quick race picker if multiple races */}
+            {races.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Select Race:</span>
+                <select
+                  value={selectedOddsRaceId || (races.find(r => r.status === 'LIVE')?.id || races[0]?.id || '')}
+                  onChange={(e) => setSelectedOddsRaceId(e.target.value)}
+                  className="bg-slate-900 border border-emerald-500/40 text-xs font-bold text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#e5b869]"
+                >
+                  {races.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.race_no ? `R#${r.race_no} - ` : ''}{r.name} ({r.venue} • {r.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {(() => {
-            const liveRaces = races.filter((r) => r.status === 'LIVE');
+            const currentRaceId = selectedOddsRaceId || (races.find(r => r.status === 'LIVE')?.id || races[0]?.id);
+            const activeRace = races.find(r => r.id === currentRaceId) || races[0];
 
-            if (liveRaces.length === 0) {
+            if (!activeRace) {
               return (
-                <div className="p-8 sm:p-12 text-center bg-[#091510] rounded-2xl border border-emerald-900/50 space-y-3 shadow-xl">
-                  <div className="w-12 h-12 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto animate-pulse">
-                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
-                  </div>
-                  <h3 className="text-base font-black text-white">No Live Races In-Play Right Now</h3>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    Live Odds Editor strictly manages in-play races. Go to <strong>Races & Settlement</strong> and click <strong>"▶ Make Race LIVE"</strong> on any upcoming race to start editing live odds here.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundManager.playClick();
-                      setActiveTab('races');
-                      setAdminRaceFilter('upcoming');
-                    }}
-                    className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black text-xs transition cursor-pointer shadow-lg active:scale-95"
-                  >
-                    <span>View Upcoming Races to Make Live</span>
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                  </button>
+                <div className="p-8 text-center bg-[#091510] rounded-2xl border border-emerald-900/50 space-y-3">
+                  <p className="text-xs text-slate-400">No race fixtures available. Add a race in the Add Race tab.</p>
                 </div>
               );
             }
 
+            const isAllSuspended = activeRace.is_suspended || activeRace.horses.every(h => h.is_suspended);
+
             return (
-              <div className="space-y-6">
-                {liveRaces.map((race) => (
-                  <div key={race.id} className="bg-slate-900 rounded-2xl border border-rose-500/40 p-4 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <div className="flex items-center gap-2">
-                        {race.race_no && (
-                          <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-black text-[11px] border border-rose-500/30">
-                            R#{race.race_no}
-                          </span>
-                        )}
-                        <h3 className="font-bold text-white text-sm">
-                          {race.name} ({race.venue} • {race.race_time})
-                        </h3>
+              <div className="space-y-4">
+                {/* Race Quick Switcher Pills */}
+                <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
+                  {races.map((r) => {
+                    const isSelected = r.id === activeRace.id;
+                    const isLive = r.status === 'LIVE';
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          soundManager.playClick();
+                          setSelectedOddsRaceId(r.id);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-md'
+                            : isLive
+                            ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 hover:text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {isLive && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
+                        <span>{r.race_no ? `R#${r.race_no} - ` : ''}{r.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* ---------------- EXACT HANDWRITTEN ODDS BOARD CONTAINER ---------------- */}
+                <div className="bg-[#091510] rounded-2xl border-2 border-emerald-900/80 shadow-2xl overflow-hidden">
+                  
+                  {/* Handwritten Header: 01 | XYZ PLATE | 1200M | 1:30 | SUSP ALL */}
+                  <div className="bg-[#040805] border-b-2 border-emerald-900/80 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                      {/* Race No box */}
+                      <div className="px-3 py-1.5 rounded-xl bg-[#1a170b] border-2 border-[#e5b869] text-[#e5b869] font-mono font-black text-sm sm:text-base shadow-inner">
+                        {String(activeRace.race_no || '01').padStart(2, '0')}
                       </div>
-                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 uppercase font-black tracking-wider animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                        LIVE IN-PLAY
+
+                      {/* Race Name */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-xl font-black text-white uppercase tracking-wider font-mono">
+                            {activeRace.name}
+                          </h3>
+                          {activeRace.status === 'LIVE' ? (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                              🔴 LIVE
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase">
+                              ⏱ {activeRace.status}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
+                          <MapPin className="w-3 h-3 text-[#e5b869]" />
+                          <span>{activeRace.venue}</span>
+                        </p>
+                      </div>
+
+                      {/* Distance & Time Pills */}
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-xl bg-slate-900 border border-emerald-700/50 text-emerald-400 font-black font-mono text-xs sm:text-sm">
+                          {activeRace.distance || '1200M'}
+                        </span>
+                        <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold font-mono text-xs sm:text-sm flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          {activeRace.race_time || '1:30'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Master "SUSP ALL" / "UNSUSPEND ALL" Action Button */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        id={`master-susp-all-btn-${activeRace.id}`}
+                        onClick={() => handleToggleRaceSuspendAll(activeRace.id, !isAllSuspended)}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
+                          isAllSuspended
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
+                        }`}
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                        <span>{isAllSuspended ? 'UNSUSPEND ALL' : 'SUSP ALL'}</span>
+                      </button>
+
+                      {activeRace.status !== 'LIVE' && (
+                        <button
+                          type="button"
+                          onClick={() => handleMakeRaceLive(activeRace)}
+                          className="px-3 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+                        >
+                          <Flame className="w-3.5 h-3.5 text-amber-200" />
+                          <span>Make Live</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ---------------- HANDWRITTEN ODDS SPREADSHEET TABLE ---------------- */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-[#020503] border-b-2 border-emerald-900/80 text-xs font-black uppercase tracking-wider text-slate-300 font-mono">
+                          <th className="py-3 px-3 w-16 text-center border-r border-emerald-900/50">
+                            SL
+                          </th>
+                          <th className="py-3 px-4 border-r border-emerald-900/50">
+                            NAME
+                          </th>
+                          <th className="py-3 px-4 w-44 text-center border-r border-emerald-900/50">
+                            <span className="text-amber-400 block text-xs sm:text-sm font-black">WIN</span>
+                            <span className="text-[9px] text-slate-400 font-normal">Odds (₹100)</span>
+                          </th>
+                          <th className="py-3 px-4 w-44 text-center border-r border-emerald-900/50">
+                            <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE</span>
+                            <span className="text-[9px] text-slate-400 font-normal">Odds (₹100)</span>
+                          </th>
+                          <th className="py-3 px-3 w-36 text-center">
+                            SUSPEND
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-950/80">
+                        {activeRace.horses.map((horse, idx) => {
+                          const isSuspended = horse.is_suspended || activeRace.is_suspended;
+                          const slNo = horse.serial_no || horse.horse_no || (idx + 1);
+
+                          return (
+                            <tr
+                              key={horse.id || idx}
+                              className={`transition-colors font-mono ${
+                                isSuspended
+                                  ? 'bg-rose-950/20 opacity-80'
+                                  : idx % 2 === 0
+                                  ? 'bg-[#091510]'
+                                  : 'bg-[#07100c]'
+                              } hover:bg-[#0f241a]`}
+                            >
+                              {/* SL (Serial Number) */}
+                              <td className="py-2.5 px-3 text-center font-black text-sm text-slate-200 border-r border-emerald-900/50">
+                                <span className="inline-flex w-7 h-7 rounded-lg bg-[#040805] border border-emerald-900/80 items-center justify-center text-[#e5b869]">
+                                  {slNo}
+                                </span>
+                              </td>
+
+                              {/* NAME (Horse Name in Uppercase bold + Trainer/Jockey) */}
+                              <td className="py-2.5 px-4 border-r border-emerald-900/50">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
+                                      {horse.name || `RUNNER #${slNo}`}
+                                    </span>
+                                    {isSuspended && (
+                                      <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[9px] font-black uppercase">
+                                        SUSPENDED
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-sans flex items-center gap-2">
+                                    <span>J: <strong className="text-slate-200">{horse.jockey || 'Jockey'}</strong></span>
+                                    <span>•</span>
+                                    <span>T: <strong className="text-slate-300">{horse.trainer || 'Trainer'}</strong></span>
+                                    {horse.gate_no !== undefined && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-amber-400">Draw {horse.gate_no}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* WIN Odds: Direct input + quick step buttons */}
+                              <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = Math.max(1.05, Math.round((horse.win_odds - 0.1) * 100) / 100);
+                                      handleUpdateOdds(horse.id, next, horse.place_odds);
+                                    }}
+                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    title="-0.10"
+                                  >
+                                    -
+                                  </button>
+
+                                  <input
+                                    type="number"
+                                    step="0.05"
+                                    min="1.05"
+                                    defaultValue={horse.win_odds}
+                                    key={`win_${horse.id}_${horse.win_odds}`}
+                                    onBlur={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      if (val >= 1.05 && val !== horse.win_odds) {
+                                        handleUpdateOdds(horse.id, val, horse.place_odds);
+                                      }
+                                    }}
+                                    className="w-20 px-2 py-1 bg-[#020503] border border-amber-500/50 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-amber-300"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = Math.round((horse.win_odds + 0.1) * 100) / 100;
+                                      handleUpdateOdds(horse.id, next, horse.place_odds);
+                                    }}
+                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    title="+0.10"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* PLACE Odds: Direct input + quick step buttons */}
+                              <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = Math.max(1.02, Math.round((horse.place_odds - 0.05) * 100) / 100);
+                                      handleUpdateOdds(horse.id, horse.win_odds, next);
+                                    }}
+                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    title="-0.05"
+                                  >
+                                    -
+                                  </button>
+
+                                  <input
+                                    type="number"
+                                    step="0.05"
+                                    min="1.02"
+                                    defaultValue={horse.place_odds}
+                                    key={`place_${horse.id}_${horse.place_odds}`}
+                                    onBlur={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      if (val >= 1.02 && val !== horse.place_odds) {
+                                        handleUpdateOdds(horse.id, horse.win_odds, val);
+                                      }
+                                    }}
+                                    className="w-20 px-2 py-1 bg-[#020503] border border-emerald-500/50 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-emerald-300"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = Math.round((horse.place_odds + 0.05) * 100) / 100;
+                                      handleUpdateOdds(horse.id, horse.win_odds, next);
+                                    }}
+                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    title="+0.05"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* SUSPEND Toggle Button per runner */}
+                              <td className="py-2.5 px-3 text-center">
+                                <button
+                                  type="button"
+                                  id={`suspend-runner-btn-${horse.id}`}
+                                  onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
+                                  className={`px-3 py-1.5 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
+                                    isSuspended
+                                      ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-sm'
+                                      : 'bg-slate-900 hover:bg-rose-950/50 text-slate-300 hover:text-rose-300 border-slate-700'
+                                  }`}
+                                >
+                                  {isSuspended ? 'SUSPENDED' : 'SUSPEND'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All) */}
+                  <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRaceSuspendAll(activeRace.id, !isAllSuspended)}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
+                          isAllSuspended
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
+                        }`}
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                        <span>{isAllSuspended ? 'UNSUSPEND ALL RUNNERS' : 'SUSP ALL'}</span>
+                      </button>
+
+                      <span className="text-xs text-slate-400 hidden sm:inline">
+                        Total {activeRace.horses.length} Runners in field
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {race.horses.map((horse) => (
-                        <div
-                          key={horse.id}
-                          className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2 text-xs"
-                        >
-                          <div className="flex items-center justify-between font-bold text-white">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-indigo-300 font-mono">
-                                S.{horse.serial_no || horse.horse_no}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono">
-                                Gate {horse.gate_no !== undefined ? horse.gate_no : (horse.serial_no || horse.horse_no)}
-                              </span>
-                              <span className="truncate">{horse.name}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-[11px] text-slate-400 truncate">
-                            <span>Jockey: <strong className="text-slate-200">{horse.jockey}</strong></span>
-                            <span className="mx-1">•</span>
-                            <span>Trainer: <strong className="text-slate-200">{horse.trainer}</strong></span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            <div>
-                              <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Win Odds (₹100)</label>
-                              <input
-                                type="number"
-                                step="0.05"
-                                min="1.05"
-                                defaultValue={horse.win_odds}
-                                onBlur={(e) => {
-                                  const val = parseFloat(e.target.value);
-                                  if (val > 1 && val !== horse.win_odds) {
-                                    handleUpdateOdds(horse.id, val, horse.place_odds);
-                                  }
-                                }}
-                                className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono focus:outline-none focus:border-amber-400"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Place Odds (₹100)</label>
-                              <input
-                                type="number"
-                                step="0.05"
-                                min="1.02"
-                                defaultValue={horse.place_odds}
-                                onBlur={(e) => {
-                                  const val = parseFloat(e.target.value);
-                                  if (val > 1 && val !== horse.place_odds) {
-                                    handleUpdateOdds(horse.id, horse.win_odds, val);
-                                  }
-                                }}
-                                className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-400"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(activeRace)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Edit Race Fixture</span>
+                      </button>
                     </div>
                   </div>
-                ))}
+
+                </div>
               </div>
             );
           })()}
@@ -1302,17 +1574,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div>
               <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Venue
+                Turf Club / Venue <span className="text-rose-400">*</span>
               </label>
               <input
                 id="new-race-venue"
                 type="text"
+                list="indian-turf-clubs"
                 required
                 value={newVenue}
                 onChange={(e) => setNewVenue(e.target.value)}
-                placeholder="e.g. Bangalore Turf Club"
+                placeholder="Select or enter venue (e.g. Royal Calcutta Turf Club)"
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
               />
+              <datalist id="indian-turf-clubs">
+                <option value="Bangalore Turf Club" />
+                <option value="Royal Calcutta Turf Club" />
+                <option value="Delhi Race Club" />
+                <option value="Hyderabad Race Club" />
+                <option value="Mahalaxmi, Mumbai" />
+                <option value="Pune Race Course" />
+                <option value="Madras Race Club" />
+                <option value="Mysore Race Club" />
+              </datalist>
             </div>
 
             <div>

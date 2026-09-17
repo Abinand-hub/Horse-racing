@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="brand-logo-btn"
                 onClick={() => {
                   soundManager.playClick();
-                  onOpenRules();
+                  onGoHome();
                 }}
                 className="flex items-center gap-2 text-left group cursor-pointer shrink-0"
               >
@@ -125,50 +125,34 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* ---------------- CENTER: Clean Nav Items (Desktop/Tablet) ---------------- */}
-            <nav className="hidden md:flex items-center gap-1.5 lg:gap-3 text-xs sm:text-sm">
-              {/* 1. How to Play & Rules (FIRST / HOME) */}
+            <nav className="hidden md:flex items-center gap-2 lg:gap-3.5 text-xs sm:text-sm">
+              {/* 1. Home (Primary) */}
               <button
-                id="nav-rules-btn"
-                onClick={() => {
-                  soundManager.playClick();
-                  onOpenRules();
-                }}
-                className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'rules'
-                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
-                    : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>How to Play & Rules</span>
-              </button>
-
-              {/* 2. Race Lobby */}
-              <button
-                id="nav-races-btn"
+                id="nav-home-btn"
                 onClick={() => {
                   soundManager.playClick();
                   onGoHome();
                 }}
-                className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'races'
-                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.25)]'
                     : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
-                <span>Race Lobby</span>
+                <Home className="w-3.5 h-3.5" />
+                <span>Home</span>
               </button>
 
-              {/* 3. My Selections */}
+              {/* 2. My Selections */}
               <button
                 id="nav-my-bets-btn"
                 onClick={() => {
                   soundManager.playClick();
                   onOpenMyBets();
                 }}
-                className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'mybets'
-                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.25)]'
                     : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
@@ -179,23 +163,22 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </button>
 
-              {/* 4. Personal Details */}
+              {/* 3. Personal Details */}
               <button
                 id="nav-personal-details-btn"
                 onClick={() => {
                   soundManager.playClick();
                   onOpenPersonalDetails();
                 }}
-                className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 ${
                   activeTab === 'personal_details'
-                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.2)]'
+                    ? 'bg-[#18160c] border border-[#e5b869]/70 text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.25)]'
                     : 'text-slate-300 hover:text-white hover:bg-emerald-950/30'
                 }`}
               >
                 <UserIcon className={`w-3.5 h-3.5 ${activeTab === 'personal_details' ? 'text-[#e5b869]' : 'text-slate-400'}`} />
                 <span>Personal Details</span>
               </button>
-
             </nav>
 
             {/* ---------------- RIGHT: Spacious Wallet & Profile with Gold & Emerald Accents ---------------- */}
@@ -462,69 +445,52 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* ---------------- MOBILE FIXED BOTTOM NAVIGATION (4 Spacious Tabs, Rules First, No Add Button) ---------------- */}
+      {/* ---------------- MOBILE FIXED BOTTOM NAVIGATION (3 Spacious Tabs: Home, Selections, Personal Details) ---------------- */}
       <nav 
         id="mobile-static-bottom-nav"
         className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[#060b08]/95 backdrop-blur-xl border-t border-emerald-900/40 px-2 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.9)]"
       >
-        <div className="grid grid-cols-4 gap-1 items-center max-w-md mx-auto">
-          {/* 1. How to Play & Rules (FIRST / HOME TAB) */}
+        <div className="grid grid-cols-3 gap-1 items-center max-w-md mx-auto">
+          {/* 1. Home (Race Lobby) */}
           <button
-            id="mobile-nav-rules"
-            onClick={() => {
-              soundManager.playClick();
-              onOpenRules();
-            }}
-            className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
-              activeTab === 'rules'
-                ? 'text-[#e5b869] font-black'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <BookOpen className="w-4.5 h-4.5" />
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">How to Play</span>
-          </button>
-
-          {/* 2. Race Lobby */}
-          <button
-            id="mobile-nav-lobby"
+            id="mobile-nav-home"
             onClick={() => {
               soundManager.playClick();
               onGoHome();
             }}
-            className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 transition cursor-pointer ${
               activeTab === 'races'
                 ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Home className="w-4.5 h-4.5" />
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Race Lobby</span>
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5 tracking-tight font-bold">Home</span>
           </button>
 
-          {/* 3. My Selections */}
+          {/* 2. My Selections */}
           <button
             id="mobile-nav-selections"
             onClick={() => {
               soundManager.playClick();
               onOpenMyBets();
             }}
-            className={`flex flex-col items-center justify-center py-1 transition relative cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 transition relative cursor-pointer ${
               activeTab === 'mybets'
                 ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <div className="relative">
-              <Trophy className={`w-4.5 h-4.5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
+              <Trophy className={`w-5 h-5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
               <span className="absolute -top-1.5 -right-2.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-black font-black text-[8px] flex items-center justify-center">
                 {pendingBetsCount > 0 ? pendingBetsCount : 2}
               </span>
             </div>
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Selections</span>
+            <span className="text-[10px] mt-0.5 tracking-tight font-bold">Selections</span>
           </button>
 
-          {/* 4. Personal Details */}
+          {/* 3. Personal Details */}
           <button
             id="mobile-nav-profile"
             onClick={() => {
@@ -535,7 +501,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onOpenAuth();
               }
             }}
-            className={`flex flex-col items-center justify-center py-1 transition cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 transition cursor-pointer ${
               activeTab === 'personal_details'
                 ? 'text-[#e5b869] font-black'
                 : 'text-slate-400 hover:text-slate-200'
@@ -545,14 +511,14 @@ export const Header: React.FC<HeaderProps> = ({
               <img
                 src={user.profile_photo || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
                 alt={user.username}
-                className={`w-4.5 h-4.5 rounded-md object-cover ring-1 ${
+                className={`w-5 h-5 rounded-md object-cover ring-1 ${
                   activeTab === 'personal_details' ? 'ring-[#e5b869] ring-2' : 'ring-emerald-500/60'
                 }`}
               />
             ) : (
-              <UserIcon className="w-4.5 h-4.5" />
+              <UserIcon className="w-5 h-5" />
             )}
-            <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">Personal Details</span>
+            <span className="text-[10px] mt-0.5 tracking-tight font-bold">Personal Details</span>
           </button>
         </div>
       </nav>

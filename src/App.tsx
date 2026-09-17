@@ -42,8 +42,8 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
-  // Navigation & View state - Default home is How to Play & Rules
-  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('rules');
+  // Navigation & View state - Default home is Home (Race Lobby)
+  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('races');
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('upcoming');
   const [isLoadingRaces, setIsLoadingRaces] = useState(true);
@@ -120,7 +120,7 @@ export default function App() {
         const rId = rawHash.replace(/^#\/?race\//i, '');
         setSelectedRaceId(rId);
         setActiveTab('races');
-      } else if (hash === '#/lobby' || hash === '#lobby') {
+      } else if (hash === '#/lobby' || hash === '#lobby' || hash === '#/' || hash === '#' || hash === '') {
         setSelectedRaceId(null);
         setActiveTab('races');
       } else if (hash === '#/mybets' || hash === '#mybets') {
@@ -133,12 +133,8 @@ export default function App() {
         setSelectedRaceId(null);
         setActiveTab('rules');
       } else {
-        // If hash is empty, set default hash to #/rules
-        if (!rawHash) {
-          window.location.replace('#/rules');
-        }
         setSelectedRaceId(null);
-        setActiveTab('rules');
+        setActiveTab('races');
       }
     };
 
