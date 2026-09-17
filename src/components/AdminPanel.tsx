@@ -41,7 +41,8 @@ import {
   Layers,
   Globe,
   CalendarCheck,
-  Flag
+  Flag,
+  Lock
 } from 'lucide-react';
 
 interface AdminPanelProps {
