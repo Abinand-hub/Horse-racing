@@ -17,6 +17,91 @@ import { DUMMY_BANNERS, DUMMY_BETS, DUMMY_RACES, DUMMY_USER } from '../data/dumm
 
 const API_BASE = '/api';
 
+// ----------------------------------------------------------------------
+// REALTIME ODDS SYNC SERVICE (WebSocket / BroadcastChannel / EventTarget)
+// ----------------------------------------------------------------------
+export interface OddsStatusUpdatePayload {
+  event: 'odds_status_update' | 'SUSPEND_HORSE' | 'RESUME_HORSE' | 'SUSPEND_ALL' | 'RESUME_ALL';
+  race_id: string;
+  horse_id?: string;
+  is_suspended?: boolean;
+  win_odds?: number;
+  place_odds?: number;
+  race?: Race;
+  timestamp: number;
+}
+
+class RealtimeOddsService {
+  private channel: BroadcastChannel | null = null;
+  private listeners: Set<(payload: OddsStatusUpdatePayload) => void> = new Set();
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        this.channel = new BroadcastChannel('derby_realtime_odds');
+        this.channel.onmessage = (event) => {
+          if (event.data) {
+            this.notifyListeners(event.data);
+          }
+        };
+      } catch (e) {
+        console.warn('BroadcastChannel initialization notice:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('derby_odds_event', ((e: CustomEvent) => {
+        if (e.detail) {
+          this.notifyListeners(e.detail);
+        }
+      }) as EventListener);
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'derby_last_odds_event' && e.newValue) {
+          try {
+            const data = JSON.parse(e.newValue);
+            this.notifyListeners(data);
+          } catch {}
+        }
+      });
+    }
+  }
+
+  broadcast(payload: OddsStatusUpdatePayload) {
+    if (this.channel) {
+      try {
+        this.channel.postMessage(payload);
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('derby_odds_event', { detail: payload }));
+        localStorage.setItem('derby_last_odds_event', JSON.stringify(payload));
+      } catch {}
+    }
+    this.notifyListeners(payload);
+  }
+
+  subscribe(callback: (payload: OddsStatusUpdatePayload) => void): () => void {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
+
+  private notifyListeners(payload: OddsStatusUpdatePayload) {
+    this.listeners.forEach((cb) => {
+      try {
+        cb(payload);
+      } catch (err) {
+        console.error('Error in odds listener callback:', err);
+      }
+    });
+  }
+}
+
+export const realtimeOdds = new RealtimeOddsService();
+
 export const api = {
   // Auth
   async sendOtp(phone: string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
@@ -1187,9 +1272,119 @@ export const api = {
         if (win_odds !== undefined && !isNaN(win_odds)) h.win_odds = Number(win_odds);
         if (place_odds !== undefined && !isNaN(place_odds)) h.place_odds = Number(place_odds);
         this.saveLocalRace(r);
+
+        realtimeOdds.broadcast({
+          event: 'odds_status_update',
+          race_id: r.id,
+          horse_id: horseId,
+          is_suspended: h.is_suspended,
+          win_odds: h.win_odds,
+          place_odds: h.place_odds,
+          race: r,
+          timestamp: Date.now(),
+        });
         break;
       }
     }
+  },
+
+  async suspendHorse(raceId: string, horseId: string): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    const horse = race.horses.find((h) => h.id === horseId);
+    if (horse) {
+      horse.is_suspended = true;
+      this.saveLocalRace(race);
+
+      realtimeOdds.broadcast({
+        event: 'SUSPEND_HORSE',
+        race_id: raceId,
+        horse_id: horseId,
+        is_suspended: true,
+        race,
+        timestamp: Date.now(),
+      });
+    }
+    return race;
+  },
+
+  async resumeHorse(raceId: string, horseId: string, new_win_odds?: number, new_place_odds?: number): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    const horse = race.horses.find((h) => h.id === horseId);
+    if (horse) {
+      horse.is_suspended = false;
+      if (new_win_odds !== undefined && !isNaN(new_win_odds) && new_win_odds > 0) {
+        horse.win_odds = Number(new_win_odds);
+      }
+      if (new_place_odds !== undefined && !isNaN(new_place_odds) && new_place_odds > 0) {
+        horse.place_odds = Number(new_place_odds);
+      }
+      this.saveLocalRace(race);
+
+      realtimeOdds.broadcast({
+        event: 'RESUME_HORSE',
+        race_id: raceId,
+        horse_id: horseId,
+        is_suspended: false,
+        win_odds: horse.win_odds,
+        place_odds: horse.place_odds,
+        race,
+        timestamp: Date.now(),
+      });
+    }
+    return race;
+  },
+
+  async suspendAll(raceId: string): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    race.is_suspended = true;
+    for (const h of race.horses) {
+      h.is_suspended = true;
+    }
+    this.saveLocalRace(race);
+
+    realtimeOdds.broadcast({
+      event: 'SUSPEND_ALL',
+      race_id: raceId,
+      is_suspended: true,
+      race,
+      timestamp: Date.now(),
+    });
+    return race;
+  },
+
+  async resumeAll(raceId: string, oddsMap?: Record<string, { win_odds?: number; place_odds?: number }>): Promise<Race | null> {
+    const allRaces = await this.getRaces('all');
+    const race = allRaces.find((r) => r.id === raceId);
+    if (!race) return null;
+
+    race.is_suspended = false;
+    for (const h of race.horses) {
+      h.is_suspended = false;
+      if (oddsMap && oddsMap[h.id]) {
+        const update = oddsMap[h.id];
+        if (update.win_odds !== undefined && !isNaN(update.win_odds)) h.win_odds = Number(update.win_odds);
+        if (update.place_odds !== undefined && !isNaN(update.place_odds)) h.place_odds = Number(update.place_odds);
+      }
+    }
+    this.saveLocalRace(race);
+
+    realtimeOdds.broadcast({
+      event: 'RESUME_ALL',
+      race_id: raceId,
+      is_suspended: false,
+      race,
+      timestamp: Date.now(),
+    });
+    return race;
   },
 
   async toggleHorseSuspend(raceId: string, horseId: string): Promise<Race | null> {
@@ -1199,8 +1394,11 @@ export const api = {
 
     const horse = race.horses.find((h) => h.id === horseId);
     if (horse) {
-      horse.is_suspended = !horse.is_suspended;
-      this.saveLocalRace(race);
+      if (horse.is_suspended) {
+        return this.resumeHorse(raceId, horseId);
+      } else {
+        return this.suspendHorse(raceId, horseId);
+      }
     }
     return race;
   },
@@ -1211,12 +1409,11 @@ export const api = {
     if (!race) return null;
 
     const shouldSuspend = forceState !== undefined ? forceState : !race.horses.every((h) => h.is_suspended);
-    race.is_suspended = shouldSuspend;
-    for (const h of race.horses) {
-      h.is_suspended = shouldSuspend;
+    if (shouldSuspend) {
+      return this.suspendAll(raceId);
+    } else {
+      return this.resumeAll(raceId);
     }
-    this.saveLocalRace(race);
-    return race;
   },
 
   async settleRace(raceId: string, winner_horse_id: string, place_horses_ids: string[]): Promise<any> {

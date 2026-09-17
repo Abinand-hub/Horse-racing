@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from './services/api';
+import { api, realtimeOdds } from './services/api';
 import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User, UserNotification } from './types';
 import { Header } from './components/Header';
 import { BannerSlider } from './components/BannerSlider';
@@ -177,6 +177,60 @@ export default function App() {
 
   useEffect(() => {
     loadRacesAndBanners();
+
+    // Subscribe to realtime odds changes and suspension updates
+    const unsubscribe = realtimeOdds.subscribe((payload) => {
+      if (payload.race) {
+        setRaces((prev) => {
+          const index = prev.findIndex((r) => r.id === payload.race.id);
+          if (index !== -1) {
+            const next = [...prev];
+            next[index] = payload.race;
+            return next;
+          }
+          return [payload.race, ...prev];
+        });
+      } else if (payload.race_id) {
+        setRaces((prev) =>
+          prev.map((r) => {
+            if (r.id === payload.race_id) {
+              if (payload.event === 'SUSPEND_ALL') {
+                return {
+                  ...r,
+                  is_suspended: true,
+                  horses: r.horses.map((h) => ({ ...h, is_suspended: true })),
+                };
+              }
+              if (payload.event === 'RESUME_ALL') {
+                return {
+                  ...r,
+                  is_suspended: false,
+                  horses: payload.race?.horses || r.horses.map((h) => ({ ...h, is_suspended: false })),
+                };
+              }
+              if (payload.horse_id) {
+                return {
+                  ...r,
+                  horses: r.horses.map((h) =>
+                    h.id === payload.horse_id
+                      ? {
+                          ...h,
+                          is_suspended: payload.is_suspended !== undefined ? payload.is_suspended : h.is_suspended,
+                          win_odds: payload.win_odds !== undefined ? payload.win_odds : h.win_odds,
+                          place_odds: payload.place_odds !== undefined ? payload.place_odds : h.place_odds,
+                        }
+                      : h
+                  ),
+                };
+              }
+            }
+            return r;
+          })
+        );
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Fetch user notifications

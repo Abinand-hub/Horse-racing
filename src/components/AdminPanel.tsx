@@ -333,6 +333,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // Temporary odds storage for live editing
+  const [tempOdds, setTempOdds] = useState<Record<string, { win_odds: number | string; place_odds: number | string }>>({});
+
   const handleUpdateOdds = async (horseId: string, winOdds: number, placeOdds: number) => {
     try {
       await api.updateHorseOdds(horseId, winOdds, placeOdds);
@@ -346,34 +349,101 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleToggleHorseSuspend = async (raceId: string, horseId: string) => {
+  const handleSuspendHorse = async (raceId: string, horseId: string) => {
     try {
-      const updatedRace = await api.toggleHorseSuspend(raceId, horseId);
+      const updatedRace = await api.suspendHorse(raceId, horseId);
       soundManager.playClick();
       if (updatedRace) {
         const horse = updatedRace.horses.find((h) => h.id === horseId);
-        setActionMessage(`🏇 Runner #${horse?.serial_no || horse?.horse_no} ${horse?.name} is now ${horse?.is_suspended ? 'SUSPENDED 🚫' : 'ACTIVE ✅'}`);
-      }
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3000);
-    } catch (err: any) {
-      setActionMessage(err.message || 'Failed to toggle suspension');
-    }
-  };
-
-  const handleToggleRaceSuspendAll = async (raceId: string, forceState?: boolean) => {
-    try {
-      const updatedRace = await api.toggleRaceSuspendAll(raceId, forceState);
-      soundManager.playClick();
-      if (updatedRace) {
-        setActionMessage(`⚡ Race "${updatedRace.name}" market: ${updatedRace.is_suspended ? 'ALL RUNNERS SUSPENDED 🚫' : 'ALL RUNNERS ACTIVE ✅'}`);
+        setActionMessage(`🚫 Runner #${horse?.serial_no || horse?.horse_no} ${horse?.name} is SUSPENDED. Users see "Odds Changing".`);
       }
       await onRefreshData();
       await loadAdminData();
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to toggle race suspension');
+      setActionMessage(err.message || 'Failed to suspend runner');
+    }
+  };
+
+  const handleResumeHorse = async (raceId: string, horseId: string) => {
+    try {
+      const current = tempOdds[horseId];
+      const race = races.find((r) => r.id === raceId);
+      const horse = race?.horses.find((h) => h.id === horseId);
+      const winVal = current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : horse?.win_odds;
+      const placeVal = current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : horse?.place_odds;
+
+      const updatedRace = await api.resumeHorse(raceId, horseId, winVal, placeVal);
+      soundManager.playChip();
+      if (updatedRace) {
+        const h = updatedRace.horses.find((item) => item.id === horseId);
+        setActionMessage(`✅ Runner #${h?.serial_no || h?.horse_no} ${h?.name} RESUMED! Live Odds: WIN ${h?.win_odds}x, PLACE ${h?.place_odds}x`);
+      }
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to resume runner');
+    }
+  };
+
+  const handleSuspendAll = async (raceId: string) => {
+    try {
+      const updatedRace = await api.suspendAll(raceId);
+      soundManager.playClick();
+      if (updatedRace) {
+        setActionMessage(`🚫 ALL RUNNERS in "${updatedRace.name}" SUSPENDED. Users see "Odds Changing" across all tiles.`);
+      }
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to suspend all runners');
+    }
+  };
+
+  const handleResumeAll = async (raceId: string) => {
+    try {
+      const race = races.find((r) => r.id === raceId);
+      const oddsMap: Record<string, { win_odds?: number; place_odds?: number }> = {};
+      race?.horses.forEach((h) => {
+        const current = tempOdds[h.id];
+        oddsMap[h.id] = {
+          win_odds: current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : h.win_odds,
+          place_odds: current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : h.place_odds,
+        };
+      });
+
+      const updatedRace = await api.resumeAll(raceId, oddsMap);
+      soundManager.playChip();
+      if (updatedRace) {
+        setActionMessage(`✅ ALL RUNNERS in "${updatedRace.name}" RESUMED! All new odds are now live on user screens.`);
+      }
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to resume all runners');
+    }
+  };
+
+  const handleToggleHorseSuspend = async (raceId: string, horseId: string) => {
+    const race = races.find((r) => r.id === raceId);
+    const horse = race?.horses.find((h) => h.id === horseId);
+    if (horse?.is_suspended) {
+      await handleResumeHorse(raceId, horseId);
+    } else {
+      await handleSuspendHorse(raceId, horseId);
+    }
+  };
+
+  const handleToggleRaceSuspendAll = async (raceId: string, forceState?: boolean) => {
+    const race = races.find((r) => r.id === raceId);
+    const isAll = forceState !== undefined ? forceState : (race?.is_suspended || race?.horses.every((h) => h.is_suspended));
+    if (isAll) {
+      await handleSuspendAll(raceId);
+    } else {
+      await handleResumeAll(raceId);
     }
   };
 
@@ -1222,20 +1292,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Master "SUSP ALL" / "UNSUSPEND ALL" Action Button */}
+                    {/* Master "SUSP ALL" / "RESUME ALL" Action Button */}
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         id={`master-susp-all-btn-${activeRace.id}`}
-                        onClick={() => handleToggleRaceSuspendAll(activeRace.id, !isAllSuspended)}
+                        onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
                           isAllSuspended
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50'
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
                             : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
                         }`}
                       >
                         <AlertCircle className="w-4 h-4" />
-                        <span>{isAllSuspended ? 'UNSUSPEND ALL' : 'SUSP ALL'}</span>
+                        <span>{isAllSuspended ? 'RESUME ALL' : 'SUSP ALL'}</span>
                       </button>
 
                       {activeRace.status !== 'LIVE' && (
@@ -1253,25 +1323,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   {/* ---------------- HANDWRITTEN ODDS SPREADSHEET TABLE ---------------- */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
+                    <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead>
                         <tr className="bg-[#020503] border-b-2 border-emerald-900/80 text-xs font-black uppercase tracking-wider text-slate-300 font-mono">
                           <th className="py-3 px-3 w-16 text-center border-r border-emerald-900/50">
                             SL
                           </th>
                           <th className="py-3 px-4 border-r border-emerald-900/50">
-                            NAME
+                            Horse Name
                           </th>
-                          <th className="py-3 px-4 w-44 text-center border-r border-emerald-900/50">
-                            <span className="text-amber-400 block text-xs sm:text-sm font-black">WIN</span>
-                            <span className="text-[9px] text-slate-400 font-normal">Odds (₹100)</span>
+                          <th className="py-3 px-4 w-48 text-center border-r border-emerald-900/50">
+                            <span className="text-amber-400 block text-xs sm:text-sm font-black">WIN Odds</span>
+                            <span className="text-[9px] text-slate-400 font-normal">Editable Input (₹100)</span>
                           </th>
-                          <th className="py-3 px-4 w-44 text-center border-r border-emerald-900/50">
-                            <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE</span>
-                            <span className="text-[9px] text-slate-400 font-normal">Odds (₹100)</span>
+                          <th className="py-3 px-4 w-48 text-center border-r border-emerald-900/50">
+                            <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE Odds</span>
+                            <span className="text-[9px] text-slate-400 font-normal">Editable Input (₹100)</span>
                           </th>
-                          <th className="py-3 px-3 w-36 text-center">
-                            SUSPEND
+                          <th className="py-3 px-4 w-40 text-center">
+                            <span className="block text-xs font-black">Action</span>
+                            <span className="text-[9px] text-slate-400 font-normal">[SUSPEND / RESUME]</span>
                           </th>
                         </tr>
                       </thead>
@@ -1279,13 +1350,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {activeRace.horses.map((horse, idx) => {
                           const isSuspended = horse.is_suspended || activeRace.is_suspended;
                           const slNo = horse.serial_no || horse.horse_no || (idx + 1);
+                          const currentWinVal = tempOdds[horse.id]?.win_odds !== undefined ? tempOdds[horse.id].win_odds : horse.win_odds;
+                          const currentPlaceVal = tempOdds[horse.id]?.place_odds !== undefined ? tempOdds[horse.id].place_odds : horse.place_odds;
 
                           return (
                             <tr
                               key={horse.id || idx}
+                              id={`admin-horse-row-${horse.id}`}
                               className={`transition-colors font-mono ${
                                 isSuspended
-                                  ? 'bg-rose-950/20 opacity-80'
+                                  ? 'bg-rose-950/20'
                                   : idx % 2 === 0
                                   ? 'bg-[#091510]'
                                   : 'bg-[#07100c]'
@@ -1298,7 +1372,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </span>
                               </td>
 
-                              {/* NAME (Horse Name in Uppercase bold + Trainer/Jockey) */}
+                              {/* Horse Name (Uppercase bold + Trainer/Jockey) */}
                               <td className="py-2.5 px-4 border-r border-emerald-900/50">
                                 <div className="space-y-0.5">
                                   <div className="flex items-center gap-2">
@@ -1306,8 +1380,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                       {horse.name || `RUNNER #${slNo}`}
                                     </span>
                                     {isSuspended && (
-                                      <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[9px] font-black uppercase">
-                                        SUSPENDED
+                                      <span className="px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                        🚫 SUSPENDED
                                       </span>
                                     )}
                                   </div>
@@ -1327,14 +1401,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                               {/* WIN Odds: Direct input + quick step buttons */}
                               <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
-                                <div className="flex items-center justify-center gap-1">
+                                <div className="flex items-center justify-center gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const next = Math.max(1.05, Math.round((horse.win_odds - 0.1) * 100) / 100);
-                                      handleUpdateOdds(horse.id, next, horse.place_odds);
+                                      const num = typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds;
+                                      const next = Math.max(1.05, Math.round((num - 0.1) * 100) / 100);
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
+                                      if (!isSuspended) {
+                                        handleUpdateOdds(horse.id, next, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
+                                      }
                                     }}
-                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
                                     title="-0.10"
                                   >
                                     -
@@ -1344,24 +1422,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     type="number"
                                     step="0.05"
                                     min="1.05"
-                                    defaultValue={horse.win_odds}
-                                    key={`win_${horse.id}_${horse.win_odds}`}
+                                    value={currentWinVal}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: val } }));
+                                    }}
                                     onBlur={(e) => {
                                       const val = parseFloat(e.target.value);
-                                      if (val >= 1.05 && val !== horse.win_odds) {
-                                        handleUpdateOdds(horse.id, val, horse.place_odds);
+                                      if (!isSuspended && val >= 1.05 && val !== horse.win_odds) {
+                                        handleUpdateOdds(horse.id, val, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
                                       }
                                     }}
-                                    className="w-20 px-2 py-1 bg-[#020503] border border-amber-500/50 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-amber-300"
+                                    className="w-24 px-2 py-1.5 bg-[#020503] border-2 border-amber-500/60 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-amber-300 focus:ring-1 focus:ring-amber-300 shadow-inner"
                                   />
 
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const next = Math.round((horse.win_odds + 0.1) * 100) / 100;
-                                      handleUpdateOdds(horse.id, next, horse.place_odds);
+                                      const num = typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds;
+                                      const next = Math.round((num + 0.1) * 100) / 100;
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
+                                      if (!isSuspended) {
+                                        handleUpdateOdds(horse.id, next, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
+                                      }
                                     }}
-                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
                                     title="+0.10"
                                   >
                                     +
@@ -1371,14 +1456,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                               {/* PLACE Odds: Direct input + quick step buttons */}
                               <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
-                                <div className="flex items-center justify-center gap-1">
+                                <div className="flex items-center justify-center gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const next = Math.max(1.02, Math.round((horse.place_odds - 0.05) * 100) / 100);
-                                      handleUpdateOdds(horse.id, horse.win_odds, next);
+                                      const num = typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds;
+                                      const next = Math.max(1.02, Math.round((num - 0.05) * 100) / 100);
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
+                                      if (!isSuspended) {
+                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, next);
+                                      }
                                     }}
-                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
                                     title="-0.05"
                                   >
                                     -
@@ -1388,24 +1477,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     type="number"
                                     step="0.05"
                                     min="1.02"
-                                    defaultValue={horse.place_odds}
-                                    key={`place_${horse.id}_${horse.place_odds}`}
+                                    value={currentPlaceVal}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: val } }));
+                                    }}
                                     onBlur={(e) => {
                                       const val = parseFloat(e.target.value);
-                                      if (val >= 1.02 && val !== horse.place_odds) {
-                                        handleUpdateOdds(horse.id, horse.win_odds, val);
+                                      if (!isSuspended && val >= 1.02 && val !== horse.place_odds) {
+                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, val);
                                       }
                                     }}
-                                    className="w-20 px-2 py-1 bg-[#020503] border border-emerald-500/50 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-emerald-300"
+                                    className="w-24 px-2 py-1.5 bg-[#020503] border-2 border-emerald-500/60 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300 shadow-inner"
                                   />
 
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const next = Math.round((horse.place_odds + 0.05) * 100) / 100;
-                                      handleUpdateOdds(horse.id, horse.win_odds, next);
+                                      const num = typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds;
+                                      const next = Math.round((num + 0.05) * 100) / 100;
+                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
+                                      if (!isSuspended) {
+                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, next);
+                                      }
                                     }}
-                                    className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer"
+                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
                                     title="+0.05"
                                   >
                                     +
@@ -1413,19 +1509,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                               </td>
 
-                              {/* SUSPEND Toggle Button per runner */}
+                              {/* Action: SUSPEND / RESUME button per runner */}
                               <td className="py-2.5 px-3 text-center">
                                 <button
                                   type="button"
-                                  id={`suspend-runner-btn-${horse.id}`}
+                                  id={`action-runner-btn-${horse.id}`}
                                   onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
-                                  className={`px-3 py-1.5 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
+                                  className={`w-full max-w-[120px] py-1.5 px-3 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
                                     isSuspended
-                                      ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-sm'
-                                      : 'bg-slate-900 hover:bg-rose-950/50 text-slate-300 hover:text-rose-300 border-slate-700'
+                                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60 animate-pulse'
+                                      : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border-rose-500/50'
                                   }`}
+                                  title={isSuspended ? 'Click RESUME to publish new odds live and enable betting' : 'Click SUSPEND to stop betting while changing odds'}
                                 >
-                                  {isSuspended ? 'SUSPENDED' : 'SUSPEND'}
+                                  {isSuspended ? 'RESUME' : 'SUSPEND'}
                                 </button>
                               </td>
                             </tr>
@@ -1435,35 +1532,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </table>
                   </div>
 
-                  {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All) */}
+                  {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All at bottom right) */}
                   <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleRaceSuspendAll(activeRace.id, !isAllSuspended)}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
-                          isAllSuspended
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50'
-                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
-                        }`}
-                      >
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{isAllSuspended ? 'UNSUSPEND ALL RUNNERS' : 'SUSP ALL'}</span>
-                      </button>
-
-                      <span className="text-xs text-slate-400 hidden sm:inline">
-                        Total {activeRace.horses.length} Runners in field
+                      <span className="text-xs text-slate-400 font-mono">
+                        Race Card: <strong className="text-white">{activeRace.horses.length} Runners</strong>
                       </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(activeRace)}
                         className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Edit Race Fixture</span>
+                        <span>Edit Fixture</span>
+                      </button>
+                    </div>
+
+                    {/* SUSP ALL / RESUME ALL button at Bottom Right as requested */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        id={`bottom-susp-all-btn-${activeRace.id}`}
+                        onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
+                        className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
+                          isAllSuspended
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
+                        }`}
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                        <span>{isAllSuspended ? 'RESUME ALL' : 'SUSP ALL'}</span>
                       </button>
                     </div>
                   </div>

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bet, BetType, Horse, Race } from '../types';
 import { SilkIcon } from './SilkIcon';
 import { OddsFormat, formatOdds } from '../utils/odds';
 import { soundManager } from '../utils/audio';
+import { realtimeOdds } from '../services/api';
 import { 
   ArrowLeft, 
   Clock, 
@@ -27,7 +28,7 @@ interface RaceDetailProps {
 }
 
 export const RaceDetail: React.FC<RaceDetailProps> = ({
-  race,
+  race: initialRace,
   onBack,
   onSelectBet,
   userBetsForRace,
@@ -36,6 +37,52 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
   oddsFormat = 'DECIMAL',
 }) => {
   const [activeTab, setActiveTab] = useState<'runners' | 'insights' | 'mybets'>('runners');
+  const [currentRace, setCurrentRace] = useState<Race>(initialRace);
+
+  // Sync with prop updates
+  useEffect(() => {
+    setCurrentRace(initialRace);
+  }, [initialRace]);
+
+  // Realtime odds listener for instant cross-tab / admin-to-user live updates
+  useEffect(() => {
+    const unsubscribe = realtimeOdds.subscribe((payload) => {
+      if (payload.race && payload.race.id === currentRace.id) {
+        setCurrentRace(payload.race);
+      } else if (payload.race_id === currentRace.id) {
+        if (payload.event === 'SUSPEND_ALL') {
+          setCurrentRace((prev) => ({
+            ...prev,
+            is_suspended: true,
+            horses: prev.horses.map((h) => ({ ...h, is_suspended: true })),
+          }));
+        } else if (payload.event === 'RESUME_ALL') {
+          setCurrentRace((prev) => ({
+            ...prev,
+            is_suspended: false,
+            horses: payload.race?.horses || prev.horses.map((h) => ({ ...h, is_suspended: false })),
+          }));
+        } else if (payload.horse_id) {
+          setCurrentRace((prev) => ({
+            ...prev,
+            horses: prev.horses.map((h) =>
+              h.id === payload.horse_id
+                ? {
+                    ...h,
+                    is_suspended: payload.is_suspended !== undefined ? payload.is_suspended : h.is_suspended,
+                    win_odds: payload.win_odds !== undefined ? payload.win_odds : h.win_odds,
+                    place_odds: payload.place_odds !== undefined ? payload.place_odds : h.place_odds,
+                  }
+                : h
+            ),
+          }));
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [currentRace.id]);
+
+  const race = currentRace;
 
   const winnerHorse = race.winner_horse_id
     ? race.horses.find((h) => h.id === race.winner_horse_id)
@@ -323,66 +370,76 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
                       {/* Column 3: WIN Odds Button */}
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
-                        <button
-                          id={`win-odds-btn-${horse.id}`}
-                          disabled={!isOpen || isSuspended}
-                          onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
-                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
-                            isSuspended
-                              ? 'bg-rose-950/40 text-rose-400 border border-rose-500/40 cursor-not-allowed opacity-90'
-                              : isOpen
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02] cursor-pointer'
-                              : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                          }`}
-                        >
-                          {isSuspended ? (
-                            <>
-                              <span className="text-xs sm:text-sm font-mono font-black text-rose-300">SUSP</span>
-                              <span className="text-[7px] uppercase tracking-wider block font-bold text-rose-400 mt-0.5">LOCKED</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-xs sm:text-sm font-mono font-black">
-                                {formatOdds(horse.win_odds, oddsFormat)}
-                              </span>
-                              <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
-                                WIN
-                              </span>
-                            </>
-                          )}
-                        </button>
+                        {isSuspended ? (
+                          <div 
+                            id={`win-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none animate-pulse shadow-inner"
+                            title="Odds are currently changing. Betting is temporarily suspended."
+                          >
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                              Odds Changing
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">
+                              Betting Paused
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            id={`win-odds-btn-${horse.id}`}
+                            disabled={!isOpen}
+                            onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
+                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
+                              isOpen
+                                ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-emerald-950/40 hover:scale-[1.02] cursor-pointer'
+                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
+                            }`}
+                          >
+                            <span className="text-xs sm:text-sm font-mono font-black">
+                              {formatOdds(horse.win_odds, oddsFormat)}
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                              WIN
+                            </span>
+                          </button>
+                        )}
                       </td>
 
                       {/* Column 4: PLACE Odds Button */}
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
-                        <button
-                          id={`place-odds-btn-${horse.id}`}
-                          disabled={!isOpen || isSuspended}
-                          onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
-                          className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
-                            isSuspended
-                              ? 'bg-rose-950/40 text-rose-400 border border-rose-500/40 cursor-not-allowed opacity-90'
-                              : isOpen
-                              ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02] cursor-pointer'
-                              : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
-                          }`}
-                        >
-                          {isSuspended ? (
-                            <>
-                              <span className="text-xs sm:text-sm font-mono font-black text-rose-300">SUSP</span>
-                              <span className="text-[7px] uppercase tracking-wider block font-bold text-rose-400 mt-0.5">LOCKED</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-xs sm:text-sm font-mono font-black">
-                                {formatOdds(horse.place_odds, oddsFormat)}
-                              </span>
-                              <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
-                                PLACE
-                              </span>
-                            </>
-                          )}
-                        </button>
+                        {isSuspended ? (
+                          <div 
+                            id={`place-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none animate-pulse shadow-inner"
+                            title="Odds are currently changing. Betting is temporarily suspended."
+                          >
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                              Odds Changing
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">
+                              Betting Paused
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            id={`place-odds-btn-${horse.id}`}
+                            disabled={!isOpen}
+                            onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
+                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono font-black text-xs sm:text-sm transition shadow active:scale-95 flex flex-col items-center justify-center leading-none ${
+                              isOpen
+                                ? 'bg-[#091510] hover:bg-[#15251d] text-[#e5b869] hover:text-[#f8dc9c] border border-[#e5b869]/60 shadow-[0_0_8px_rgba(229,184,105,0.2)] hover:scale-[1.02] cursor-pointer'
+                                : 'bg-slate-900 text-slate-500 cursor-not-allowed border border-emerald-950 opacity-60'
+                            }`}
+                          >
+                            <span className="text-xs sm:text-sm font-mono font-black">
+                              {formatOdds(horse.place_odds, oddsFormat)}
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-85 mt-0.5">
+                              PLACE
+                            </span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
