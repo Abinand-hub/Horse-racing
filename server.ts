@@ -1288,12 +1288,12 @@ app.get('/api/races/:id', (req, res) => {
 });
 
 // POST /api/admin/races/:id/open-betting
-// Activates target race as OPEN_FOR_BETTING, automatically CLOSES all other races in this center/day (Single Active Race)
+// Activates target race as OPEN_FOR_BETTING, keeping other upcoming races active with odds
 app.post('/api/admin/races/:id/open-betting', (req, res) => {
   const targetRace = db.races.find((r) => r.id === req.params.id);
   if (!targetRace) return res.status(404).json({ error: 'Race not found' });
 
-  // 1. Close all other races in the same center or race day (unless already resulted)
+  // 1. Keep other races as UPCOMING (unless already resulted) and ensure odds are not suspended
   const centerId = targetRace.center_id;
   const raceDayId = targetRace.race_day_id;
 
@@ -1303,8 +1303,11 @@ app.post('/api/admin/races/:id/open-betting', (req, res) => {
                               (r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase());
     if (r.id !== targetRace.id && isSameDayOrCenter) {
       if (r.status !== 'RESULTED') {
-        r.status = 'CLOSED';
-        r.is_suspended = true;
+        r.status = 'UPCOMING';
+        r.is_suspended = false;
+        r.horses.forEach((h) => {
+          h.is_suspended = false;
+        });
       }
     }
   });
@@ -1320,7 +1323,7 @@ app.post('/api/admin/races/:id/open-betting', (req, res) => {
 
   return res.json({
     success: true,
-    message: `Race #${targetRace.race_no || ''} "${targetRace.name}" is now OPEN FOR BETTING! All other races in ${targetRace.venue} are now closed.`,
+    message: `Race #${targetRace.race_no || ''} "${targetRace.name}" is now OPEN FOR BETTING!`,
     race: targetRace,
     races: db.races,
   });

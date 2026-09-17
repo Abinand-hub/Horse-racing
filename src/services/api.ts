@@ -445,9 +445,11 @@ export const api = {
             if (r.id === target.id) {
               r.status = 'OPEN_FOR_BETTING';
               r.is_suspended = false;
+              if (r.horses) r.horses.forEach(h => { h.is_suspended = false; });
             } else if (r.status !== 'RESULTED') {
-              r.status = 'CLOSED';
-              r.is_suspended = true;
+              r.status = 'UPCOMING';
+              r.is_suspended = false;
+              if (r.horses) r.horses.forEach(h => { h.is_suspended = false; });
             }
           }
         });

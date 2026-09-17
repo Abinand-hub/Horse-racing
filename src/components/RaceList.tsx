@@ -34,19 +34,6 @@ interface RaceListProps {
   onOpenSearch?: () => void;
 }
 
-const RACE_CENTERS_MASTER = [
-  { id: 'all', name: 'ALL CENTERS', code: 'ALL' },
-  { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS' },
-  { id: 'cntr_bangalore', name: 'BANGALORE', code: 'BTC' },
-  { id: 'cntr_ooty', name: 'OOTY', code: 'OOT' },
-  { id: 'cntr_madras', name: 'MADRAS', code: 'MRC' },
-  { id: 'cntr_hyderabad', name: 'HYDERABAD', code: 'HRC' },
-  { id: 'cntr_kolkata', name: 'KOLKATA', code: 'RCTC' },
-  { id: 'cntr_delhi', name: 'DELHI', code: 'DRC' },
-  { id: 'cntr_pune', name: 'PUNE', code: 'PRC' },
-  { id: 'cntr_mumbai', name: 'MUMBAI', code: 'RWITC' },
-];
-
 export const RaceList: React.FC<RaceListProps> = ({
   races,
   onSelectRace,
@@ -59,6 +46,32 @@ export const RaceList: React.FC<RaceListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCenter, setSelectedCenter] = useState<string>('all');
   const [showAllNewRacing, setShowAllNewRacing] = useState(false);
+
+  // Dynamically extract active centers from today's races
+  const activeCentersWithRaces = useMemo(() => {
+    const centerMap = new Map<string, { id: string; name: string; count: number; hasLive: boolean }>();
+    
+    races.forEach((r) => {
+      const venueName = r.venue ? r.venue.trim().toUpperCase() : 'MAIN TURF';
+      const centerKey = (r.center_id || venueName).toLowerCase();
+      
+      if (!centerMap.has(centerKey)) {
+        centerMap.set(centerKey, {
+          id: r.center_id || centerKey,
+          name: venueName,
+          count: 0,
+          hasLive: false,
+        });
+      }
+      const entry = centerMap.get(centerKey)!;
+      entry.count += 1;
+      if (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') {
+        entry.hasLive = true;
+      }
+    });
+
+    return Array.from(centerMap.values());
+  }, [races]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,7 +88,7 @@ export const RaceList: React.FC<RaceListProps> = ({
     if (!matchesSearch) return false;
 
     if (selectedCenter !== 'all') {
-      const centerNameKey = selectedCenter.replace('cntr_', '');
+      const centerNameKey = selectedCenter.replace('cntr_', '').toLowerCase();
       const matchesCenter = 
         race.center_id === selectedCenter || 
         (race.venue && race.venue.toLowerCase().includes(centerNameKey));
@@ -143,59 +156,100 @@ export const RaceList: React.FC<RaceListProps> = ({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       
-      {/* ---------------- SCREEN 1: RACE CENTER TABS (MYSORE, BANGALORE, OOTY, MADRAS...) ---------------- */}
-      <div className="space-y-2 bg-[#06100b] p-3 rounded-2xl border border-emerald-900/60 shadow-lg">
-        <div className="flex items-center justify-between text-xs px-1">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-black">
-            <MapPin className="w-4 h-4 text-emerald-400" />
-            <span>Select Race Center (Venues):</span>
-          </span>
-          <span className="text-[11px] text-slate-400">
-            {races.filter(r => r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE').length > 0 
-              ? '🟢 1 Active race open for betting'
-              : 'All centers scheduled'}
-          </span>
+      {/* ---------------- ACTIVE CENTER / TODAY'S RACE CARD BANNER ---------------- */}
+      {activeCentersWithRaces.length > 1 ? (
+        // Multi-center day (Rare occasion: 2+ centers hosting races today)
+        <div className="space-y-2 bg-[#06100b] p-3 rounded-2xl border border-emerald-900/60 shadow-lg">
+          <div className="flex items-center justify-between text-xs px-1">
+            <span className="flex items-center gap-1.5 text-emerald-400 font-black">
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              <span>Today's Active Race Centers ({activeCentersWithRaces.length} Venues):</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            <button
+              id="center-tab-all"
+              onClick={() => {
+                soundManager.playClick();
+                setSelectedCenter('all');
+              }}
+              className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                selectedCenter === 'all'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
+                  : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
+              }`}
+            >
+              <span>ALL VENUES</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/40 text-slate-300">
+                {races.length}
+              </span>
+            </button>
+            {activeCentersWithRaces.map((cntr) => {
+              const isSelected = selectedCenter === cntr.id;
+              return (
+                <button
+                  key={cntr.id}
+                  id={`center-tab-${cntr.id}`}
+                  onClick={() => {
+                    soundManager.playClick();
+                    setSelectedCenter(cntr.id);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
+                      : cntr.hasLive
+                      ? 'bg-[#0b1c14] text-emerald-300 border-emerald-500/50 hover:bg-[#10291d]'
+                      : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
+                  }`}
+                >
+                  {cntr.hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+                  <span>{cntr.name}</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    isSelected ? 'bg-slate-950/40 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'
+                  }`}>
+                    {cntr.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-
-        {/* Center horizontal pill bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-          {RACE_CENTERS_MASTER.map((cntr) => {
-            const isSelected = selectedCenter === cntr.id;
-            const centerRaces = cntr.id === 'all' 
-              ? races 
-              : races.filter(r => r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())));
-            const hasLive = centerRaces.some(r => r.status === 'OPEN_FOR_BETTING' || r.status === 'LIVE');
-
-            return (
-              <button
-                key={cntr.id}
-                id={`center-tab-${cntr.id}`}
-                onClick={() => {
-                  soundManager.playClick();
-                  setSelectedCenter(cntr.id);
-                }}
-                className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
-                  isSelected
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
-                    : hasLive
-                    ? 'bg-[#0b1c14] text-emerald-300 border-emerald-500/50 hover:bg-[#10291d]'
-                    : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white hover:border-emerald-800'
-                }`}
-              >
-                {hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
-                <span>{cntr.name}</span>
-                <span className={`text-[10px] font-mono px-1 rounded ${
-                  isSelected ? 'bg-slate-950/30 text-slate-950' : 'bg-slate-900 text-slate-400'
-                }`}>
-                  {centerRaces.length}
-                </span>
-              </button>
-            );
-          })}
+      ) : (
+        // Standard single center race day banner (Bangalore / Mysore / etc.)
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#06140e] via-[#091b13] to-[#040c08] border border-emerald-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
+              <MapPin className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-1.5">
+                  <span>{activeCentersWithRaces[0]?.name || (races[0]?.venue ? races[0].venue.toUpperCase() : 'TURF CLUB')}</span>
+                  <span className="text-emerald-400">•</span>
+                  <span className="text-[#e5b869]">TODAY'S RACE CARD</span>
+                </h2>
+                {activeCentersWithRaces[0]?.hasLive && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[9px] font-black uppercase animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    Live Betting In-Play
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {activeCentersWithRaces[0]?.count || races.length} Fixtures Scheduled for today • Live Decimal Odds & Pre-Post Betting Open
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 font-mono font-bold text-xs">
+              {races.length} Races Today
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ---------------- TOP BANNER / SEARCH BAR ---------------- */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -559,10 +613,10 @@ export const RaceList: React.FC<RaceListProps> = ({
                               </span>
                               <span className={`px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] border ${
                                 isActiveBetting
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                  : 'bg-slate-900 text-slate-400 border-slate-800'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-black'
+                                  : 'bg-[#101e17] text-[#e5b869] border-[#e5b869]/30 font-bold'
                               }`}>
-                                {isActiveBetting ? formatOdds(h.win_odds, oddsFormat) : 'Card'}
+                                {formatOdds(h.win_odds, oddsFormat)}
                               </span>
                             </div>
                           ))}

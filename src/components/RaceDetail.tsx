@@ -109,7 +109,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
     ? ([race.horses.find((h) => h.id === race.place_horses_ids[2])].filter(Boolean) as Horse[])
     : [];
 
-  const isBettingOpen = (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN') && !race.is_suspended;
+  const isBettingOpen = 
+    (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN' || race.status === 'UPCOMING' || !race.status) && 
+    !race.is_suspended && 
+    race.status !== 'CLOSED' && 
+    race.status !== 'RESULTED';
   const isOpen = isBettingOpen;
 
   const handleOddsClick = (horse: Horse, betType: BetType, odds: number) => {
@@ -344,7 +348,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                   const isP2 = p2Horses.some((h) => h.id === horse.id);
                   const isP3 = p3Horses.some((h) => h.id === horse.id);
                   const isWinner = isP1;
-                  const isSuspended = horse.is_suspended || race.is_suspended;
+                  const isSuspended = !!(horse.is_suspended || (race.is_suspended && race.status === 'SUSPENDED'));
 
                   return (
                     <tr
@@ -439,13 +443,29 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                           >
                             <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                              Odds Changing
+                              Suspended
                             </span>
                             <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">
-                              Betting Paused
+                              Paused
                             </span>
                           </div>
-                        ) : isBettingOpen ? (
+                        ) : race.status === 'RESULTED' ? (
+                          <div 
+                            id={`win-odds-btn-${horse.id}`}
+                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono text-center flex flex-col items-center justify-center leading-none border ${
+                              isWinner 
+                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-black' 
+                                : 'bg-slate-900/60 border-slate-800 text-slate-400 font-bold'
+                            }`}
+                          >
+                            <span className="text-xs sm:text-sm font-mono font-black">
+                              {formatOdds(horse.win_odds, oddsFormat)}
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-75 mt-0.5">
+                              {isWinner ? 'Winner' : 'Settled'}
+                            </span>
+                          </div>
+                        ) : (
                           <button
                             id={`win-odds-btn-${horse.id}`}
                             onClick={() => handleOddsClick(horse, 'WIN', horse.win_odds)}
@@ -458,19 +478,6 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               WIN
                             </span>
                           </button>
-                        ) : (
-                          <div 
-                            id={`win-odds-btn-${horse.id}`}
-                            className="w-full py-1.5 px-1 rounded-lg bg-slate-900/90 border border-slate-700/60 text-slate-400 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner opacity-75"
-                            title="Odds Suspended / Betting Closed for this race. Only the active race is open for live betting."
-                          >
-                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 leading-tight">
-                              Odds Suspended
-                            </span>
-                            <span className="text-[7px] sm:text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                              Betting Closed
-                            </span>
-                          </div>
                         )}
                       </td>
 
@@ -484,13 +491,29 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                           >
                             <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                              Odds Changing
+                              Suspended
                             </span>
                             <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">
-                              Betting Paused
+                              Paused
                             </span>
                           </div>
-                        ) : isBettingOpen ? (
+                        ) : race.status === 'RESULTED' ? (
+                          <div 
+                            id={`place-odds-btn-${horse.id}`}
+                            className={`w-full py-1 sm:py-1.5 px-1 rounded-lg font-mono text-center flex flex-col items-center justify-center leading-none border ${
+                              isP1 || isP2 || isP3 
+                                ? 'bg-[#e5b869]/20 border-[#e5b869]/50 text-[#e5b869] font-black' 
+                                : 'bg-slate-900/60 border-slate-800 text-slate-400 font-bold'
+                            }`}
+                          >
+                            <span className="text-xs sm:text-sm font-mono font-black">
+                              {formatOdds(horse.place_odds, oddsFormat)}
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-wider block font-bold opacity-75 mt-0.5">
+                              {isP1 || isP2 || isP3 ? 'Placed' : 'Settled'}
+                            </span>
+                          </div>
+                        ) : (
                           <button
                             id={`place-odds-btn-${horse.id}`}
                             onClick={() => handleOddsClick(horse, 'PLACE', horse.place_odds)}
@@ -503,19 +526,6 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                               PLACE
                             </span>
                           </button>
-                        ) : (
-                          <div 
-                            id={`place-odds-btn-${horse.id}`}
-                            className="w-full py-1.5 px-1 rounded-lg bg-slate-900/90 border border-slate-700/60 text-slate-400 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner opacity-75"
-                            title="Odds Suspended / Betting Closed for this race. Only the active race is open for live betting."
-                          >
-                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 leading-tight">
-                              Odds Suspended
-                            </span>
-                            <span className="text-[7px] sm:text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                              Betting Closed
-                            </span>
-                          </div>
                         )}
                       </td>
                     </tr>
