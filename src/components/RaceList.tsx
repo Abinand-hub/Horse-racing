@@ -399,34 +399,38 @@ export const RaceList: React.FC<RaceListProps> = ({
               {/* 1ST: 🔴 LIVE RACES (Open For Betting)                    */}
               {/* ======================================================== */}
               {(filterStatus === 'all' || filterStatus === 'live') && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between pb-1 border-b border-emerald-500/40">
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
-                      <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
-                        <span>1ST • 🔴 LIVE RACES</span>
-                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40">
-                          OPEN FOR BETTING
+                      <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
+                      <h2 className="text-base sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+                        <span>Featured Racing Fixtures</span>
+                        <span className="text-xs font-bold text-rose-300 bg-rose-950/80 px-2.5 py-0.5 rounded-full border border-rose-500/40">
+                          LIVE IN-PLAY
                         </span>
                       </h2>
                     </div>
-                    <span className="text-xs font-mono font-bold text-emerald-300">
-                      {liveRaces.length} Active {liveRaces.length === 1 ? 'Race' : 'Races'}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onChangeFilter('all')}
+                      className="text-xs font-bold text-slate-400 hover:text-emerald-300 transition"
+                    >
+                      See All →
+                    </button>
                   </div>
 
                   {liveRaces.length === 0 ? (
                     <div className="p-4 rounded-2xl bg-[#040e08]/90 border-2 border-emerald-900/60 text-slate-400 text-xs flex items-center justify-between shadow-inner">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>No race is currently running in-play. Check upcoming race card below.</span>
+                        <span>No race is currently running in-play. Check upcoming race fixtures below.</span>
                       </div>
                       <span className="text-[10px] font-mono text-emerald-400 font-bold hidden sm:inline">
                         Next Race Ready
                       </span>
                     </div>
                   ) : (
-                    <div className="space-y-3.5">
+                    <div className="space-y-4">
                       {liveRaces.map((race) => (
                         <div
                           key={`live-${race.id}`}
@@ -435,106 +439,111 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group rounded-3xl p-3.5 sm:p-5 transition-all duration-200 shadow-2xl cursor-pointer border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-[#061e12] via-[#05150d] to-[#030d08] hover:border-emerald-300 hover:scale-[1.01]"
+                          className="group relative overflow-hidden rounded-3xl min-h-[230px] sm:min-h-[260px] md:min-h-[280px] flex flex-col justify-between p-4 sm:p-5 shadow-2xl cursor-pointer border-2 border-emerald-500/40 transition-all duration-300 hover:border-emerald-300 hover:scale-[1.008] hover:shadow-[0_0_30px_rgba(16,185,129,0.35)]"
                         >
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            {/* Match Left: Thumbnail Banner Image + Title & Info */}
-                            <div className="flex items-start gap-3.5 w-full sm:w-auto">
-                              {/* Match Image Container */}
-                              <div className="relative w-24 sm:w-32 h-20 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-emerald-500/50 bg-slate-950 shadow-lg">
-                                <img
-                                  src={race.image_url || '/images/race_action.jpg'}
-                                  alt={race.name}
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/images/race_action.jpg';
-                                  }}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-[0.85]"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                                {race.race_no && (
-                                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md font-mono font-black text-[10px] bg-emerald-500 text-slate-950 shadow">
-                                    #{race.race_no}
-                                  </span>
-                                )}
-                                {race.distance && (
-                                  <span className="absolute bottom-1 left-1.5 text-[9px] font-mono font-bold text-emerald-300">
-                                    {race.distance}
-                                  </span>
-                                )}
-                              </div>
+                          {/* Full-Bleed Cinematic Background Image */}
+                          <img
+                            src={race.image_url || '/images/race_action.jpg'}
+                            alt={race.name}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/images/race_action.jpg';
+                            }}
+                            className="absolute inset-0 w-full h-full object-cover brightness-[0.68] group-hover:scale-105 group-hover:brightness-[0.76] transition-all duration-700"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#020905] via-[#020905]/45 to-black/30 pointer-events-none" />
 
-                              <div className="space-y-1 min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                  <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2 py-0.5 rounded-lg border border-[#e5b869]/40 text-[11px]">
-                                    <MapPin className="w-3 h-3" />
-                                    {race.venue}
-                                  </span>
-                                  <span className="text-emerald-900">•</span>
-                                  <span className="text-emerald-300 font-mono font-bold flex items-center gap-1 text-[11px]">
-                                    <Clock className="w-3 h-3 text-emerald-400 animate-spin" />
-                                    {race.race_time}
-                                  </span>
-                                </div>
+                          {/* Top Row: Live Pill Badge + Favorite Heart Button */}
+                          <div className="relative z-10 flex items-center justify-between gap-2">
+                            <span className="px-3.5 py-1.5 rounded-full bg-rose-600/90 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
+                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                              <span className="w-2 h-2 rounded-full bg-white" />
+                              <span>LIVE IN-PLAY</span>
+                            </span>
 
-                                <h3 className="text-sm sm:text-base md:text-lg font-black text-white group-hover:text-emerald-300 transition truncate">
-                                  {race.name}
-                                </h3>
-
-                                <div className="text-[11px] text-slate-400 font-medium">
-                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
-                                  {race.going && <span className="text-slate-400"> • Going: {race.going}</span>}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Match Right: Status & Action Button */}
-                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/40">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.4)] animate-pulse shrink-0">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                🟢 LIVE IN-PLAY
-                              </span>
-
-                              <button
-                                id={`race-bet-btn-${race.id}`}
-                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-emerald-950/60 animate-pulse shrink-0"
-                              >
-                                <span>⚡ BET NOW</span>
-                                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(race.id, e)}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
+                                favorites[race.id]
+                                  ? 'bg-rose-500 text-white border-rose-400 shadow-lg'
+                                  : 'bg-black/40 text-slate-300 border-white/20 hover:bg-black/60 hover:text-white'
+                              }`}
+                            >
+                              <Heart className={`w-4 h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
+                            </button>
                           </div>
 
-                          {/* Quick Runners & Live Odds Strip */}
-                          {race.horses.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-                              <span className="text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
-                                Live Odds:
-                              </span>
-                              {race.horses.slice(0, 5).map((h) => (
-                                <div
-                                  key={h.id}
-                                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-emerald-500/40 bg-slate-950 whitespace-nowrap shadow-inner"
-                                >
-                                  <SilkIcon
-                                    color={h.silk_color}
-                                    number={h.horse_no || h.serial_no}
-                                    size="sm"
-                                  />
-                                  <span className="font-bold text-slate-200 truncate max-w-[100px]">
-                                    {h.name}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                    {formatOdds(h.win_odds, oddsFormat)}
-                                  </span>
-                                </div>
-                              ))}
-                              {race.horses.length > 5 && (
-                                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
-                                  +{race.horses.length - 5} more
+                          {/* Bottom Overlay Content */}
+                          <div className="relative z-10 space-y-2 pt-12">
+                            {/* Race Title */}
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-lg sm:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md">
+                                {race.name}
+                              </h3>
+                              {race.race_no && (
+                                <span className="px-2.5 py-0.5 rounded-lg font-mono font-black text-xs bg-emerald-500 text-slate-950 border border-emerald-300 shadow shrink-0">
+                                  RACE #{race.race_no}
                                 </span>
                               )}
                             </div>
-                          )}
+
+                            {/* Middle Line: Location & Distance */}
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-semibold pt-0.5">
+                              <span className="flex items-center gap-1.5 text-rose-300 font-bold">
+                                <MapPin className="w-4 h-4 text-rose-400" />
+                                <span>{race.venue}</span>
+                              </span>
+                              {race.distance && (
+                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase">
+                                  {race.distance}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bottom Line: Post Time & Runners Count */}
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
+                              <span className="flex items-center gap-1.5 font-mono text-slate-300">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{race.race_time} - {race.date_str || 'Today, 5th Sep'}</span>
+                              </span>
+                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono">
+                                <span>{race.horses.length} Runners</span>
+                                <span>→</span>
+                              </span>
+                            </div>
+
+                            {/* Quick Runners & Live Odds Strip */}
+                            {race.horses.length > 0 && (
+                              <div className="pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 text-xs scrollbar-none">
+                                <span className="text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
+                                  Live Odds:
+                                </span>
+                                {race.horses.slice(0, 5).map((h) => (
+                                  <div
+                                    key={h.id}
+                                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-white/15 bg-black/60 backdrop-blur-md whitespace-nowrap shadow-inner"
+                                  >
+                                    <SilkIcon
+                                      color={h.silk_color}
+                                      number={h.horse_no || h.serial_no}
+                                      size="sm"
+                                    />
+                                    <span className="font-bold text-slate-200 truncate max-w-[110px]">
+                                      {h.name}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[11px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                                      {formatOdds(h.win_odds, oddsFormat)}
+                                    </span>
+                                  </div>
+                                ))}
+                                {race.horses.length > 5 && (
+                                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
+                                    +{race.horses.length - 5} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -546,13 +555,13 @@ export const RaceList: React.FC<RaceListProps> = ({
               {/* 2ND: ⏱ UPCOMING RACES (Scheduled for Today)              */}
               {/* ======================================================== */}
               {(filterStatus === 'all' || filterStatus === 'upcoming') && (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-4 pt-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 border-b border-emerald-900/60">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-slate-300" />
-                      <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
-                        <span>2ND • ⏱ UPCOMING RACES</span>
-                        <span className="text-xs font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                      <h2 className="text-base sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+                        <span>⏱ Upcoming Racing Fixtures</span>
+                        <span className="text-xs font-bold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
                           SCHEDULED
                         </span>
                       </h2>
@@ -567,7 +576,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                       No upcoming scheduled races remaining for today.
                     </div>
                   ) : (
-                    <div className="space-y-3.5">
+                    <div className="space-y-4">
                       {upcomingRaces.map((race) => (
                         <div
                           key={`upcoming-${race.id}`}
@@ -576,106 +585,110 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group rounded-3xl p-3.5 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer border-2 border-emerald-700/80 bg-[#07150e] hover:border-emerald-400 hover:scale-[1.005]"
+                          className="group relative overflow-hidden rounded-3xl min-h-[230px] sm:min-h-[260px] md:min-h-[280px] flex flex-col justify-between p-4 sm:p-5 shadow-xl cursor-pointer border-2 border-emerald-700/60 transition-all duration-300 hover:border-emerald-400 hover:scale-[1.008] hover:shadow-[0_0_25px_rgba(16,185,129,0.25)]"
                         >
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            {/* Match Left: Thumbnail Banner Image + Title & Info */}
-                            <div className="flex items-start gap-3.5 w-full sm:w-auto">
-                              {/* Match Image Container */}
-                              <div className="relative w-24 sm:w-32 h-20 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-emerald-700/60 bg-slate-950 shadow-md">
-                                <img
-                                  src={race.image_url || '/images/race_action.jpg'}
-                                  alt={race.name}
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/images/race_action.jpg';
-                                  }}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-[0.80]"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                                {race.race_no && (
-                                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-slate-900 text-slate-200 border border-slate-700 shadow">
-                                    #{race.race_no}
-                                  </span>
-                                )}
-                                {race.distance && (
-                                  <span className="absolute bottom-1 left-1.5 text-[9px] font-mono font-semibold text-emerald-400">
-                                    {race.distance}
-                                  </span>
-                                )}
-                              </div>
+                          {/* Full-Bleed Background Image */}
+                          <img
+                            src={race.image_url || '/images/jockey_hero.jpg'}
+                            alt={race.name}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/images/race_action.jpg';
+                            }}
+                            className="absolute inset-0 w-full h-full object-cover brightness-[0.62] group-hover:scale-105 group-hover:brightness-[0.72] transition-all duration-700"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#020905] via-[#020905]/45 to-black/30 pointer-events-none" />
 
-                              <div className="space-y-1 min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                  <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2 py-0.5 rounded-lg border border-[#e5b869]/30 text-[11px]">
-                                    <MapPin className="w-3 h-3" />
-                                    {race.venue}
-                                  </span>
-                                  <span className="text-emerald-900">•</span>
-                                  <span className="text-slate-300 font-mono font-semibold flex items-center gap-1 text-[11px]">
-                                    <Clock className="w-3 h-3 text-slate-400" />
-                                    {race.race_time}
-                                  </span>
-                                </div>
+                          {/* Top Row: Upcoming Badge + Favorite Button */}
+                          <div className="relative z-10 flex items-center justify-between gap-2">
+                            <span className="px-3.5 py-1.5 rounded-full bg-slate-900/90 text-emerald-300 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md backdrop-blur-md border border-emerald-500/40">
+                              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>⏱ UPCOMING</span>
+                            </span>
 
-                                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-200 group-hover:text-white transition truncate">
-                                  {race.name}
-                                </h3>
-
-                                <div className="text-[11px] text-slate-400 font-medium">
-                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
-                                  {race.going && <span className="text-slate-500"> • Going: {race.going}</span>}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Match Right: Status & Action Button */}
-                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700 text-[11px] font-bold uppercase tracking-wider shrink-0">
-                                <Clock className="w-3 h-3 text-slate-400" />
-                                ⏱ Upcoming
-                              </span>
-
-                              <button
-                                id={`race-view-btn-${race.id}`}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer bg-[#0e241b] hover:bg-[#133024] text-emerald-300 hover:text-white border border-emerald-800/80 shrink-0"
-                              >
-                                <span>View Card & Odds</span>
-                                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(race.id, e)}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition backdrop-blur-md border ${
+                                favorites[race.id]
+                                  ? 'bg-rose-500 text-white border-rose-400 shadow-lg'
+                                  : 'bg-black/40 text-slate-300 border-white/20 hover:bg-black/60 hover:text-white'
+                              }`}
+                            >
+                              <Heart className={`w-4 h-4 ${favorites[race.id] ? 'fill-current' : ''}`} />
+                            </button>
                           </div>
 
-                          {/* Runner Preview Strip */}
-                          {race.horses.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-                              <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
-                                Runners:
-                              </span>
-                              {race.horses.slice(0, 4).map((h) => (
-                                <div
-                                  key={h.id}
-                                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-slate-800 bg-slate-950/70 whitespace-nowrap"
-                                >
-                                  <SilkIcon
-                                    color={h.silk_color}
-                                    number={h.horse_no || h.serial_no}
-                                    size="sm"
-                                  />
-                                  <span className="font-bold text-slate-300 truncate max-w-[100px]">
-                                    {h.name}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
-                                    {formatOdds(h.win_odds, oddsFormat)}
-                                  </span>
-                                </div>
-                              ))}
-                              {race.horses.length > 4 && (
-                                <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
-                                  +{race.horses.length - 4} more
+                          {/* Bottom Overlay Content */}
+                          <div className="relative z-10 space-y-2 pt-12">
+                            {/* Race Title */}
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-lg sm:text-2xl font-black text-white group-hover:text-emerald-300 transition tracking-tight drop-shadow-md">
+                                {race.name}
+                              </h3>
+                              {race.race_no && (
+                                <span className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-xs bg-slate-900/90 text-slate-200 border border-slate-700 shadow shrink-0">
+                                  RACE #{race.race_no}
                                 </span>
                               )}
                             </div>
-                          )}
+
+                            {/* Middle Line: Location & Distance */}
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-semibold pt-0.5">
+                              <span className="flex items-center gap-1.5 text-[#e5b869] font-bold">
+                                <MapPin className="w-4 h-4 text-[#e5b869]" />
+                                <span>{race.venue}</span>
+                              </span>
+                              {race.distance && (
+                                <span className="font-mono font-black text-[#e5b869] text-xs sm:text-sm uppercase">
+                                  {race.distance}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bottom Line: Post Time & Runners Count */}
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
+                              <span className="flex items-center gap-1.5 font-mono text-slate-300">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{race.race_time} - {race.date_str || 'Today, 5th Sep'}</span>
+                              </span>
+                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono">
+                                <span>{race.horses.length} Runners</span>
+                                <span>→</span>
+                              </span>
+                            </div>
+
+                            {/* Runner Preview Strip */}
+                            {race.horses.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 text-xs scrollbar-none">
+                                <span className="text-[10px] uppercase font-black text-slate-400 whitespace-nowrap">
+                                  Runners:
+                                </span>
+                                {race.horses.slice(0, 4).map((h) => (
+                                  <div
+                                    key={h.id}
+                                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-white/10 bg-black/60 backdrop-blur-md whitespace-nowrap"
+                                  >
+                                    <SilkIcon
+                                      color={h.silk_color}
+                                      number={h.horse_no || h.serial_no}
+                                      size="sm"
+                                    />
+                                    <span className="font-bold text-slate-200 truncate max-w-[100px]">
+                                      {h.name}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
+                                      {formatOdds(h.win_odds, oddsFormat)}
+                                    </span>
+                                  </div>
+                                ))}
+                                {race.horses.length > 4 && (
+                                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
+                                    +{race.horses.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
