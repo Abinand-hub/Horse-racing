@@ -107,6 +107,26 @@ export const RaceList: React.FC<RaceListProps> = ({
     return true;
   });
 
+  // 1st: Live In-Play Races (Open for live betting)
+  const liveRaces = filteredRaces.filter(
+    (r) => (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') && !r.is_suspended
+  );
+
+  // 2nd: Upcoming Races (Scheduled for today, opened sequentially by admin)
+  const upcomingRaces = filteredRaces.filter(
+    (r) =>
+      (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT' || !r.status) &&
+      r.status !== 'RESULTED' &&
+      r.status !== 'CLOSED' &&
+      r.status !== 'LIVE' &&
+      r.status !== 'OPEN_FOR_BETTING'
+  );
+
+  // 3rd: Recent Results & Settled Races (Completed, resulted, payouts distributed)
+  const recentResultsRaces = filteredRaces.filter(
+    (r) => r.status === 'RESULTED' || r.status === 'CLOSED'
+  );
+
   const getStatusBadge = (status: RaceStatus) => {
     switch (status) {
       case 'LIVE':
@@ -343,296 +363,373 @@ export const RaceList: React.FC<RaceListProps> = ({
       {/* ---------------- PC & LAPTOP DUAL COLUMN LAYOUT ---------------- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* LEFT COLUMN: Main Races List (8 cols on PC) */}
+        {/* LEFT COLUMN: 3-Tier Races Hierarchy (8 cols on PC) */}
         <div className="lg:col-span-8 space-y-6">
           
-          {/* Section 1: "New Racing" Visual Feature Cards */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                <Flame className="w-5 h-5 text-rose-500" />
-                Featured Racing Fixtures
-              </h2>
-              <button
-                onClick={() => setShowAllNewRacing(!showAllNewRacing)}
-                className="text-xs font-bold text-slate-400 hover:text-rose-400 transition cursor-pointer"
-              >
-                {showAllNewRacing ? 'Show Less' : 'See All'}
-              </button>
+          {isLoading ? (
+            <div className="py-16 text-center text-slate-500">
+              <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs font-semibold">Loading race fixtures...</p>
             </div>
-
-            {/* Horizontal carousel on mobile / 2-column grid on desktop */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {(showAllNewRacing ? filteredRaces : filteredRaces.slice(0, 2)).map((race, index) => {
-                const bgImg = raceImages[index % raceImages.length];
-                const isFav = !!favorites[race.id];
-
-                return (
-                  <div
-                    key={`feat-${race.id}`}
-                    onClick={() => {
-                      soundManager.playClick();
-                      onSelectRace(race.id);
-                    }}
-                    className="relative h-[200px] sm:h-[220px] rounded-3xl overflow-hidden cursor-pointer group border border-white/10 shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:border-rose-500/40"
-                  >
-                    <img
-                      src={bgImg}
-                      alt={race.name}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 brightness-[0.70]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20" />
-
-                    <div className="absolute top-3.5 right-3.5 z-10">
-                      <button
-                        onClick={(e) => toggleFavorite(race.id, e)}
-                        className={`w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center transition border ${
-                          isFav
-                            ? 'bg-rose-500/40 text-rose-400 border-rose-500/60'
-                            : 'bg-black/50 text-white/80 border-white/10 hover:bg-black/80'
-                        }`}
-                      >
-                        <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
-                      </button>
+          ) : filteredRaces.length === 0 ? (
+            <div className="p-8 text-center bg-slate-900/60 rounded-3xl border-2 border-emerald-900/40">
+              <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-300">No races found for this selection</p>
+              <p className="text-xs text-slate-500 mt-1">Try switching venue or filter tabs.</p>
+            </div>
+          ) : (
+            <>
+              {/* ======================================================== */}
+              {/* 1ST: 🔴 LIVE RACES (Open For Betting)                    */}
+              {/* ======================================================== */}
+              {(filterStatus === 'all' || filterStatus === 'live') && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-emerald-500/40">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
+                      <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                        <span>1ST • 🔴 LIVE RACES</span>
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                          OPEN FOR BETTING
+                        </span>
+                      </h2>
                     </div>
-
-                    <div className="absolute top-3.5 left-3.5 z-10">
-                      {race.status === 'LIVE' ? (
-                        <span className="px-3 py-1 rounded-full bg-rose-600/95 text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-lg animate-pulse border border-rose-400/40">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          🔴 Live In-Play
-                        </span>
-                      ) : race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT' ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-600/90 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow border border-emerald-400/30">
-                          <Clock className="w-3 h-3 text-emerald-200" />
-                          Upcoming
-                        </span>
-                      ) : race.status === 'RESULTED' ? (
-                        <span className="px-3 py-1 rounded-full bg-blue-600/90 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow border border-blue-400/30">
-                          <CheckCircle2 className="w-3 h-3 text-blue-200" />
-                          Official Result
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full bg-amber-600/80 text-white font-bold text-[10px] uppercase border border-amber-400/30">
-                          Closed
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="absolute bottom-3.5 left-3.5 right-3.5 z-10 space-y-1.5">
-                      <h3 className="text-base sm:text-lg font-black text-white tracking-tight drop-shadow truncate">
-                        {race.name}
-                      </h3>
-                      <div className="flex items-center justify-between text-xs text-slate-300">
-                        <span className="flex items-center gap-1 truncate max-w-[140px]">
-                          <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                          {race.venue}
-                        </span>
-                        <span className="font-mono text-amber-300 font-bold">
-                          {race.distance || '1400m'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/10">
-                        <span className="flex items-center gap-1 font-mono">
-                          <Clock className="w-3.5 h-3.5" />
-                          {race.race_time} - {race.date_str}
-                        </span>
-                        <span className="text-rose-400 font-bold">
-                          {race.horses.length} Runners →
-                        </span>
-                      </div>
-                    </div>
+                    <span className="text-xs font-mono font-bold text-emerald-300">
+                      {liveRaces.length} Active {liveRaces.length === 1 ? 'Race' : 'Races'}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Section 2: Screen 2 - Center Race List View (Sequence of Races) */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-emerald-900/40">
-              <div>
-                <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  {selectedCenter !== 'all' ? (
-                    <>
-                      <MapPin className="w-5 h-5 text-emerald-400" />
-                      <span>{RACE_CENTERS_MASTER.find(c => c.id === selectedCenter)?.name || 'Center'} - Today's Race Fixtures</span>
-                    </>
-                  ) : filterStatus === 'live' ? (
-                    <>
-                      <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
-                      <span>Live In-Play Races</span>
-                    </>
-                  ) : filterStatus === 'resulted' ? (
-                    <>
-                      <Trophy className="w-5 h-5 text-[#e5b869]" />
-                      <span>Completed Races</span>
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="w-5 h-5 text-emerald-400" />
-                      <span>Upcoming Races (Center Schedule)</span>
-                    </>
-                  )}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  {selectedCenter !== 'all'
-                    ? 'Only 1 active race is open for live betting at a time. Click any race to inspect runners.'
-                    : 'Select a race center above or filter by live / upcoming'}
-                </p>
-              </div>
-
-              <div className="text-xs text-emerald-400 font-bold self-start sm:self-auto flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>{filteredRaces.length} Races on Card</span>
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div className="py-16 text-center text-slate-500">
-                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-xs font-semibold">Loading race fixtures...</p>
-              </div>
-            ) : filteredRaces.length === 0 ? (
-              <div className="p-8 text-center bg-slate-900/60 rounded-3xl border border-slate-800">
-                <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm font-bold text-slate-300">No races found for this selection</p>
-                <p className="text-xs text-slate-500 mt-1">Try selecting "ALL CENTERS" or switching tabs.</p>
-              </div>
-            ) : (
-              <div className="space-y-3.5">
-                {filteredRaces.map((race) => {
-                  const winnerHorse = race.winner_horse_id
-                    ? race.horses.find((h) => h.id === race.winner_horse_id)
-                    : null;
-                  const isActiveBetting = (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE') && !race.is_suspended;
-
-                  return (
-                    <div
-                      key={race.id}
-                      id={`race-card-${race.id}`}
-                      onClick={() => {
-                        soundManager.playClick();
-                        onSelectRace(race.id);
-                      }}
-                      className={`group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer ${
-                        isActiveBetting
-                          ? 'border-2 border-emerald-500/90 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-emerald-950/60 via-[#07170e] to-[#07100a] scale-[1.01]'
-                          : 'border border-slate-800/80 bg-[#091510]/70 opacity-85 hover:opacity-100 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        {/* Main Title & Format */}
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            {race.race_no && (
-                              <span className={`px-2.5 py-0.5 rounded-lg font-mono font-black text-[11px] border ${
-                                isActiveBetting
-                                  ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-sm'
-                                  : 'bg-slate-900 text-slate-300 border-slate-700'
-                              }`}>
-                                RACE #{race.race_no}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/40">
-                              <MapPin className="w-3.5 h-3.5" />
-                              {race.venue}
-                            </span>
-                            <span className="text-emerald-900">•</span>
-                            <span className="text-slate-300 font-mono font-semibold flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              {race.race_time} - {race.date_str || 'Today'}
-                            </span>
-                            {race.distance && (
-                              <>
-                                <span className="text-emerald-900">•</span>
-                                <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
-                              </>
-                            )}
-                          </div>
-
-                          <h3 className={`text-base sm:text-lg font-black transition ${
-                            isActiveBetting ? 'text-white' : 'text-slate-200 group-hover:text-white'
-                          }`}>
-                            {race.name}
-                          </h3>
-
-                          {race.status === 'RESULTED' && winnerHorse && (
-                            <p className="text-xs text-blue-300 flex items-center gap-1.5">
-                              <Trophy className="w-3.5 h-3.5 text-[#e5b869]" />
-                              Winner: <strong>#{winnerHorse.horse_no || winnerHorse.serial_no} {winnerHorse.name}</strong>
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Status & Action Button */}
-                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
-                          <div className="text-left sm:text-right">
-                            <div className="text-xs text-slate-400 mb-1">
-                              Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
-                            </div>
-                            {getStatusBadge(race.status)}
-                          </div>
-
-                          <button
-                            id={`race-view-btn-${race.id}`}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer ${
-                              isActiveBetting
-                                ? 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black shadow-emerald-950/60 animate-pulse'
-                                : 'bg-[#0e241b] hover:bg-[#133024] text-emerald-300 hover:text-white border border-emerald-800/60'
-                            }`}
-                          >
-                            <span>{isActiveBetting ? '⚡ BET NOW' : 'View Card'}</span>
-                            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
-                          </button>
-                        </div>
+                  {liveRaces.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-[#040e08]/90 border-2 border-emerald-900/60 text-slate-400 text-xs flex items-center justify-between shadow-inner">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>No race is currently running in-play. Check upcoming race card below.</span>
                       </div>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold hidden sm:inline">
+                        Next Race Ready
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {liveRaces.map((race) => (
+                        <div
+                          key={`live-${race.id}`}
+                          id={`race-card-${race.id}`}
+                          onClick={() => {
+                            soundManager.playClick();
+                            onSelectRace(race.id);
+                          }}
+                          className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-2xl cursor-pointer border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-[#061e12] via-[#05150d] to-[#030d08] hover:border-emerald-300 hover:scale-[1.01]"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                {race.race_no && (
+                                  <span className="px-2.5 py-0.5 rounded-lg font-mono font-black text-[11px] bg-emerald-500 text-slate-950 border border-emerald-300 shadow-sm">
+                                    RACE #{race.race_no}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/40">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  {race.venue}
+                                </span>
+                                <span className="text-emerald-900">•</span>
+                                <span className="text-emerald-300 font-mono font-bold flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                  {race.race_time} - {race.date_str || 'Today'}
+                                </span>
+                                {race.distance && (
+                                  <>
+                                    <span className="text-emerald-900">•</span>
+                                    <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
+                                  </>
+                                )}
+                              </div>
 
-                      {/* Quick Runners & Odds Strip */}
-                      {race.horses.length > 0 && race.status !== 'RESULTED' && (
-                        <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-                          <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
-                            Field Preview:
-                          </span>
-                          {race.horses.slice(0, 4).map((h) => (
-                            <div
-                              key={h.id}
-                              className={`flex items-center gap-2 px-2.5 py-1 rounded-xl border whitespace-nowrap ${
-                                isActiveBetting 
-                                  ? 'bg-slate-950 border-emerald-500/40' 
-                                  : 'bg-slate-950/70 border-slate-800'
-                              }`}
-                            >
-                              <SilkIcon
-                                color={h.silk_color}
-                                number={h.horse_no || h.serial_no}
-                                size="sm"
-                              />
-                              <span className="font-bold text-slate-200 truncate max-w-[100px]">
-                                {h.name}
-                              </span>
-                              <span className={`px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] border ${
-                                isActiveBetting
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-black'
-                                  : 'bg-[#101e17] text-[#e5b869] border-[#e5b869]/30 font-bold'
-                              }`}>
-                                {formatOdds(h.win_odds, oddsFormat)}
-                              </span>
+                              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-emerald-300 transition">
+                                {race.name}
+                              </h3>
                             </div>
-                          ))}
-                          {race.horses.length > 4 && (
-                            <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
-                              +{race.horses.length - 4} more runners
-                            </span>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/40">
+                              <div className="text-left sm:text-right">
+                                <div className="text-xs text-slate-400 mb-1">
+                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
+                                </div>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.4)] animate-pulse">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                  🟢 LIVE IN-PLAY
+                                </span>
+                              </div>
+
+                              <button
+                                id={`race-bet-btn-${race.id}`}
+                                className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-emerald-950/60 animate-pulse shrink-0"
+                              >
+                                <span>⚡ BET NOW</span>
+                                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Quick Runners & Live Odds Strip */}
+                          {race.horses.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                              <span className="text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
+                                Live Odds:
+                              </span>
+                              {race.horses.slice(0, 5).map((h) => (
+                                <div
+                                  key={h.id}
+                                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-emerald-500/40 bg-slate-950 whitespace-nowrap shadow-inner"
+                                >
+                                  <SilkIcon
+                                    color={h.silk_color}
+                                    number={h.horse_no || h.serial_no}
+                                    size="sm"
+                                  />
+                                  <span className="font-bold text-slate-200 truncate max-w-[100px]">
+                                    {h.name}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    {formatOdds(h.win_odds, oddsFormat)}
+                                  </span>
+                                </div>
+                              ))}
+                              {race.horses.length > 5 && (
+                                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
+                                  +{race.horses.length - 5} more
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              )}
+
+              {/* ======================================================== */}
+              {/* 2ND: ⏱ UPCOMING RACES (Scheduled for Today)              */}
+              {/* ======================================================== */}
+              {(filterStatus === 'all' || filterStatus === 'upcoming') && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 border-b border-emerald-900/60">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-300" />
+                      <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                        <span>2ND • ⏱ UPCOMING RACES</span>
+                        <span className="text-xs font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                          SCHEDULED
+                        </span>
+                      </h2>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Opened sequentially by admin after previous race finishes
+                    </p>
+                  </div>
+
+                  {upcomingRaces.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-slate-900/40 border-2 border-emerald-900/40 text-slate-400 text-xs text-center">
+                      No upcoming scheduled races remaining for today.
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {upcomingRaces.map((race) => (
+                        <div
+                          key={`upcoming-${race.id}`}
+                          id={`race-card-${race.id}`}
+                          onClick={() => {
+                            soundManager.playClick();
+                            onSelectRace(race.id);
+                          }}
+                          className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer border-2 border-emerald-700/80 bg-[#07150e] hover:border-emerald-400 hover:scale-[1.005]"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                {race.race_no && (
+                                  <span className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-[11px] bg-slate-900 text-slate-300 border border-slate-700">
+                                    RACE #{race.race_no}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/30">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  {race.venue}
+                                </span>
+                                <span className="text-emerald-900">•</span>
+                                <span className="text-slate-300 font-mono font-semibold flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                  {race.race_time} - {race.date_str || 'Today'}
+                                </span>
+                                {race.distance && (
+                                  <>
+                                    <span className="text-emerald-900">•</span>
+                                    <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
+                                  </>
+                                )}
+                              </div>
+
+                              <h3 className="text-base sm:text-lg font-black text-slate-200 group-hover:text-white transition">
+                                {race.name}
+                              </h3>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
+                              <div className="text-left sm:text-right">
+                                <div className="text-xs text-slate-400 mb-1">
+                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
+                                </div>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700 text-[11px] font-bold uppercase tracking-wider">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  ⏱ Upcoming
+                                </span>
+                              </div>
+
+                              <button
+                                id={`race-view-btn-${race.id}`}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer bg-[#0e241b] hover:bg-[#133024] text-emerald-300 hover:text-white border border-emerald-800/80 shrink-0"
+                              >
+                                <span>View Card & Odds</span>
+                                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Runner Preview Strip */}
+                          {race.horses.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                              <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
+                                Runners:
+                              </span>
+                              {race.horses.slice(0, 4).map((h) => (
+                                <div
+                                  key={h.id}
+                                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-slate-800 bg-slate-950/70 whitespace-nowrap"
+                                >
+                                  <SilkIcon
+                                    color={h.silk_color}
+                                    number={h.horse_no || h.serial_no}
+                                    size="sm"
+                                  />
+                                  <span className="font-bold text-slate-300 truncate max-w-[100px]">
+                                    {h.name}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
+                                    {formatOdds(h.win_odds, oddsFormat)}
+                                  </span>
+                                </div>
+                              ))}
+                              {race.horses.length > 4 && (
+                                <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap pl-1">
+                                  +{race.horses.length - 4} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ======================================================== */}
+              {/* 3RD: 🏆 RECENT RESULTS & SETTLED RACES                   */}
+              {/* ======================================================== */}
+              {(filterStatus === 'all' || filterStatus === 'resulted') && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-amber-500/40">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-[#e5b869]" />
+                      <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                        <span>3RD • 🏆 RECENT RESULTS</span>
+                        <span className="text-xs font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/40">
+                          SETTLED & PAID
+                        </span>
+                      </h2>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-amber-400">
+                      {recentResultsRaces.length} Completed
+                    </span>
+                  </div>
+
+                  {recentResultsRaces.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-[#0e110a]/90 border-2 border-amber-950/60 text-slate-400 text-xs text-center">
+                      No resulted races yet. Once a race is declared official by stewards, results appear here.
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {recentResultsRaces.map((race) => {
+                        const winnerHorse = race.winner_horse_id
+                          ? race.horses.find((h) => h.id === race.winner_horse_id)
+                          : null;
+
+                        return (
+                          <div
+                            key={`result-${race.id}`}
+                            id={`race-card-${race.id}`}
+                            onClick={() => {
+                              soundManager.playClick();
+                              onSelectRace(race.id);
+                            }}
+                            className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-md cursor-pointer border-2 border-amber-500/50 bg-[#0a140d] hover:border-amber-400 hover:scale-[1.005]"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  {race.race_no && (
+                                    <span className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-[11px] bg-slate-900 text-slate-300 border border-slate-700">
+                                      RACE #{race.race_no}
+                                    </span>
+                                  )}
+                                  <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/30">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                    {race.venue}
+                                  </span>
+                                  <span className="text-emerald-900">•</span>
+                                  <span className="text-slate-300 font-mono font-semibold">
+                                    {race.race_time}
+                                  </span>
+                                </div>
+
+                                <h3 className="text-base sm:text-lg font-black text-slate-200 group-hover:text-white transition">
+                                  {race.name}
+                                </h3>
+
+                                {winnerHorse && (
+                                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-300 font-bold">
+                                    <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span>Winner: <strong>#{winnerHorse.horse_no || winnerHorse.serial_no} {winnerHorse.name}</strong></span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-950/40">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 text-xs font-bold uppercase tracking-wider">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                                  Official Result
+                                </span>
+
+                                <button
+                                  id={`race-result-btn-${race.id}`}
+                                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 shrink-0"
+                                >
+                                  <span>View Payouts</span>
+                                  <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
         </div>
 

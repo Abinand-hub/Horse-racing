@@ -233,6 +233,60 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // 3-second Live Market Odds Fluctuation Engine
+  useEffect(() => {
+    const oddsInterval = setInterval(() => {
+      setRaces((prevRaces) => {
+        const activeRaces = prevRaces.filter(
+          (r) =>
+            (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING' || r.status === 'UPCOMING' || r.status === 'OPEN') &&
+            !r.is_suspended &&
+            r.horses &&
+            r.horses.length > 0
+        );
+        if (activeRaces.length === 0) return prevRaces;
+
+        // Pick one active race randomly
+        const targetRace = activeRaces[Math.floor(Math.random() * activeRaces.length)];
+        const availableHorses = targetRace.horses.filter((h) => !h.is_suspended);
+        if (availableHorses.length === 0) return prevRaces;
+
+        // Pick 1 or 2 random horses to fluctuate
+        const horseToUpdate = availableHorses[Math.floor(Math.random() * availableHorses.length)];
+        
+        // Small realistic tick delta between -0.15 and +0.15
+        const delta = (Math.floor(Math.random() * 7) - 3) * 0.05;
+        if (delta === 0) return prevRaces;
+
+        const updatedWinOdds = Math.max(1.10, Math.min(50.00, Number((horseToUpdate.win_odds + delta).toFixed(2))));
+        const updatedPlaceOdds = Math.max(1.05, Math.min(20.00, Number(((updatedWinOdds * 0.35) + 0.55).toFixed(2))));
+
+        const updatedHorses = targetRace.horses.map((h) =>
+          h.id === horseToUpdate.id
+            ? { ...h, win_odds: updatedWinOdds, place_odds: updatedPlaceOdds }
+            : h
+        );
+
+        const updatedRace = { ...targetRace, horses: updatedHorses };
+
+        // Broadcast to listeners (RaceDetail, BetSlip, etc.)
+        realtimeOdds.broadcast({
+          event: 'ODDS_UPDATED',
+          race_id: updatedRace.id,
+          race: updatedRace,
+          horse_id: horseToUpdate.id,
+          win_odds: updatedWinOdds,
+          place_odds: updatedPlaceOdds,
+          timestamp: Date.now(),
+        });
+
+        return prevRaces.map((r) => (r.id === updatedRace.id ? updatedRace : r));
+      });
+    }, 3000);
+
+    return () => clearInterval(oddsInterval);
+  }, []);
+
   // Fetch user notifications
   const loadNotifications = async () => {
     if (!user?.id) return;
