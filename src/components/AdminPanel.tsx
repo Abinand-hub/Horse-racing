@@ -182,6 +182,107 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editRaceImage, setEditRaceImage] = useState('/images/race_action.jpg');
   const [editRaceStatus, setEditRaceStatus] = useState<RaceStatus>('UPCOMING');
   const [editHorses, setEditHorses] = useState<any[]>([]);
+  
+  // Bulk Paste Horses State
+  const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
+  const [bulkPasteTarget, setBulkPasteTarget] = useState<'new' | 'edit'>('new');
+  const [bulkPasteText, setBulkPasteText] = useState('');
+
+  // Universal Bulk Runner Text Parser (supports: No-Gate-Name-Jockey-Trainer, tabs, CSV, pipes)
+  const parseBulkRunnersText = (rawText: string) => {
+    let clean = rawText.trim();
+    if (clean.startsWith('(') && clean.endsWith(')')) {
+      clean = clean.slice(1, -1).trim();
+    }
+
+    const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean);
+    const parsedRunners: any[] = [];
+    const silkColors = [
+      '#e11d48', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', 
+      '#ec4899', '#f97316', '#64748b', '#14b8a6', '#a855f7', '#84cc16', 
+      '#0ea5e9', '#d97706', '#ef4444', '#10b981'
+    ];
+
+    lines.forEach((line, index) => {
+      let parts: string[] = [];
+      if (line.includes('\t')) {
+        parts = line.split('\t').map((p) => p.trim()).filter(Boolean);
+      } else if (line.includes('|')) {
+        parts = line.split('|').map((p) => p.trim()).filter(Boolean);
+      } else if (line.includes(',')) {
+        parts = line.split(',').map((p) => p.trim()).filter(Boolean);
+      } else if (line.includes('-')) {
+        parts = line.split('-').map((p) => p.trim()).filter(Boolean);
+      } else {
+        parts = line.split(/\s{2,}/).map((p) => p.trim()).filter(Boolean);
+      }
+
+      if (parts.length >= 3) {
+        let horseNo = index + 1;
+        let gateNo = index + 1;
+        let name = '';
+        let jockey = 'TBD';
+        let trainer = 'TBD';
+
+        if (parts.length >= 5) {
+          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
+          gateNo = parseInt(parts[1].replace(/\D/g, '')) || horseNo;
+          name = parts[2];
+          jockey = parts[3];
+          trainer = parts[4];
+        } else if (parts.length === 4) {
+          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
+          gateNo = parseInt(parts[1].replace(/\D/g, '')) || horseNo;
+          name = parts[2];
+          jockey = parts[3];
+        } else if (parts.length === 3) {
+          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
+          gateNo = horseNo;
+          name = parts[1];
+          jockey = parts[2];
+        }
+
+        const initialWin = Number((2.20 + (index * 0.45) + (Math.random() * 0.4)).toFixed(2));
+        const initialPlace = Number(((initialWin * 0.35) + 0.55).toFixed(2));
+
+        parsedRunners.push({
+          id: `h_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 4)}`,
+          serial_no: horseNo,
+          horse_no: horseNo,
+          gate_no: gateNo,
+          name: name.toUpperCase().trim(),
+          jockey: jockey.trim(),
+          trainer: trainer.trim(),
+          win_odds: initialWin,
+          place_odds: initialPlace,
+          silk_color: silkColors[index % silkColors.length],
+          is_suspended: false,
+        });
+      }
+    });
+
+    return parsedRunners;
+  };
+
+  const handleApplyBulkRunners = () => {
+    const parsed = parseBulkRunnersText(bulkPasteText);
+    if (parsed.length === 0) {
+      alert('Please paste valid runner lines in format: Horse number-Gate number-Horse name-Jockey-Trainer');
+      return;
+    }
+
+    if (bulkPasteTarget === 'new') {
+      setNewHorses(parsed);
+    } else {
+      setEditHorses(parsed);
+    }
+
+    soundManager.playClick();
+    setActionMessage(`✅ Successfully imported ${parsed.length} horses into race card!`);
+    setIsBulkPasteOpen(false);
+    setBulkPasteText('');
+    setTimeout(() => setActionMessage(null), 4000);
+  };
 
   // Add Banner Form state
   const [newBannerTitle, setNewBannerTitle] = useState('');
@@ -2704,30 +2805,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </p>
               </div>
 
-              <button
-                type="button"
-                id="add-runner-row-btn"
-                onClick={() => {
-                  const nextSerial = newHorses.length + 1;
-                  setNewHorses([
-                    ...newHorses,
-                    {
-                      serial_no: nextSerial,
-                      gate_no: nextSerial,
-                      name: '',
-                      jockey: '',
-                      trainer: '',
-                      win_odds: 3.5,
-                      place_odds: 1.6,
-                      silk_color: '#3b82f6',
-                    },
-                  ]);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Runner Row</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  id="bulk-paste-add-race-btn"
+                  onClick={() => {
+                    setBulkPasteTarget('new');
+                    setIsBulkPasteOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/50 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
+                  title="Paste entire field text (e.g. 1-12-SPLENDIDO-S Sanjan-Saddam Iqbal)"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>📋 Bulk Paste Horses</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="add-runner-row-btn"
+                  onClick={() => {
+                    const nextSerial = newHorses.length + 1;
+                    setNewHorses([
+                      ...newHorses,
+                      {
+                        serial_no: nextSerial,
+                        gate_no: nextSerial,
+                        name: '',
+                        jockey: '',
+                        trainer: '',
+                        win_odds: 3.5,
+                        place_odds: 1.6,
+                        silk_color: '#3b82f6',
+                      },
+                    ]);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Row</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2.5">
@@ -4217,30 +4334,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <h4 className="text-xs font-bold text-white">
                     Runners Field ({editHorses.length} Runners)
                   </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextSNo = editHorses.length + 1;
-                      setEditHorses([
-                        ...editHorses,
-                        {
-                          id: `h_new_${Date.now()}_${nextSNo}`,
-                          serial_no: nextSNo,
-                          gate_no: nextSNo,
-                          name: '',
-                          jockey: '',
-                          trainer: '',
-                          win_odds: 4.0,
-                          place_odds: 1.8,
-                          silk_color: '#3b82f6',
-                        },
-                      ]);
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Runner</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      id="bulk-paste-edit-race-btn"
+                      onClick={() => {
+                        setBulkPasteTarget('edit');
+                        setIsBulkPasteOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/50 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>📋 Bulk Paste Horses</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextSNo = editHorses.length + 1;
+                        setEditHorses([
+                          ...editHorses,
+                          {
+                            id: `h_new_${Date.now()}_${nextSNo}`,
+                            serial_no: nextSNo,
+                            gate_no: nextSNo,
+                            name: '',
+                            jockey: '',
+                            trainer: '',
+                            win_odds: 4.0,
+                            place_odds: 1.8,
+                            silk_color: '#3b82f6',
+                          },
+                        ]);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Runner</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2.5">
@@ -4649,6 +4781,183 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition cursor-pointer"
               >
                 Close Ledger
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* BULK PASTE RUNNERS / RACE CARD MODAL                                      */}
+      {/* ========================================================================= */}
+      {isBulkPasteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl bg-slate-900 border border-emerald-500/50 rounded-3xl shadow-[0_0_50px_rgba(16,185,129,0.2)] p-5 sm:p-6 space-y-4 my-8 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-white text-base sm:text-lg">
+                      📋 Bulk Paste Horses
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
+                      {bulkPasteTarget === 'new' ? 'Target: New Race Form' : 'Target: Edit Race Modal'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Paste raw text from race cards, spreadsheets, or official declarations.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBulkPasteOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Instruction Callout */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  Format Supported: <code className="text-emerald-300 bg-slate-900 px-2 py-0.5 rounded font-mono">Horse number-Gate number-Horse name-Jockey-Trainer</code>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkPasteText(`1-12-SPLENDIDO-S Sanjan-Saddam Iqbal
+2-11-ULTIMATE BLUES-Mohd Talib-K Aditya
+3-10-BLUEMED-Vinod Shinde-J Sebastian
+4-2-METZINGER-Shamaz Shareef-P Krishna
+5-9-RAPIDUS-Jitendra Singh-M M Uthaiah
+6-3-BOLD SHOW-S Sachin-R Ramanathan
+7-1-SQUARE CUT-Rafique Sk-G T Surender
+8-5-NATURAL TORNADO-R Rakesh-Mansoor Khan
+9-8-SIR CALCULUS-Abhishek Mhatre-Ranjeet Shinde
+10-6-CLOUDY HILLS-Aleemuddin-M Bobby
+11-7-SPRINGSTEEN-A Ayaz Khan-H Zulquarnain
+12-4-ONE DIAMOND-Faiz-C D Monnappa`);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition cursor-pointer"
+                >
+                  Load Example Card (12 Horses)
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Also accepts Tab-separated, CSV (comma), Pipe (<code className="text-slate-300">|</code>), and bracket-wrapped inputs. Odds will be initialized automatically and can be tweaked live anytime.
+              </p>
+            </div>
+
+            {/* Textarea Input */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-300">
+                Paste Runners Text (One line per horse)
+              </label>
+              <textarea
+                rows={8}
+                value={bulkPasteText}
+                onChange={(e) => setBulkPasteText(e.target.value)}
+                placeholder={`1-12-SPLENDIDO-S Sanjan-Saddam Iqbal\n2-11-ULTIMATE BLUES-Mohd Talib-K Aditya\n3-10-BLUEMED-Vinod Shinde-J Sebastian\n4-2-METZINGER-Shamaz Shareef-P Krishna\n5-9-RAPIDUS-Jitendra Singh-M M Uthaiah`}
+                className="w-full p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 leading-relaxed placeholder-slate-600"
+              />
+            </div>
+
+            {/* Live Parsing Preview */}
+            {(() => {
+              const previewRunners = parseBulkRunnersText(bulkPasteText);
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Live Parsed Preview: <strong className="text-emerald-400 font-mono">{previewRunners.length} Runners Detected</strong>
+                    </span>
+                    {bulkPasteText && (
+                      <button
+                        type="button"
+                        onClick={() => setBulkPasteText('')}
+                        className="text-[11px] text-slate-400 hover:text-rose-400 transition"
+                      >
+                        Clear Text
+                      </button>
+                    )}
+                  </div>
+
+                  {previewRunners.length > 0 ? (
+                    <div className="max-h-56 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-slate-900 sticky top-0 z-10 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
+                          <tr>
+                            <th className="py-2 px-3 text-center w-12">#</th>
+                            <th className="py-2 px-3 text-center w-16">Gate</th>
+                            <th className="py-2 px-3">Horse Name</th>
+                            <th className="py-2 px-3">Jockey</th>
+                            <th className="py-2 px-3">Trainer</th>
+                            <th className="py-2 px-3 text-center w-20">Win</th>
+                            <th className="py-2 px-3 text-center w-20">Place</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono">
+                          {previewRunners.map((runner, i) => (
+                            <tr key={i} className="hover:bg-slate-900/50">
+                              <td className="py-1.5 px-3 text-center font-bold text-slate-300">
+                                {runner.serial_no}
+                              </td>
+                              <td className="py-1.5 px-3 text-center text-amber-400 font-bold">
+                                {runner.gate_no}
+                              </td>
+                              <td className="py-1.5 px-3 font-bold text-white font-sans">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                                    style={{ backgroundColor: runner.silk_color }}
+                                  />
+                                  <span>{runner.name}</span>
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-3 text-slate-300 font-sans">{runner.jockey}</td>
+                              <td className="py-1.5 px-3 text-slate-400 font-sans">{runner.trainer}</td>
+                              <td className="py-1.5 px-3 text-center text-amber-400 font-bold">{runner.win_odds}</td>
+                              <td className="py-1.5 px-3 text-center text-emerald-400 font-bold">{runner.place_odds}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-slate-950/40 border border-dashed border-slate-800 text-center text-slate-500 text-xs">
+                      Type or paste your horses above to preview the parsed race card.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Modal Controls */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsBulkPasteOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="apply-bulk-horses-btn"
+                disabled={parseBulkRunnersText(bulkPasteText).length === 0}
+                onClick={handleApplyBulkRunners}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Apply & Populate Race Card ({parseBulkRunnersText(bulkPasteText).length} Horses)</span>
               </button>
             </div>
           </div>
