@@ -577,12 +577,14 @@ export default function App() {
             />
           </div>
         ) : (
-          /* RACE LOBBY: Direct race fixtures and live betting only (no banner, clean view) */
+          /* RACE LOBBY: Direct race fixtures and live betting with promotional banner */
           <RaceList
             races={races}
+            banners={banners}
             onSelectRace={(raceId) => {
               window.location.hash = `#/race/${raceId}`;
             }}
+            onOpenDeposit={() => setIsDepositOpen(true)}
             filterStatus={raceFilter}
             onChangeFilter={setRaceFilter}
             isLoading={isLoadingRaces}

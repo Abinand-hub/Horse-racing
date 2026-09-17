@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Horse, Race, RaceStatus } from '../types';
+import { Banner, Horse, Race, RaceStatus } from '../types';
 import { SilkIcon } from './SilkIcon';
+import { BannerSlider } from './BannerSlider';
 import { OddsFormat, formatOdds } from '../utils/odds';
 import { soundManager } from '../utils/audio';
 import { 
@@ -21,12 +22,15 @@ import {
   Zap,
   Layers,
   Calendar, 
-  ShieldCheck
+  ShieldCheck,
+  ImageIcon
 } from 'lucide-react';
 
 interface RaceListProps {
   races: Race[];
+  banners?: Banner[];
   onSelectRace: (raceId: string) => void;
+  onOpenDeposit?: () => void;
   filterStatus: 'all' | 'upcoming' | 'live' | 'resulted';
   onChangeFilter: (status: 'all' | 'upcoming' | 'live' | 'resulted') => void;
   isLoading: boolean;
@@ -36,7 +40,9 @@ interface RaceListProps {
 
 export const RaceList: React.FC<RaceListProps> = ({
   races,
+  banners = [],
   onSelectRace,
+  onOpenDeposit,
   filterStatus,
   onChangeFilter,
   isLoading,
@@ -176,7 +182,17 @@ export const RaceList: React.FC<RaceListProps> = ({
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-4 sm:space-y-6">
+      {/* ---------------- 1. TOP PROMOTIONAL BANNER SLIDER (Admin Uploaded) ---------------- */}
+      {banners && banners.length > 0 && (
+        <div className="w-full">
+          <BannerSlider
+            banners={banners}
+            onSelectRace={onSelectRace}
+            onOpenDeposit={onOpenDeposit}
+          />
+        </div>
+      )}
       
       {/* ---------------- ACTIVE CENTER / TODAY'S RACE CARD BANNER ---------------- */}
       {activeCentersWithRaces.length > 1 ? (
@@ -419,48 +435,64 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-2xl cursor-pointer border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-[#061e12] via-[#05150d] to-[#030d08] hover:border-emerald-300 hover:scale-[1.01]"
+                          className="group rounded-3xl p-3.5 sm:p-5 transition-all duration-200 shadow-2xl cursor-pointer border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] bg-gradient-to-r from-[#061e12] via-[#05150d] to-[#030d08] hover:border-emerald-300 hover:scale-[1.01]"
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1.5">
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            {/* Match Left: Thumbnail Banner Image + Title & Info */}
+                            <div className="flex items-start gap-3.5 w-full sm:w-auto">
+                              {/* Match Image Container */}
+                              <div className="relative w-24 sm:w-32 h-20 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-emerald-500/50 bg-slate-950 shadow-lg">
+                                <img
+                                  src={race.image_url || '/images/race_action.jpg'}
+                                  alt={race.name}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/images/race_action.jpg';
+                                  }}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-[0.85]"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                                 {race.race_no && (
-                                  <span className="px-2.5 py-0.5 rounded-lg font-mono font-black text-[11px] bg-emerald-500 text-slate-950 border border-emerald-300 shadow-sm">
-                                    RACE #{race.race_no}
+                                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md font-mono font-black text-[10px] bg-emerald-500 text-slate-950 shadow">
+                                    #{race.race_no}
                                   </span>
                                 )}
-                                <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/40">
-                                  <MapPin className="w-3.5 h-3.5" />
-                                  {race.venue}
-                                </span>
-                                <span className="text-emerald-900">•</span>
-                                <span className="text-emerald-300 font-mono font-bold flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                                  {race.race_time} - {race.date_str || 'Today'}
-                                </span>
                                 {race.distance && (
-                                  <>
-                                    <span className="text-emerald-900">•</span>
-                                    <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
-                                  </>
+                                  <span className="absolute bottom-1 left-1.5 text-[9px] font-mono font-bold text-emerald-300">
+                                    {race.distance}
+                                  </span>
                                 )}
                               </div>
 
-                              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-emerald-300 transition">
-                                {race.name}
-                              </h3>
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                  <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2 py-0.5 rounded-lg border border-[#e5b869]/40 text-[11px]">
+                                    <MapPin className="w-3 h-3" />
+                                    {race.venue}
+                                  </span>
+                                  <span className="text-emerald-900">•</span>
+                                  <span className="text-emerald-300 font-mono font-bold flex items-center gap-1 text-[11px]">
+                                    <Clock className="w-3 h-3 text-emerald-400 animate-spin" />
+                                    {race.race_time}
+                                  </span>
+                                </div>
+
+                                <h3 className="text-sm sm:text-base md:text-lg font-black text-white group-hover:text-emerald-300 transition truncate">
+                                  {race.name}
+                                </h3>
+
+                                <div className="text-[11px] text-slate-400 font-medium">
+                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
+                                  {race.going && <span className="text-slate-400"> • Going: {race.going}</span>}
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/40">
-                              <div className="text-left sm:text-right">
-                                <div className="text-xs text-slate-400 mb-1">
-                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
-                                </div>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.4)] animate-pulse">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                  🟢 LIVE IN-PLAY
-                                </span>
-                              </div>
+                            {/* Match Right: Status & Action Button */}
+                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/40">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.4)] animate-pulse shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                🟢 LIVE IN-PLAY
+                              </span>
 
                               <button
                                 id={`race-bet-btn-${race.id}`}
@@ -474,7 +506,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           {/* Quick Runners & Live Odds Strip */}
                           {race.horses.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                            <div className="mt-3 pt-2.5 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
                               <span className="text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
                                 Live Odds:
                               </span>
@@ -544,48 +576,64 @@ export const RaceList: React.FC<RaceListProps> = ({
                             soundManager.playClick();
                             onSelectRace(race.id);
                           }}
-                          className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer border-2 border-emerald-700/80 bg-[#07150e] hover:border-emerald-400 hover:scale-[1.005]"
+                          className="group rounded-3xl p-3.5 sm:p-5 transition-all duration-200 shadow-xl cursor-pointer border-2 border-emerald-700/80 bg-[#07150e] hover:border-emerald-400 hover:scale-[1.005]"
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1.5">
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            {/* Match Left: Thumbnail Banner Image + Title & Info */}
+                            <div className="flex items-start gap-3.5 w-full sm:w-auto">
+                              {/* Match Image Container */}
+                              <div className="relative w-24 sm:w-32 h-20 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-emerald-700/60 bg-slate-950 shadow-md">
+                                <img
+                                  src={race.image_url || '/images/race_action.jpg'}
+                                  alt={race.name}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/images/race_action.jpg';
+                                  }}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-[0.80]"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                                 {race.race_no && (
-                                  <span className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-[11px] bg-slate-900 text-slate-300 border border-slate-700">
-                                    RACE #{race.race_no}
+                                  <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-slate-900 text-slate-200 border border-slate-700 shadow">
+                                    #{race.race_no}
                                   </span>
                                 )}
-                                <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2.5 py-0.5 rounded-lg border border-[#e5b869]/30">
-                                  <MapPin className="w-3.5 h-3.5" />
-                                  {race.venue}
-                                </span>
-                                <span className="text-emerald-900">•</span>
-                                <span className="text-slate-300 font-mono font-semibold flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                  {race.race_time} - {race.date_str || 'Today'}
-                                </span>
                                 {race.distance && (
-                                  <>
-                                    <span className="text-emerald-900">•</span>
-                                    <span className="text-emerald-400 font-mono font-semibold">{race.distance}</span>
-                                  </>
+                                  <span className="absolute bottom-1 left-1.5 text-[9px] font-mono font-semibold text-emerald-400">
+                                    {race.distance}
+                                  </span>
                                 )}
                               </div>
 
-                              <h3 className="text-base sm:text-lg font-black text-slate-200 group-hover:text-white transition">
-                                {race.name}
-                              </h3>
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                  <span className="flex items-center gap-1 text-[#e5b869] font-black bg-[#1a170b] px-2 py-0.5 rounded-lg border border-[#e5b869]/30 text-[11px]">
+                                    <MapPin className="w-3 h-3" />
+                                    {race.venue}
+                                  </span>
+                                  <span className="text-emerald-900">•</span>
+                                  <span className="text-slate-300 font-mono font-semibold flex items-center gap-1 text-[11px]">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    {race.race_time}
+                                  </span>
+                                </div>
+
+                                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-200 group-hover:text-white transition truncate">
+                                  {race.name}
+                                </h3>
+
+                                <div className="text-[11px] text-slate-400 font-medium">
+                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
+                                  {race.going && <span className="text-slate-500"> • Going: {race.going}</span>}
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
-                              <div className="text-left sm:text-right">
-                                <div className="text-xs text-slate-400 mb-1">
-                                  Runners: <span className="text-white font-mono font-bold">{race.horses.length}</span>
-                                </div>
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700 text-[11px] font-bold uppercase tracking-wider">
-                                  <Clock className="w-3 h-3 text-slate-400" />
-                                  ⏱ Upcoming
-                                </span>
-                              </div>
+                            {/* Match Right: Status & Action Button */}
+                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-900/30">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700 text-[11px] font-bold uppercase tracking-wider shrink-0">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                ⏱ Upcoming
+                              </span>
 
                               <button
                                 id={`race-view-btn-${race.id}`}
@@ -599,7 +647,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           {/* Runner Preview Strip */}
                           {race.horses.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+                            <div className="mt-3 pt-2.5 border-t border-emerald-900/40 flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
                               <span className="text-[10px] uppercase font-black text-slate-500 whitespace-nowrap">
                                 Runners:
                               </span>
