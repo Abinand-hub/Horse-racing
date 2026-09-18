@@ -90,20 +90,71 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [auditRace, setAuditRace] = useState<Race | null>(null);
   const [auditBetSearch, setAuditBetSearch] = useState<string>('');
 
+  // Helper: 24h (HH:mm) <-> 12h (h:mm A) for native clock picker
+  const format24To12 = (time24: string): string => {
+    if (!time24) return '';
+    const clean = time24.trim();
+    if (clean.toUpperCase().includes('AM') || clean.toUpperCase().includes('PM')) {
+      return clean;
+    }
+    const [hStr, mStr] = clean.split(':');
+    let hours = parseInt(hStr, 10);
+    const minutes = mStr ? mStr.padStart(2, '0') : '00';
+    if (isNaN(hours)) return time24;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 becomes 12
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
+  const format12To24 = (time12: string): string => {
+    if (!time12) return '';
+    const clean = time12.trim();
+    if (!clean.toUpperCase().includes('AM') && !clean.toUpperCase().includes('PM')) {
+      const parts = clean.split(':');
+      if (parts.length === 2) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+      }
+      return clean;
+    }
+    const parts = clean.split(' ');
+    const timePart = parts[0];
+    const modifier = parts[1]?.toUpperCase();
+    const [hStr, mStr] = timePart.split(':');
+    let hours = parseInt(hStr, 10);
+    const minutes = mStr ? mStr.padStart(2, '0') : '00';
+    if (isNaN(hours)) return '';
+    if (modifier === 'PM' && hours < 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  };
+
   // Real-time race timer helper
   const getRaceCountdown = (timeStr: string) => {
     try {
       if (!timeStr) return 'Post Time Scheduled';
       const now = new Date();
-      const parts = timeStr.trim().split(' ');
-      const timePart = parts[0];
-      const modifier = parts[1]?.toUpperCase();
-      let [hours, minutes] = timePart.split(':').map(Number);
-      if (modifier === 'PM' && hours < 12) hours += 12;
-      if (modifier === 'AM' && hours === 12) hours = 0;
+      const clean = timeStr.trim();
+      let hours = 0;
+      let minutes = 0;
+
+      if (clean.toUpperCase().includes('PM') || clean.toUpperCase().includes('AM')) {
+        const parts = clean.split(' ');
+        const timePart = parts[0];
+        const modifier = parts[1]?.toUpperCase();
+        const [h, m] = timePart.split(':').map(Number);
+        hours = h || 0;
+        minutes = m || 0;
+        if (modifier === 'PM' && hours < 12) hours += 12;
+        if (modifier === 'AM' && hours === 12) hours = 0;
+      } else {
+        const [h, m] = clean.split(':').map(Number);
+        hours = h || 0;
+        minutes = m || 0;
+      }
 
       const target = new Date();
-      target.setHours(hours, minutes || 0, 0, 0);
+      target.setHours(hours, minutes, 0, 0);
       const diff = target.getTime() - now.getTime();
       if (diff <= 0) return '🏁 Ready for Post Time';
       const diffMins = Math.floor(diff / 60000);
@@ -2706,18 +2757,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Time <span className="text-rose-400">*</span>
+              <label className="block text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Race Time <span className="text-rose-400">*</span></span>
+                </span>
+                {newTime && (
+                  <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                    {format24To12(newTime)}
+                  </span>
+                )}
               </label>
-              <input
-                id="new-race-time"
-                type="text"
-                required
-                value={newTime}
-                onChange={(e) => setNewTime(e.target.value)}
-                placeholder="e.g. 1:55 PM"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
-              />
+              <div className="relative">
+                <input
+                  id="new-race-time"
+                  type="time"
+                  required
+                  value={format12To24(newTime)}
+                  onChange={(e) => {
+                    const val24 = e.target.value;
+                    setNewTime(format24To12(val24));
+                  }}
+                  onClick={(e) => {
+                    try {
+                      (e.target as any).showPicker?.();
+                    } catch {}
+                  }}
+                  className="w-full px-3 py-2 pl-9 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-emerald-500 cursor-pointer [color-scheme:dark]"
+                />
+                <Clock
+                  onClick={() => {
+                    const el = document.getElementById('new-race-time') as any;
+                    el?.showPicker ? el.showPicker() : el?.focus();
+                  }}
+                  className="w-4 h-4 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-emerald-300"
+                />
+              </div>
+              {/* Quick Preset Time Buttons */}
+              <div className="flex items-center gap-1 mt-1.5 overflow-x-auto scrollbar-none text-[10px]">
+                {['1:45 PM', '2:15 PM', '2:45 PM', '3:15 PM', '3:45 PM', '4:15 PM', '4:45 PM'].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setNewTime(preset)}
+                    className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${
+                      format24To12(newTime) === preset
+                        ? 'bg-emerald-600 text-slate-950 font-black border border-emerald-400 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="sm:col-span-2">
@@ -4195,16 +4287,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs text-slate-300 font-semibold mb-1">
-                    Time <span className="text-rose-400">*</span>
+                  <label className="block text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Race Time <span className="text-rose-400">*</span></span>
+                    </span>
+                    {editTime && (
+                      <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                        {format24To12(editTime)}
+                      </span>
+                    )}
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500"
-                  />
+                  <div className="relative">
+                    <input
+                      id="edit-race-time"
+                      type="time"
+                      required
+                      value={format12To24(editTime)}
+                      onChange={(e) => {
+                        const val24 = e.target.value;
+                        setEditTime(format24To12(val24));
+                      }}
+                      onClick={(e) => {
+                        try {
+                          (e.target as any).showPicker?.();
+                        } catch {}
+                      }}
+                      className="w-full px-3 py-2 pl-9 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
+                    />
+                    <Clock
+                      onClick={() => {
+                        const el = document.getElementById('edit-race-time') as any;
+                        el?.showPicker ? el.showPicker() : el?.focus();
+                      }}
+                      className="w-4 h-4 text-indigo-400 absolute left-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-indigo-300"
+                    />
+                  </div>
+                  {/* Quick Presets */}
+                  <div className="flex items-center gap-1 mt-1.5 overflow-x-auto scrollbar-none text-[10px]">
+                    {['1:45 PM', '2:15 PM', '2:45 PM', '3:15 PM', '3:45 PM', '4:15 PM', '4:45 PM'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setEditTime(preset)}
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${
+                          format24To12(editTime) === preset
+                            ? 'bg-indigo-600 text-white font-bold border border-indigo-500'
+                            : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
