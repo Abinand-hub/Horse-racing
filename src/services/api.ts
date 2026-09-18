@@ -785,25 +785,43 @@ export const api = {
       if (raw) localNotes = JSON.parse(raw);
     } catch {}
 
-    if (localNotes.length === 0) {
-      // Seed default welcome notifications
-      localNotes = [
+    const userSpecificNotes = localNotes.filter(
+      (n) => n.user_id === userId || !n.user_id || n.user_id === 'all'
+    );
+
+    if (userSpecificNotes.length === 0) {
+      // Seed rich personalized welcome notifications for this user
+      const welcomeNotes: UserNotification[] = [
         {
-          id: 'notif_welcome',
+          id: `notif_welcome_${userId}_bonus`,
+          user_id: userId,
+          type: 'DEPOSIT_APPROVED',
+          title: '🎉 Welcome to DerbyBet Turf!',
+          message: 'Welcome aboard! ₹50 complimentary sign-up bonus has been credited to your wallet balance. Start exploring live fixtures & placing selections!',
+          amount: 50,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: `notif_welcome_${userId}_guide`,
           user_id: userId,
           type: 'GENERAL',
-          title: 'Welcome to DerbyBet Turf! 🏇',
-          message: 'Explore live races, place WIN/PLACE selections, and track your wallet statements in real-time.',
+          title: '🏇 Live Turf Fixtures & Decimal Odds',
+          message: 'Explore live and upcoming races, view jockeys & win/place odds, and track your instant settlements and statements in real-time.',
           is_read: false,
-          created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-        }
+          created_at: new Date(Date.now() - 60000).toISOString(),
+        },
       ];
+
+      localNotes = [...welcomeNotes, ...localNotes];
       try {
         localStorage.setItem('derby_user_notifications', JSON.stringify(localNotes));
       } catch {}
+
+      return welcomeNotes;
     }
 
-    return localNotes.filter((n) => n.user_id === userId || !n.user_id || n.user_id === 'all');
+    return userSpecificNotes;
   },
 
   async markNotificationRead(notificationId: string): Promise<void> {

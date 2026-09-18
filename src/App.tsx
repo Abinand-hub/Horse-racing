@@ -833,7 +833,7 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onSuccess={(newUser) => {
           setUser(newUser);
-          showToast(`Welcome @${newUser.username}!`, 'success');
+          showToast(`🎉 Welcome @${newUser.username}! ₹50 welcome bonus credited to your wallet.`, 'success');
           loadUserFinancials();
         }}
       />
