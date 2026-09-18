@@ -154,19 +154,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [settlingRace, setSettlingRace] = useState<Race | null>(null);
   const [settlePositions, setSettlePositions] = useState<Record<string, 1 | 2 | 3 | 0>>({});
 
-  // Add Race Form state (Manual Entry)
-  const [newRaceName, setNewRaceName] = useState(HANDWRITTEN_SHEET_PRESET.name);
-  const [newRaceNo, setNewRaceNo] = useState<number | string>(HANDWRITTEN_SHEET_PRESET.race_no);
-  const [newRaceCenterId, setNewRaceCenterId] = useState('cntr_bangalore');
-  const [newRaceDayId, setNewRaceDayId] = useState('day_btc_today');
-  const [newVenue, setNewVenue] = useState(HANDWRITTEN_SHEET_PRESET.venue);
-  const [newTime, setNewTime] = useState(HANDWRITTEN_SHEET_PRESET.race_time);
-  const [newDistance, setNewDistance] = useState(HANDWRITTEN_SHEET_PRESET.distance);
-  const [newGoing, setNewGoing] = useState(HANDWRITTEN_SHEET_PRESET.going);
-  const [newClassGrade, setNewClassGrade] = useState(HANDWRITTEN_SHEET_PRESET.class_grade);
+  // Add Race Form state (Clean Blank by Default)
+  const [newRaceName, setNewRaceName] = useState('');
+  const [newRaceNo, setNewRaceNo] = useState<number | string>('1');
+  const [newRaceCenterId, setNewRaceCenterId] = useState('cntr_hyderabad');
+  const [newRaceDayId, setNewRaceDayId] = useState('');
+  const [newVenue, setNewVenue] = useState('Hyderabad Race Club');
+  const [newTime, setNewTime] = useState('');
+  const [newDistance, setNewDistance] = useState('');
+  const [newGoing, setNewGoing] = useState('Good');
+  const [newClassGrade, setNewClassGrade] = useState('Grade 1 • Terms');
   const [newRaceImage, setNewRaceImage] = useState('/images/race_action.jpg');
   const [newRaceStatus, setNewRaceStatus] = useState<RaceStatus>('UPCOMING');
-  const [newHorses, setNewHorses] = useState([...HANDWRITTEN_SHEET_PRESET.horses]);
+  const [newHorses, setNewHorses] = useState<any[]>([
+    { serial_no: 1, gate_no: 1, name: '', jockey: '', trainer: '', win_odds: 2.5, place_odds: 1.5, silk_color: '#dc2626' }
+  ]);
 
   // Edit Race Modal state (Manual Edit)
   const [editingRace, setEditingRace] = useState<Race | null>(null);
@@ -804,35 +806,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateRace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRaceName.trim()) {
-      setActionMessage('⚠️ Please provide a race name');
+      setActionMessage('⚠️ Please provide a race name (e.g. The Rock of Gibraltar Plate)');
       setTimeout(() => setActionMessage(null), 3000);
       return;
     }
     const finalStatus = newRaceStatus || 'UPCOMING';
+
+    // Filter runners and assign standard baseline odds automatically (odds will be refined in Live Odds Editor before post time)
+    const validRunners = (newHorses || [])
+      .filter((h) => h.name && h.name.trim().length > 0)
+      .map((h, i) => ({
+        id: h.id || `h_${Date.now()}_${i + 1}_${Math.random().toString(36).substr(2, 4)}`,
+        serial_no: Number(h.serial_no) || (i + 1),
+        horse_no: Number(h.serial_no) || (i + 1),
+        gate_no: h.gate_no !== undefined && h.gate_no !== '' ? h.gate_no : (i + 1),
+        name: h.name.trim(),
+        jockey: (h.jockey || 'TBD').trim(),
+        trainer: (h.trainer || 'TBD').trim(),
+        win_odds: Number(h.win_odds) || Number((2.20 + (i * 0.45)).toFixed(2)),
+        place_odds: Number(h.place_odds) || Number((1.40 + (i * 0.20)).toFixed(2)),
+        silk_color: h.silk_color || '#3b82f6',
+        is_suspended: false,
+      }));
+
+    if (validRunners.length === 0) {
+      setActionMessage('⚠️ Please add at least 1 runner (or click "Bulk Paste Horses")');
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
+
     try {
       setIsLoading(true);
       await api.createRace({
         name: newRaceName.trim(),
-        race_no: newRaceNo ? Number(newRaceNo) : undefined,
-        center_id: newRaceCenterId || undefined,
+        race_no: newRaceNo ? Number(newRaceNo) : 1,
+        center_id: newRaceCenterId || 'cntr_hyderabad',
         race_day_id: newRaceDayId || undefined,
-        venue: newVenue || 'Bangalore Turf Club',
-        race_time: newTime || '14:30',
-        date_str: 'Today, 5th Sep',
-        distance: newDistance || '1400M',
+        venue: newVenue || 'Hyderabad Race Club',
+        race_time: newTime || '1:55 PM',
+        date_str: 'Today',
+        distance: newDistance || '1400m',
         going: newGoing || 'Good',
         class_grade: newClassGrade || 'Grade 1 • Terms',
         status: finalStatus,
         image_url: newRaceImage || '/images/race_action.jpg',
-        horses: newHorses,
+        horses: validRunners,
       });
+
       if (finalStatus === 'LIVE') {
         soundManager.playRaceBugle();
-        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${newHorses.length} runners!`);
+        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`);
         setAdminRaceFilter('live');
       } else {
         soundManager.playBetPlaced();
-        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING RACES with ${newHorses.length} runners!`);
+        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`);
         setAdminRaceFilter('upcoming');
       }
       await onRefreshData();
@@ -948,13 +975,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleClearForm = () => {
     setNewRaceName('');
-    setNewRaceNo('');
-    setNewVenue('Bangalore Turf Club');
+    setNewRaceNo('1');
+    setNewRaceCenterId('cntr_hyderabad');
+    setNewVenue('Hyderabad Race Club');
     setNewTime('');
     setNewDistance('');
     setNewGoing('Good');
     setNewHorses([
-      { serial_no: 1, gate_no: 1, name: '', jockey: '', trainer: '', win_odds: 3.0, place_odds: 1.5, silk_color: '#dc2626' }
+      { serial_no: 1, gate_no: 1, name: '', jockey: '', trainer: '', win_odds: 2.5, place_odds: 1.5, silk_color: '#dc2626' }
     ]);
   };
 
@@ -2515,17 +2543,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 3: Add New Race (Full Manual Entry Form) */}
+      {/* TAB 3: Add New Race (Simplified Clean Manual Entry) */}
       {activeTab === 'add_race' && (
         <form onSubmit={handleCreateRace} className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-5 max-w-4xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-400" />
-                Manual Race & Runner Entry (Level 3)
+                <Plus className="w-4 h-4 text-emerald-400" />
+                <span>Add New Race Card</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Assign to Race Center & Race Day card, then enter runner details and odds manually
+                Fill in race details and paste or enter runners. Odds can be adjusted in the Live Odds Editor before the race.
               </p>
             </div>
 
@@ -2534,10 +2562,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 onClick={handleLoadPreset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition cursor-pointer"
-                title="Fill 7 horses directly from the handwritten Star Future Cup sheet"
+                title="Fill 7 demo horses for quick testing"
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>Fill Handwritten Sheet</span>
+                <span>Fill Demo (7 Horses)</span>
               </button>
 
               <button
@@ -2546,16 +2574,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Clear</span>
+                <span>Reset to Blank</span>
               </button>
             </div>
           </div>
 
-          {/* Race Master Hierarchy Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-950 rounded-xl border border-emerald-900/40">
+          {/* Race Master Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Level 1: Race Center (Master) <span className="text-rose-400">*</span>
+                Race Center / Location <span className="text-rose-400">*</span>
               </label>
               <select
                 id="new-race-center-select"
@@ -2572,7 +2600,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     setNewRaceDayId(matchingDays[0].id);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
               >
                 {(raceCenters || []).map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.code}) - {c.city}</option>
@@ -2582,51 +2610,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div>
               <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Level 2: Race Day / Card
-              </label>
-              <select
-                id="new-race-day-select"
-                value={newRaceDayId}
-                onChange={(e) => setNewRaceDayId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500"
-              >
-                {(raceDays || [])
-                  .filter(d => !newRaceCenterId || d.center_id === newRaceCenterId)
-                  .map(d => (
-                    <option key={d.id} value={d.id}>{d.title} ({d.status})</option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Race Master Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Name of the Race <span className="text-rose-400">*</span>
-              </label>
-              <input
-                id="new-race-name"
-                type="text"
-                required
-                value={newRaceName}
-                onChange={(e) => setNewRaceName(e.target.value)}
-                placeholder="e.g. The Star Future Cup"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Race Number (1-10)
+                Race Number <span className="text-rose-400">*</span>
               </label>
               <input
                 id="new-race-no"
                 type="number"
+                min="1"
+                max="20"
                 value={newRaceNo}
                 onChange={(e) => setNewRaceNo(e.target.value)}
                 placeholder="e.g. 1"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500"
               />
             </div>
 
@@ -2640,8 +2634,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={newTime}
                 onChange={(e) => setNewTime(e.target.value)}
-                placeholder="e.g. 1:30 PM"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
+                placeholder="e.g. 1:55 PM"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-slate-300 font-semibold mb-1">
+                Name of the Race <span className="text-rose-400">*</span>
+              </label>
+              <input
+                id="new-race-name"
+                type="text"
+                required
+                value={newRaceName}
+                onChange={(e) => setNewRaceName(e.target.value)}
+                placeholder="e.g. The Rock of Gibraltar Plate"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:border-indigo-500"
               />
             </div>
 
@@ -2655,52 +2664,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={newDistance}
                 onChange={(e) => setNewDistance(e.target.value)}
-                placeholder="e.g. 1200M"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
+                placeholder="e.g. 1400m"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Turf Club / Venue <span className="text-rose-400">*</span>
-              </label>
-              <input
-                id="new-race-venue"
-                type="text"
-                list="indian-turf-clubs"
-                required
-                value={newVenue}
-                onChange={(e) => setNewVenue(e.target.value)}
-                placeholder="Select or enter venue (e.g. Royal Calcutta Turf Club)"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
-              />
-              <datalist id="indian-turf-clubs">
-                <option value="Bangalore Turf Club" />
-                <option value="Royal Calcutta Turf Club" />
-                <option value="Delhi Race Club" />
-                <option value="Hyderabad Race Club" />
-                <option value="Mahalaxmi, Mumbai" />
-                <option value="Pune Race Course" />
-                <option value="Madras Race Club" />
-                <option value="Mysore Race Club" />
-              </datalist>
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-300 font-semibold mb-1">
-                Going (Track condition)
-              </label>
-              <select
-                value={newGoing}
-                onChange={(e) => setNewGoing(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="Good">Good</option>
-                <option value="Soft">Soft</option>
-                <option value="Firm">Firm</option>
-                <option value="Heavy">Heavy</option>
-                <option value="Yielding">Yielding</option>
-              </select>
             </div>
           </div>
 
@@ -2708,11 +2674,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="space-y-2 pt-2 border-t border-slate-800">
             <label className="block text-xs font-bold text-white flex items-center gap-1.5">
               <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-              Race Banner & Fixture Horse Image <span className="text-rose-400">*</span>
+              Race Banner & Fixture Horse Image
             </label>
-            <p className="text-[11px] text-slate-400">
-              Select an authentic horse racing image to show on the user fixture card and live betting page:
-            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {HORSE_IMAGE_PRESETS.map((preset) => (
                 <button
@@ -2725,8 +2688,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img src={preset.url} alt={preset.label} className="w-full h-24 object-cover" />
-                  <div className="p-2 bg-slate-950/90 text-xs">
+                  <img src={preset.url} alt={preset.label} className="w-full h-20 object-cover" />
+                  <div className="p-1.5 bg-slate-950/90 text-xs">
                     <p className="font-bold text-white text-[11px] truncate">{preset.label}</p>
                   </div>
                   {newRaceImage === preset.url && (
@@ -2739,69 +2702,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* Publishing Mode */}
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-            <label className="block text-xs font-bold text-white">Publishing Target & Status:</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => setNewRaceStatus('UPCOMING')}
-                className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                  newRaceStatus === 'UPCOMING' || newRaceStatus === 'OPEN'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-md'
-                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <span className="text-xl">⏱️</span>
-                <div>
-                  <p className="font-bold text-xs text-white">Upcoming Races</p>
-                  <p className="text-[10px] text-slate-400">Scheduled race open in Upcoming tab</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setNewRaceStatus('LIVE')}
-                className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                  newRaceStatus === 'LIVE'
-                    ? 'border-red-500 bg-red-500/15 text-white shadow-md animate-pulse'
-                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <span className="text-xl">🔴</span>
-                <div>
-                  <p className="font-bold text-xs text-white">Publish LIVE Now</p>
-                  <p className="text-[10px] text-slate-400">In-play live race in Live Races tab</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setNewRaceStatus('DRAFT')}
-                className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-3 ${
-                  newRaceStatus === 'DRAFT'
-                    ? 'border-amber-500 bg-amber-500/10 text-white'
-                    : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <span className="text-xl">📝</span>
-                <div>
-                  <p className="font-bold text-xs text-white">Save as DRAFT</p>
-                  <p className="text-[10px] text-slate-400">Hidden from user page until published</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
           {/* Runners Manual Entry Table */}
           <div className="space-y-3 pt-2 border-t border-slate-800">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                  Runners Entry List ({newHorses.length} Horses)
+                  Runners Field List ({newHorses.length} Horses)
                 </label>
                 <p className="text-[11px] text-slate-400">
-                  Enter Serial No, Gate No (Draw), Horse Name, Jockey Name, and Trainer Name
+                  Enter Horse Number, Gate Number, Horse Name, Jockey Name, and Trainer Name
                 </p>
               </div>
 
@@ -2814,7 +2723,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     setIsBulkPasteOpen(true);
                   }}
                   className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/50 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
-                  title="Paste entire field text (e.g. 1-12-SPLENDIDO-S Sanjan-Saddam Iqbal)"
+                  title="Paste entire field text"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>📋 Bulk Paste Horses</span>
@@ -2833,8 +2742,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         name: '',
                         jockey: '',
                         trainer: '',
-                        win_odds: 3.5,
-                        place_odds: 1.6,
+                        win_odds: 2.5,
+                        place_odds: 1.5,
                         silk_color: '#3b82f6',
                       },
                     ]);
@@ -2847,15 +2756,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {newHorses.map((horse, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-950 p-3 sm:p-3.5 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
+                  className="bg-slate-950 p-2.5 sm:p-3 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
                 >
-                  {/* Serial Number (S.No) */}
+                  {/* Horse Number (S.No) */}
                   <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">S.No</label>
+                    <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">Horse #</label>
                     <input
                       type="number"
                       required
@@ -2866,7 +2775,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         setNewHorses(updated);
                       }}
                       className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-center text-xs"
-                      placeholder="S.No"
+                      placeholder="No"
                     />
                   </div>
 
@@ -2888,7 +2797,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {/* Horse Name */}
-                  <div className="col-span-2 sm:col-span-3">
+                  <div className="col-span-2 sm:col-span-4">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                       Name of the Horse <span className="text-rose-400">*</span>
                     </label>
@@ -2901,19 +2810,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         updated[idx].name = e.target.value;
                         setNewHorses(updated);
                       }}
-                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs"
-                      placeholder="Horse Name"
+                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs uppercase"
+                      placeholder="e.g. SPLENDIDO"
                     />
                   </div>
 
                   {/* Jockey Name */}
-                  <div className="col-span-1 sm:col-span-2">
+                  <div className="col-span-1 sm:col-span-3">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
-                      Jockey Name <span className="text-rose-400">*</span>
+                      Jockey Name
                     </label>
                     <input
                       type="text"
-                      required
                       value={horse.jockey}
                       onChange={(e) => {
                         const updated = [...newHorses];
@@ -2921,18 +2829,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         setNewHorses(updated);
                       }}
                       className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
-                      placeholder="Jockey"
+                      placeholder="e.g. S Sanjan"
                     />
                   </div>
 
                   {/* Trainer Name */}
                   <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
-                      Trainer Name <span className="text-rose-400">*</span>
+                      Trainer Name
                     </label>
                     <input
                       type="text"
-                      required
                       value={horse.trainer}
                       onChange={(e) => {
                         const updated = [...newHorses];
@@ -2940,43 +2847,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         setNewHorses(updated);
                       }}
                       className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
-                      placeholder="Trainer"
-                    />
-                  </div>
-
-                  {/* Win Odds */}
-                  <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Win</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      required
-                      value={horse.win_odds}
-                      onChange={(e) => {
-                        const updated = [...newHorses];
-                        updated[idx].win_odds = parseFloat(e.target.value) || 1.05;
-                        setNewHorses(updated);
-                      }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center text-xs"
-                      placeholder="Win"
-                    />
-                  </div>
-
-                  {/* Place Odds */}
-                  <div className="col-span-1 sm:col-span-1">
-                    <label className="block text-[10px] text-emerald-400 font-semibold mb-0.5">Place</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      required
-                      value={horse.place_odds}
-                      onChange={(e) => {
-                        const updated = [...newHorses];
-                        updated[idx].place_odds = parseFloat(e.target.value) || 1.02;
-                        setNewHorses(updated);
-                      }}
-                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center text-xs"
-                      placeholder="Place"
+                      placeholder="e.g. Saddam Iqbal"
                     />
                   </div>
 
@@ -3003,14 +2874,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
             <span className="text-xs text-slate-400">
-              Total Runners to be created: <strong className="text-white">{newHorses.length}</strong>
+              Total Runners: <strong className="text-white">{newHorses.filter(h => h.name && h.name.trim()).length} Valid</strong> ({newHorses.length} rows)
             </span>
 
             <button
               type="submit"
               id="submit-create-race-btn"
               disabled={isLoading}
-              className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm transition cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/20"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-2 shadow-lg disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Publish Race Card & Runners</span>
@@ -4375,15 +4246,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {editHorses.map((horse, idx) => (
                     <div
                       key={horse.id || idx}
-                      className="bg-slate-950 p-3 sm:p-3.5 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
+                      className="bg-slate-950 p-2.5 sm:p-3 rounded-xl border border-slate-800/90 grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-2.5 items-center text-xs"
                     >
                       {/* Serial Number */}
                       <div className="col-span-1 sm:col-span-1">
-                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">S.No</label>
+                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">Horse #</label>
                         <input
                           type="number"
                           required
@@ -4414,7 +4285,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
 
                       {/* Name of the Horse */}
-                      <div className="col-span-2 sm:col-span-3">
+                      <div className="col-span-2 sm:col-span-4">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
                           Name of the Horse <span className="text-rose-400">*</span>
                         </label>
@@ -4427,18 +4298,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             updated[idx].name = e.target.value;
                             setEditHorses(updated);
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs"
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-semibold text-xs uppercase"
                         />
                       </div>
 
                       {/* Name of the Jockey */}
-                      <div className="col-span-1 sm:col-span-2">
+                      <div className="col-span-1 sm:col-span-3">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
-                          Name of the Jockey <span className="text-rose-400">*</span>
+                          Jockey Name
                         </label>
                         <input
                           type="text"
-                          required
                           value={horse.jockey}
                           onChange={(e) => {
                             const updated = [...editHorses];
@@ -4452,11 +4322,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       {/* Name of the Trainer */}
                       <div className="col-span-1 sm:col-span-2">
                         <label className="block text-[10px] text-slate-300 font-semibold mb-0.5">
-                          Name of the Trainer <span className="text-rose-400">*</span>
+                          Trainer Name
                         </label>
                         <input
                           type="text"
-                          required
                           value={horse.trainer}
                           onChange={(e) => {
                             const updated = [...editHorses];
@@ -4464,40 +4333,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             setEditHorses(updated);
                           }}
                           className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs"
-                        />
-                      </div>
-
-                      {/* Win Odds */}
-                      <div className="col-span-1 sm:col-span-1">
-                        <label className="block text-[10px] text-amber-400 font-semibold mb-0.5">Win</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          required
-                          value={horse.win_odds}
-                          onChange={(e) => {
-                            const updated = [...editHorses];
-                            updated[idx].win_odds = parseFloat(e.target.value) || 1.05;
-                            setEditHorses(updated);
-                          }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold font-mono text-center text-xs"
-                        />
-                      </div>
-
-                      {/* Place Odds */}
-                      <div className="col-span-1 sm:col-span-1">
-                        <label className="block text-[10px] text-emerald-400 font-semibold mb-0.5">Place</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          required
-                          value={horse.place_odds}
-                          onChange={(e) => {
-                            const updated = [...editHorses];
-                            updated[idx].place_odds = parseFloat(e.target.value) || 1.02;
-                            setEditHorses(updated);
-                          }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-bold font-mono text-center text-xs"
                         />
                       </div>
 
