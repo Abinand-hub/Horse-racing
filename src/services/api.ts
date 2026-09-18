@@ -757,7 +757,10 @@ export const api = {
     let localBets: Bet[] = [];
     try {
       const raw = localStorage.getItem('derby_custom_bets');
-      if (raw) localBets = JSON.parse(raw);
+      if (raw) {
+        const allBets: Bet[] = JSON.parse(raw);
+        localBets = allBets.filter((b) => b.user_id === userId);
+      }
     } catch {}
 
     try {
@@ -769,7 +772,7 @@ export const api = {
         }
       }
     } catch {}
-    return [...localBets, ...DUMMY_BETS];
+    return localBets;
   },
 
   // ----------------------------------------------------------------------

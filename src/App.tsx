@@ -315,7 +315,7 @@ export default function App() {
   };
 
   // Fetch user bets, statement, deposits and withdrawals
-  const loadUserFinancials = async () => {
+  const loadUserFinancials = async (isBackground = false) => {
     if (!user) {
       setMyBets([]);
       setTransactions([]);
@@ -325,8 +325,10 @@ export default function App() {
       return;
     }
     try {
-      setIsLoadingBets(true);
-      setIsLoadingTxs(true);
+      if (!isBackground) {
+        setIsLoadingBets(true);
+        setIsLoadingTxs(true);
+      }
       const [betsData, txsData, freshUser, notifsData, depData, wthData] = await Promise.all([
         api.getMyBets(user.id),
         api.getTransactions(user.id),
@@ -337,29 +339,31 @@ export default function App() {
       ]);
       setMyBets(betsData);
       setTransactions(txsData);
-      setUser(freshUser);
+      if (freshUser) setUser(freshUser);
       setNotifications(notifsData);
       setDepositRequests(depData);
       setWithdrawalRequests(wthData);
     } catch (err: any) {
       console.error('Error loading financials:', err);
     } finally {
-      setIsLoadingBets(false);
-      setIsLoadingTxs(false);
+      if (!isBackground) {
+        setIsLoadingBets(false);
+        setIsLoadingTxs(false);
+      }
     }
   };
 
   useEffect(() => {
     if (user?.id) {
-      loadUserFinancials();
+      loadUserFinancials(false);
       // Background polling every 3 seconds for live balance & payment approvals
       const interval = setInterval(() => {
-        loadUserFinancials();
+        loadUserFinancials(true);
       }, 3000);
 
       // Realtime cross-tab & storage event subscription for instant sync
       const unsubscribe = financialSync.subscribe(() => {
-        loadUserFinancials();
+        loadUserFinancials(true);
       });
 
       return () => {

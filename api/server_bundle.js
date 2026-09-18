@@ -257,6 +257,9 @@ OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 1800 });
 var OtpModel = import_mongoose.default.models.Otp || import_mongoose.default.model("Otp", OtpSchema, "otps");
 
 // src/models/db.ts
+var isConnected = false;
+var connectPromise = null;
+var lastConnectAttempt = 0;
 var lastMongoError = null;
 async function connectMongoDB(uri) {
   const fallbackUri = Buffer.from("bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl", "base64").toString("utf-8");
@@ -272,15 +275,20 @@ async function connectMongoDB(uri) {
   if (connectPromise) {
     return connectPromise;
   }
+  if (Date.now() - lastConnectAttempt < 4e3) {
+    return false;
+  }
+  lastConnectAttempt = Date.now();
   connectPromise = (async () => {
     try {
       if (import_mongoose2.default.connection.readyState === 1) {
         isConnected = true;
         return true;
       }
+      import_mongoose2.default.set("bufferCommands", false);
       await import_mongoose2.default.connect(mongoUri, {
-        serverSelectionTimeoutMS: 2500,
-        connectTimeoutMS: 2500,
+        serverSelectionTimeoutMS: 1500,
+        connectTimeoutMS: 1500,
         maxPoolSize: 5
       });
       isConnected = true;

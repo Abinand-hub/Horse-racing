@@ -12,6 +12,10 @@ import {
   OtpModel,
 } from './index';
 
+let isConnected = false;
+let connectPromise: Promise<boolean> | null = null;
+let lastConnectAttempt = 0;
+
 export let lastMongoError: string | null = null;
 
 export async function connectMongoDB(uri?: string): Promise<boolean> {
@@ -36,6 +40,12 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
     return connectPromise;
   }
 
+  // Throttle connection attempts if recently failed
+  if (Date.now() - lastConnectAttempt < 4000) {
+    return false;
+  }
+  lastConnectAttempt = Date.now();
+
   connectPromise = (async () => {
     try {
       if (mongoose.connection.readyState === 1) {
@@ -43,9 +53,11 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
         return true;
       }
 
+      mongoose.set('bufferCommands', false);
+
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 2500,
-        connectTimeoutMS: 2500,
+        serverSelectionTimeoutMS: 1500,
+        connectTimeoutMS: 1500,
         maxPoolSize: 5,
       });
 
