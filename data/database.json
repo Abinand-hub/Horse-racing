@@ -209,5 +209,11 @@
       "code": "471932",
       "expires_at": 1789734871829
     }
+  },
+  "system_settings": {
+    "betting_enabled": true,
+    "emergency_message": "",
+    "announcement": "",
+    "sub_admins": []
   }
 }

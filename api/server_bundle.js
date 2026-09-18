@@ -698,9 +698,6 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
-  if (!req.url.startsWith("/api") && !req.url.startsWith("/dist") && !req.url.startsWith("/images") && !req.url.startsWith("/sounds")) {
-    req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
-  }
   if (!isMongoDBConnected()) {
     ensureMongoConnected().catch(() => {
     });
