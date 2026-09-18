@@ -1865,15 +1865,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Trophy className="w-3.5 h-3.5 text-blue-400" />
                           <span>Re-Settle Result</span>
                         </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(race)}
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer flex items-center gap-1"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Edit</span>
-                        </button>
                       </div>
                     </div>
                   </div>
