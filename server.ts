@@ -27,8 +27,8 @@ const PORT = Number(process.env.PORT) || 3005;
 
 app.use(express.json());
 
-// CORS & Vercel URL Rewriting normalizer
-app.use((req, res, next) => {
+// CORS & Vercel URL Rewriting normalizer & Mongo auto-connect
+app.use(async (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -39,6 +39,16 @@ app.use((req, res, next) => {
   if (!req.url.startsWith('/api') && !req.url.startsWith('/dist') && !req.url.startsWith('/images') && !req.url.startsWith('/sounds')) {
     req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
   }
+
+  // Ensure active MongoDB Atlas connection for serverless invocations
+  if (req.url.startsWith('/api')) {
+    try {
+      await ensureMongoConnected();
+    } catch (e: any) {
+      console.warn('Mongo auto-connect notice:', e.message);
+    }
+  }
+
   next();
 });
 
@@ -483,21 +493,23 @@ function generateId(prefix: string) {
 // ----------------------------------------------------
 // HEALTH & DB STATUS CHECKS
 // ----------------------------------------------------
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  const connected = await ensureMongoConnected();
   return res.json({
     status: 'ok',
-    mongodb_connected: isMongoDBConnected(),
+    mongodb_connected: connected,
     time: new Date().toISOString(),
   });
 });
 
 app.get('/api/admin/mongo-status', async (req, res) => {
   try {
-    const connected = isMongoDBConnected();
+    const connected = await ensureMongoConnected();
     let counts: any = null;
     if (connected) {
       counts = {
         users: await UserModel.countDocuments(),
+        otps: await OtpModel.countDocuments(),
         races: await RaceModel.countDocuments(),
         bets: await BetModel.countDocuments(),
         transactions: await TransactionModel.countDocuments(),
@@ -506,7 +518,7 @@ app.get('/api/admin/mongo-status', async (req, res) => {
     }
     return res.json({
       connected,
-      provider: connected ? 'MongoDB Atlas / Server' : 'Local JSON Storage',
+      provider: connected ? 'MongoDB Atlas' : 'Local JSON Storage',
       counts,
       timestamp: new Date().toISOString(),
     });

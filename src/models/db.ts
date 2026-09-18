@@ -44,8 +44,8 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
       }
 
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 5000,
-        bufferCommands: false,
+        serverSelectionTimeoutMS: 8000,
+        maxPoolSize: 10,
       });
 
       isConnected = true;

@@ -270,8 +270,8 @@ async function connectMongoDB(uri) {
         return true;
       }
       await import_mongoose2.default.connect(mongoUri, {
-        serverSelectionTimeoutMS: 5e3,
-        bufferCommands: false
+        serverSelectionTimeoutMS: 8e3,
+        maxPoolSize: 10
       });
       isConnected = true;
       console.log("\u2705 Connected to MongoDB Atlas successfully! Collections active: users, otps, races, bets, etc.");
@@ -593,7 +593,7 @@ Never share this code with anyone.
 var app = (0, import_express.default)();
 var PORT = Number(process.env.PORT) || 3005;
 app.use(import_express.default.json());
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -602,6 +602,13 @@ app.use((req, res, next) => {
   }
   if (!req.url.startsWith("/api") && !req.url.startsWith("/dist") && !req.url.startsWith("/images") && !req.url.startsWith("/sounds")) {
     req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
+  }
+  if (req.url.startsWith("/api")) {
+    try {
+      await ensureMongoConnected();
+    } catch (e) {
+      console.warn("Mongo auto-connect notice:", e.message);
+    }
   }
   next();
 });
@@ -847,20 +854,22 @@ connectMongoDB().then(async (connected) => {
 function generateId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  const connected = await ensureMongoConnected();
   return res.json({
     status: "ok",
-    mongodb_connected: isMongoDBConnected(),
+    mongodb_connected: connected,
     time: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
 app.get("/api/admin/mongo-status", async (req, res) => {
   try {
-    const connected = isMongoDBConnected();
+    const connected = await ensureMongoConnected();
     let counts = null;
     if (connected) {
       counts = {
         users: await UserModel.countDocuments(),
+        otps: await OtpModel.countDocuments(),
         races: await RaceModel.countDocuments(),
         bets: await BetModel.countDocuments(),
         transactions: await TransactionModel.countDocuments(),
@@ -869,7 +878,7 @@ app.get("/api/admin/mongo-status", async (req, res) => {
     }
     return res.json({
       connected,
-      provider: connected ? "MongoDB Atlas / Server" : "Local JSON Storage",
+      provider: connected ? "MongoDB Atlas" : "Local JSON Storage",
       counts,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
