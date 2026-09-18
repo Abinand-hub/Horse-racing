@@ -344,12 +344,6 @@ function loadDatabase() {
         db.race_days = defaultData.race_days;
       }
 
-      // Ensure Star Future Cup race exists
-      if (!db.races.some((r) => r.id === 'race_sfc_07')) {
-        const sfcRace = defaultData.races.find((r) => r.id === 'race_sfc_07');
-        if (sfcRace) db.races.unshift(sfcRace);
-      }
-
       // Ensure every horse has serial_no, gate_no and every race has image_url, center_id, race_day_id
       const sampleImages = ['/images/race_action.jpg', '/images/jockey_hero.jpg', '/images/horse_runner.jpg'];
       db.races.forEach((r, rIdx) => {

@@ -195,96 +195,98 @@ export const RaceList: React.FC<RaceListProps> = ({
       )}
       
       {/* ---------------- ACTIVE CENTER / TODAY'S RACE CARD BANNER ---------------- */}
-      {activeCentersWithRaces.length > 1 ? (
-        // Multi-center day (Rare occasion: 2+ centers hosting races today)
-        <div className="space-y-2 bg-[#06100b] p-3 rounded-2xl border border-emerald-900/60 shadow-lg">
-          <div className="flex items-center justify-between text-xs px-1">
-            <span className="flex items-center gap-1.5 text-emerald-400 font-black">
-              <MapPin className="w-4 h-4 text-emerald-400" />
-              <span>Today's Active Race Centers ({activeCentersWithRaces.length} Venues):</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-            <button
-              id="center-tab-all"
-              onClick={() => {
-                soundManager.playClick();
-                setSelectedCenter('all');
-              }}
-              className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
-                selectedCenter === 'all'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
-                  : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
-              }`}
-            >
-              <span>ALL VENUES</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/40 text-slate-300">
-                {races.length}
+      {races.length > 0 && (
+        activeCentersWithRaces.length > 1 ? (
+          // Multi-center day (Rare occasion: 2+ centers hosting races today)
+          <div className="space-y-2 bg-[#06100b] p-3 rounded-2xl border border-emerald-900/60 shadow-lg">
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-black">
+                <MapPin className="w-4 h-4 text-emerald-400" />
+                <span>Today's Active Race Centers ({activeCentersWithRaces.length} Venues):</span>
               </span>
-            </button>
-            {activeCentersWithRaces.map((cntr) => {
-              const isSelected = selectedCenter === cntr.id;
-              return (
-                <button
-                  key={cntr.id}
-                  id={`center-tab-${cntr.id}`}
-                  onClick={() => {
-                    soundManager.playClick();
-                    setSelectedCenter(cntr.id);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
-                    isSelected
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
-                      : cntr.hasLive
-                      ? 'bg-[#0b1c14] text-emerald-300 border-emerald-500/50 hover:bg-[#10291d]'
-                      : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
-                  }`}
-                >
-                  {cntr.hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
-                  <span>{cntr.name}</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                    isSelected ? 'bg-slate-950/40 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'
-                  }`}>
-                    {cntr.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        // Standard single center race day banner (Bangalore / Mysore / etc.)
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#06140e] via-[#091b13] to-[#040c08] border border-emerald-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
-              <MapPin className="w-5 h-5 text-slate-950" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-1.5">
-                  <span>{activeCentersWithRaces[0]?.name || (races[0]?.venue ? races[0].venue.toUpperCase() : 'TURF CLUB')}</span>
-                  <span className="text-emerald-400">•</span>
-                  <span className="text-[#e5b869]">TODAY'S RACE CARD</span>
-                </h2>
-                {activeCentersWithRaces[0]?.hasLive && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[9px] font-black uppercase animate-pulse">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    Live Betting In-Play
-                  </span>
-                )}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+              <button
+                id="center-tab-all"
+                onClick={() => {
+                  soundManager.playClick();
+                  setSelectedCenter('all');
+                }}
+                className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                  selectedCenter === 'all'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
+                    : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
+                }`}
+              >
+                <span>ALL VENUES</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/40 text-slate-300">
+                  {races.length}
+                </span>
+              </button>
+              {activeCentersWithRaces.map((cntr) => {
+                const isSelected = selectedCenter === cntr.id;
+                return (
+                  <button
+                    key={cntr.id}
+                    id={`center-tab-${cntr.id}`}
+                    onClick={() => {
+                      soundManager.playClick();
+                      setSelectedCenter(cntr.id);
+                    }}
+                    className={`px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-[1.02]'
+                        : cntr.hasLive
+                        ? 'bg-[#0b1c14] text-emerald-300 border-emerald-500/50 hover:bg-[#10291d]'
+                        : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
+                    }`}
+                  >
+                    {cntr.hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+                    <span>{cntr.name}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-slate-950/40 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'
+                    }`}>
+                      {cntr.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          // Standard single center race day banner (Bangalore / Mysore / etc.)
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#06140e] via-[#091b13] to-[#040c08] border border-emerald-500/30 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
+                <MapPin className="w-5 h-5 text-slate-950" />
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                {activeCentersWithRaces[0]?.count || races.length} Fixtures Scheduled for today • Live Decimal Odds & Pre-Post Betting Open
-              </p>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-1.5">
+                    <span>{activeCentersWithRaces[0]?.name || (races[0]?.venue ? races[0].venue.toUpperCase() : 'TURF CLUB')}</span>
+                    <span className="text-emerald-400">•</span>
+                    <span className="text-[#e5b869]">TODAY'S RACE CARD</span>
+                  </h2>
+                  {activeCentersWithRaces[0]?.hasLive && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[9px] font-black uppercase animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      Live Betting In-Play
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {activeCentersWithRaces[0]?.count || races.length} Fixtures Scheduled for today • Live Decimal Odds & Pre-Post Betting Open
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 font-mono font-bold text-xs">
+                {races.length} Races Today
+              </span>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 font-mono font-bold text-xs">
-              {races.length} Races Today
-            </span>
-          </div>
-        </div>
+        )
       )}
 
       {/* ---------------- TOP BANNER / SEARCH BAR ---------------- */}
