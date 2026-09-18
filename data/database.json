@@ -199,5 +199,6 @@
       "tag": "LIVE ODDS",
       "is_active": true
     }
-  ]
+  ],
+  "otps": {}
 }

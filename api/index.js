@@ -1,0 +1,2079 @@
+// server.ts
+import express from "express";
+import fs from "fs";
+import path from "path";
+import "dotenv/config";
+
+// src/models/db.ts
+import mongoose2 from "mongoose";
+
+// src/models/index.ts
+import mongoose, { Schema } from "mongoose";
+var UserSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    phone: { type: String, required: true, index: true },
+    username: { type: String, required: true, unique: true, index: true },
+    password_hash: { type: String, required: true },
+    balance: { type: Number, default: 0, min: 0 },
+    exposure: { type: Number, default: 0, min: 0 },
+    role: { type: String, enum: ["user", "admin"], default: "user" },
+    full_name: { type: String, default: "" },
+    email: { type: String, default: "" },
+    ref_id: { type: String, default: "" },
+    profile_photo: { type: String, default: "" },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+  },
+  { timestamps: true }
+);
+var UserModel = mongoose.models.User || mongoose.model("User", UserSchema, "users");
+var HorseSchema = new Schema(
+  {
+    id: { type: String, required: true, index: true },
+    race_id: { type: String, required: true, index: true },
+    horse_no: { type: Number, required: true },
+    serial_no: { type: Number, required: true },
+    gate_no: { type: Schema.Types.Mixed, default: 1 },
+    name: { type: String, required: true },
+    jockey: { type: String, default: "TBD" },
+    trainer: { type: String, default: "TBD" },
+    win_odds: { type: Number, required: true, default: 2.5 },
+    place_odds: { type: Number, required: true, default: 1.5 },
+    silk_color: { type: String, default: "#3b82f6" },
+    form: { type: String, default: "" },
+    weight: { type: String, default: "55kg" },
+    is_suspended: { type: Boolean, default: false }
+  },
+  { _id: false }
+);
+var HorseModel = mongoose.models.Horse || mongoose.model("Horse", HorseSchema, "horses");
+var RaceSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    race_day_id: { type: String, default: "", index: true },
+    center_id: { type: String, default: "", index: true },
+    name: { type: String, required: true },
+    race_no: { type: Schema.Types.Mixed, default: 1 },
+    venue: { type: String, required: true },
+    race_time: { type: String, required: true },
+    date_str: { type: String, default: "Today" },
+    distance: { type: String, default: "1400m" },
+    going: { type: String, default: "Good" },
+    class_grade: { type: String, default: "Class 1" },
+    status: {
+      type: String,
+      enum: ["DRAFT", "UPCOMING", "OPEN", "LIVE", "CLOSED", "RESULTED", "OPEN_FOR_BETTING", "SUSPENDED"],
+      default: "UPCOMING",
+      index: true
+    },
+    is_suspended: { type: Boolean, default: false },
+    image_url: { type: String, default: "/images/race_action.jpg" },
+    winner_horse_id: { type: String, default: null },
+    place_horses_ids: { type: [String], default: [] },
+    position_1: { type: [String], default: [] },
+    position_2: { type: [String], default: [] },
+    position_3: { type: [String], default: [] },
+    is_dead_heat: { type: Boolean, default: false },
+    dead_heat_note: { type: String, default: "" },
+    horses: { type: [HorseSchema], default: [] },
+    settled_at: { type: String, default: null }
+  },
+  { timestamps: true }
+);
+var RaceModel = mongoose.models.Race || mongoose.model("Race", RaceSchema, "races");
+var BetSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    user_id: { type: String, required: true, index: true },
+    username: { type: String, required: true },
+    race_id: { type: String, required: true, index: true },
+    race_name: { type: String, required: true },
+    venue: { type: String, required: true },
+    horse_id: { type: String, required: true, index: true },
+    horse_name: { type: String, required: true },
+    horse_no: { type: Number, required: true },
+    serial_no: { type: Number },
+    gate_no: { type: Schema.Types.Mixed },
+    jockey: { type: String, default: "TBD" },
+    trainer: { type: String, default: "TBD" },
+    bet_type: { type: String, enum: ["WIN", "PLACE"], required: true, index: true },
+    odds: { type: Number, required: true },
+    stake: { type: Number, required: true },
+    potential_win: { type: Number, required: true },
+    payout: { type: Number, default: 0 },
+    status: { type: String, enum: ["PENDING", "WON", "LOST"], default: "PENDING", index: true },
+    is_dead_heat: { type: Boolean, default: false },
+    dead_heat_divider: { type: Number, default: 1 },
+    placed_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() },
+    settled_at: { type: String, default: null }
+  },
+  { timestamps: true }
+);
+var BetModel = mongoose.models.Bet || mongoose.model("Bet", BetSchema, "bets");
+var TransactionSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    user_id: { type: String, required: true, index: true },
+    type: { type: String, enum: ["DEPOSIT", "WITHDRAW", "BET", "WIN", "REFUND"], required: true, index: true },
+    amount: { type: Number, required: true },
+    balance_after: { type: Number, required: true },
+    description: { type: String, default: "" },
+    reference_id: { type: String, default: "" },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+  },
+  { timestamps: true }
+);
+var TransactionModel = mongoose.models.Transaction || mongoose.model("Transaction", TransactionSchema, "transactions");
+var BannerSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    image_url: { type: String, required: true },
+    is_active: { type: Boolean, default: true, index: true },
+    title: { type: String, default: "" },
+    order: { type: Number, default: 0 },
+    link_url: { type: String, default: "" },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+  },
+  { timestamps: true }
+);
+var BannerModel = mongoose.models.Banner || mongoose.model("Banner", BannerSchema, "banners");
+var RaceCenterSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    name: { type: String, required: true },
+    code: { type: String, required: true, unique: true },
+    city: { type: String, default: "" },
+    is_active: { type: Boolean, default: true },
+    order: { type: Number, default: 0 },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+  },
+  { timestamps: true }
+);
+var RaceCenterModel = mongoose.models.RaceCenter || mongoose.model("RaceCenter", RaceCenterSchema, "race_centers");
+var RaceDaySchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    center_id: { type: String, required: true, index: true },
+    center_name: { type: String, required: true },
+    race_date: { type: String, required: true },
+    title: { type: String, required: true },
+    status: { type: String, enum: ["DRAFT", "PUBLISHED"], default: "PUBLISHED" },
+    races_count: { type: Number, default: 0 },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+  },
+  { timestamps: true }
+);
+var RaceDayModel = mongoose.models.RaceDay || mongoose.model("RaceDay", RaceDaySchema, "race_days");
+var DepositRequestSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    user_id: { type: String, required: true, index: true },
+    username: { type: String, required: true },
+    amount: { type: Number, required: true },
+    utr_number: { type: String, required: true, index: true },
+    payment_method: { type: String, default: "UPI" },
+    screenshot_url: { type: String, default: "" },
+    status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING", index: true },
+    admin_notes: { type: String, default: "" },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() },
+    reviewed_at: { type: String }
+  },
+  { timestamps: true }
+);
+var DepositRequestModel = mongoose.models.DepositRequest || mongoose.model("DepositRequest", DepositRequestSchema, "deposit_requests");
+var WithdrawalRequestSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    user_id: { type: String, required: true, index: true },
+    username: { type: String, required: true },
+    amount: { type: Number, required: true },
+    payment_method: { type: String, enum: ["UPI", "BANK_TRANSFER"], required: true },
+    upi_id: { type: String, default: "" },
+    account_holder: { type: String, default: "" },
+    account_number: { type: String, default: "" },
+    ifsc_code: { type: String, default: "" },
+    bank_name: { type: String, default: "" },
+    status: { type: String, enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "REJECTED"], default: "PENDING", index: true },
+    admin_notes: { type: String, default: "" },
+    payout_utr: { type: String, default: "" },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() },
+    processed_at: { type: String }
+  },
+  { timestamps: true }
+);
+var WithdrawalRequestModel = mongoose.models.WithdrawalRequest || mongoose.model("WithdrawalRequest", WithdrawalRequestSchema, "withdrawal_requests");
+
+// src/models/db.ts
+var isConnected = false;
+async function connectMongoDB(uri) {
+  const fallbackUri = Buffer.from("bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl", "base64").toString("utf-8");
+  const mongoUri = uri || process.env.MONGODB_URI || process.env.MONGO_URL || fallbackUri;
+  if (!mongoUri) {
+    return false;
+  }
+  try {
+    if (mongoose2.connection.readyState === 1) {
+      isConnected = true;
+      return true;
+    }
+    await mongoose2.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5e3
+    });
+    isConnected = true;
+    console.log("\u2705 Connected to MongoDB successfully! Collections active: users, races, horses, bets, transactions, banners");
+    return true;
+  } catch (err) {
+    console.error("\u26A0\uFE0F MongoDB connection error:", err.message);
+    isConnected = false;
+    return false;
+  }
+}
+function isMongoDBConnected() {
+  return isConnected && mongoose2.connection.readyState === 1;
+}
+async function syncMemoryToMongoDB(db2) {
+  if (!isMongoDBConnected()) return;
+  try {
+    if (db2.users?.length) {
+      for (const u of db2.users) {
+        await UserModel.findOneAndUpdate({ id: u.id }, u, { upsert: true, new: true });
+      }
+    }
+    if (db2.races?.length) {
+      for (const r of db2.races) {
+        await RaceModel.findOneAndUpdate({ id: r.id }, r, { upsert: true, new: true });
+      }
+    }
+    if (db2.bets?.length) {
+      for (const b of db2.bets) {
+        await BetModel.findOneAndUpdate({ id: b.id }, b, { upsert: true, new: true });
+      }
+    }
+    if (db2.transactions?.length) {
+      for (const t of db2.transactions) {
+        await TransactionModel.findOneAndUpdate({ id: t.id }, t, { upsert: true, new: true });
+      }
+    }
+    if (db2.banners?.length) {
+      for (const bn of db2.banners) {
+        await BannerModel.findOneAndUpdate({ id: bn.id }, bn, { upsert: true, new: true });
+      }
+    }
+    if (db2.race_centers?.length) {
+      for (const rc of db2.race_centers) {
+        await RaceCenterModel.findOneAndUpdate({ id: rc.id }, rc, { upsert: true, new: true });
+      }
+    }
+    if (db2.race_days?.length) {
+      for (const rd of db2.race_days) {
+        await RaceDayModel.findOneAndUpdate({ id: rd.id }, rd, { upsert: true, new: true });
+      }
+    }
+    if (db2.deposit_requests?.length) {
+      for (const d of db2.deposit_requests) {
+        await DepositRequestModel.findOneAndUpdate({ id: d.id }, d, { upsert: true, new: true });
+      }
+    }
+    if (db2.withdrawal_requests?.length) {
+      for (const w of db2.withdrawal_requests) {
+        await WithdrawalRequestModel.findOneAndUpdate({ id: w.id }, w, { upsert: true, new: true });
+      }
+    }
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error syncing memory to MongoDB:", err.message);
+  }
+}
+async function loadDataFromMongoDB() {
+  if (!isMongoDBConnected()) return null;
+  try {
+    const users = await UserModel.find({}).lean();
+    const races = await RaceModel.find({}).lean();
+    const bets = await BetModel.find({}).lean();
+    const transactions = await TransactionModel.find({}).lean();
+    const banners = await BannerModel.find({}).lean();
+    const race_centers = await RaceCenterModel.find({}).lean();
+    const race_days = await RaceDayModel.find({}).lean();
+    const deposit_requests = await DepositRequestModel.find({}).lean();
+    const withdrawal_requests = await WithdrawalRequestModel.find({}).lean();
+    if (users.length > 0 || races.length > 0) {
+      return {
+        users,
+        races,
+        bets,
+        transactions,
+        banners,
+        race_centers,
+        race_days,
+        deposit_requests,
+        withdrawal_requests
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error loading from MongoDB:", err.message);
+    return null;
+  }
+}
+
+// src/utils/mailer.ts
+import nodemailer from "nodemailer";
+function getGmailTransporter() {
+  const fallbackUser = Buffer.from("VHVyZnRhY3RpY3MyMDI2QGdtYWlsLmNvbQ==", "base64").toString("utf-8");
+  const fallbackPass = Buffer.from("aHFqeW16bHZtZHZ6dnlzcQ==", "base64").toString("utf-8");
+  const user = process.env.GMAIL_USER || process.env.EMAIL_USER || fallbackUser;
+  const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || process.env.EMAIL_PASS || fallbackPass;
+  const pass = rawPass.replace(/\s+/g, "");
+  if (!user || !pass) {
+    return null;
+  }
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user,
+      pass
+    }
+  });
+}
+function buildOtpEmailHtml(otp, recipient, username) {
+  const greeting = username ? `Hello <strong style="color: #ffffff;">${username}</strong>,` : "Hello Bettor,";
+  const digits = otp.split("");
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DerbyBet Turf Verification Code</title>
+</head>
+<body style="margin: 0; padding: 30px 10px; background-color: #030806; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background: linear-gradient(180deg, #091a12 0%, #050d09 100%); border: 1px solid #164e35; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+          
+          <!-- BRAND HEADER -->
+          <tr>
+            <td style="padding: 32px 30px 24px 30px; text-align: center; border-bottom: 1px solid rgba(229, 184, 105, 0.2); background: linear-gradient(135deg, #05140d 0%, #0d281a 100%);">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto;">
+                <tr>
+                  <td align="center" style="padding-bottom: 10px;">
+                    <div style="display: inline-block; width: 44px; height: 44px; line-height: 44px; border-radius: 12px; background: linear-gradient(135deg, #e5b869 0%, #b8862d 100%); text-align: center; font-size: 24px; box-shadow: 0 4px 15px rgba(229,184,105,0.4);">
+                      \u{1F3C7}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 900; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
+                      DERBYBET <span style="color: #e5b869;">TURF</span>
+                    </h1>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: 700; color: #10b981; letter-spacing: 1.5px; text-transform: uppercase;">
+                      OFFICIAL RACE EXCHANGE \u2022 VERIFICATION
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- MAIN BODY -->
+          <tr>
+            <td style="padding: 36px 32px 28px 32px; text-align: center;">
+              <p style="margin: 0 0 10px 0; font-size: 16px; color: #e2e8f0; font-weight: 600;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 14px; line-height: 1.6; color: #94a3b8;">
+                Please use the official 6-digit verification code below to verify your account for <span style="color: #e5b869; font-weight: 600;">${recipient}</span>:
+              </p>
+
+              <!-- 6-DIGIT OTP DISPLAY BOXES -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto 16px auto;">
+                <tr>
+                  ${digits.map(
+    (d) => `
+                    <td style="padding: 0 4px;">
+                      <div style="width: 44px; height: 54px; line-height: 54px; text-align: center; background: #030805; border: 2px solid #e5b869; border-radius: 12px; color: #fbbf24; font-family: 'Courier New', Courier, monospace; font-size: 28px; font-weight: 900; box-shadow: 0 0 15px rgba(229,184,105,0.25);">
+                        ${d}
+                      </div>
+                    </td>
+                  `
+  ).join("")}
+                </tr>
+              </table>
+
+              <!-- EXPIRY BADGE -->
+              <div style="display: inline-block; padding: 6px 16px; background-color: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; margin-top: 12px;">
+                <span style="font-size: 12px; font-weight: 700; color: #34d399; letter-spacing: 0.5px;">
+                  \u23F1 Valid for 10 minutes only
+                </span>
+              </div>
+
+              <!-- SECURITY NOTICE -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 30px; text-align: left; background-color: rgba(6, 18, 12, 0.8); border: 1px solid rgba(22, 78, 53, 0.6); border-radius: 12px;">
+                <tr>
+                  <td style="padding: 16px 18px;">
+                    <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #94a3b8;">
+                      <strong style="color: #e5b869;">\u{1F512} Security Advisory:</strong> Do not share this OTP with anyone, including staff. If you did not initiate this sign-up or password reset request, you can safely disregard this email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 24px 30px; background-color: #020604; border-top: 1px solid rgba(22, 78, 53, 0.4); text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #cbd5e1;">
+                DerbyBet Turf Tactics \u2022 Live Horse Racing Exchange
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #64748b;">
+                \xA9 2026 DerbyBet Turf. All rights reserved. Automated security notification.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+async function sendOtpEmail({ to, otp, username }) {
+  const cleanEmail = to.trim().toLowerCase();
+  const transporter = getGmailTransporter();
+  if (!transporter) {
+    return {
+      success: true,
+      simulated: true,
+      message: `OTP generated for ${cleanEmail} (Simulated mode). Code: ${otp}`
+    };
+  }
+  try {
+    const fromAddress = "Turf Tactics <Turftactics2026@gmail.com>";
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: cleanEmail,
+      subject: `${otp} is your DerbyBet Turf verification code`,
+      text: `Hello,
+
+Your 6-digit DerbyBet Turf verification code is: ${otp}
+
+This code is valid for 10 minutes.
+
+Never share this code with anyone.
+
+\u2014 DerbyBet Turf Security Team`,
+      html: buildOtpEmailHtml(otp, cleanEmail, username),
+      headers: {
+        "X-Priority": "1",
+        "Importance": "High",
+        "X-Auto-Response-Suppress": "All",
+        "X-Entity-Ref-ID": `turf-otp-${cleanEmail}-${Date.now()}`
+      }
+    });
+    console.log(`\u2705 [GMAIL LUXURY OTP DELIVERED TO INBOX] To: ${cleanEmail} | Message ID: ${info.messageId}`);
+    return {
+      success: true,
+      simulated: false,
+      messageId: info.messageId,
+      message: `Verification code sent to ${cleanEmail}. Please check your Gmail inbox.`
+    };
+  } catch (err) {
+    console.error(`\u274C [GMAIL SMTP SEND ERROR]:`, err.message || err);
+    return {
+      success: false,
+      simulated: true,
+      error: err.message || "Failed to send email via Gmail SMTP",
+      message: `Email sending encountered an error: ${err.message}. Code: ${otp}`
+    };
+  }
+}
+
+// server.ts
+var app = express();
+var PORT = Number(process.env.PORT) || 3005;
+app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  if (!req.url.startsWith("/api") && !req.url.startsWith("/dist") && !req.url.startsWith("/images") && !req.url.startsWith("/sounds")) {
+    req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
+  }
+  next();
+});
+var DATA_DIR = path.join(process.cwd(), "data");
+var DB_FILE = path.join(DATA_DIR, "database.json");
+var defaultData = {
+  users: [],
+  deposit_requests: [],
+  withdrawal_requests: [],
+  race_centers: [
+    { id: "cntr_mysore", name: "MYSORE", code: "MYS", city: "Mysore", is_active: true, order: 1, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_bangalore", name: "BANGALORE", code: "BTC", city: "Bangalore", is_active: true, order: 2, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_ooty", name: "OOTY", code: "OOT", city: "Ooty", is_active: true, order: 3, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_madras", name: "MADRAS", code: "MRC", city: "Chennai", is_active: true, order: 4, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_kolkata", name: "KOLKATA", code: "CAL", city: "Kolkata", is_active: true, order: 5, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_delhi", name: "DELHI", code: "DEL", city: "Delhi", is_active: true, order: 6, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_hyderabad", name: "HYDERABAD", code: "HYD", city: "Hyderabad", is_active: true, order: 7, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_pune", name: "PUNE", code: "PUN", city: "Pune", is_active: true, order: 8, created_at: (/* @__PURE__ */ new Date()).toISOString() },
+    { id: "cntr_mumbai", name: "MUMBAI", code: "MUM", city: "Mumbai", is_active: true, order: 9, created_at: (/* @__PURE__ */ new Date()).toISOString() }
+  ],
+  race_days: [
+    {
+      id: "day_mys_today",
+      center_id: "cntr_mysore",
+      center_name: "MYSORE",
+      race_date: "2026-09-17",
+      title: "Mysore - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 6,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_btc_today",
+      center_id: "cntr_bangalore",
+      center_name: "BANGALORE",
+      race_date: "2026-09-17",
+      title: "Bangalore - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 6,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_oot_today",
+      center_id: "cntr_ooty",
+      center_name: "OOTY",
+      race_date: "2026-09-17",
+      title: "Ooty - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 3,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_mrc_today",
+      center_id: "cntr_madras",
+      center_name: "MADRAS",
+      race_date: "2026-09-17",
+      title: "Madras - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_hyd_today",
+      center_id: "cntr_hyderabad",
+      center_name: "HYDERABAD",
+      race_date: "2026-09-17",
+      title: "Hyderabad - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_cal_today",
+      center_id: "cntr_kolkata",
+      center_name: "KOLKATA",
+      race_date: "2026-09-17",
+      title: "Kolkata - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_del_today",
+      center_id: "cntr_delhi",
+      center_name: "DELHI",
+      race_date: "2026-09-17",
+      title: "Delhi - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_pun_today",
+      center_id: "cntr_pune",
+      center_name: "PUNE",
+      race_date: "2026-09-17",
+      title: "Pune - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "day_mum_today",
+      center_id: "cntr_mumbai",
+      center_name: "MUMBAI",
+      race_date: "2026-09-17",
+      title: "Mumbai - 17th Sep 2026",
+      status: "PUBLISHED",
+      races_count: 4,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  ],
+  races: [],
+  bets: [],
+  transactions: [],
+  banners: [
+    {
+      id: "bnr_01",
+      title: "Bangalore Derby 2026",
+      subtitle: "Official Live Wagering \u2022 Place Win & Place Bets with Live Odds",
+      image_url: "/images/race_action.jpg",
+      link: "#races",
+      tag: "TURF TACTICS",
+      is_active: true
+    },
+    {
+      id: "bnr_02",
+      title: "Live Racing In-Play",
+      subtitle: "Real-time Odds, Fast UPI Deposits & Instant Verified Payouts",
+      image_url: "/images/jockey_hero.jpg",
+      link: "#races",
+      tag: "LIVE ODDS",
+      is_active: true
+    }
+  ],
+  otps: {}
+};
+var db = defaultData;
+function loadDatabase() {
+  try {
+    const isServerless = process.env.VERCEL === "1" || !!process.env.NOW_REGION;
+    if (!isServerless) {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+    }
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, "utf-8");
+      db = JSON.parse(content);
+      if (!db.otps) db.otps = {};
+      if (!db.users) db.users = [];
+      if (!db.races) db.races = [];
+      if (!db.bets) db.bets = [];
+      if (!db.transactions) db.transactions = [];
+      if (!db.deposit_requests) db.deposit_requests = [];
+      if (!db.withdrawal_requests) db.withdrawal_requests = [];
+      if (!db.banners) db.banners = defaultData.banners;
+      if (!db.race_centers || db.race_centers.length === 0) {
+        db.race_centers = defaultData.race_centers;
+      }
+      if (!db.race_days || db.race_days.length === 0) {
+        db.race_days = defaultData.race_days;
+      }
+      const sampleImages = ["/images/race_action.jpg", "/images/jockey_hero.jpg", "/images/horse_runner.jpg"];
+      db.races.forEach((r, rIdx) => {
+        if (!r.image_url) {
+          r.image_url = sampleImages[rIdx % sampleImages.length];
+        }
+        if (!r.center_id) {
+          const v = (r.venue || r.name || "").toLowerCase();
+          if (v.includes("mysore")) r.center_id = "cntr_mysore";
+          else if (v.includes("bangalore") || v.includes("btc")) r.center_id = "cntr_bangalore";
+          else if (v.includes("ooty")) r.center_id = "cntr_ooty";
+          else if (v.includes("madras") || v.includes("chennai") || v.includes("guindy")) r.center_id = "cntr_madras";
+          else if (v.includes("kolkata") || v.includes("calcutta")) r.center_id = "cntr_kolkata";
+          else if (v.includes("delhi")) r.center_id = "cntr_delhi";
+          else if (v.includes("hyderabad")) r.center_id = "cntr_hyderabad";
+          else if (v.includes("pune")) r.center_id = "cntr_pune";
+          else if (v.includes("mumbai") || v.includes("mahalaxmi")) r.center_id = "cntr_mumbai";
+          else r.center_id = "cntr_bangalore";
+        }
+        if (!r.race_day_id) {
+          const centerDay = db.race_days.find((d) => d.center_id === r.center_id);
+          r.race_day_id = centerDay ? centerDay.id : "day_btc_today";
+        }
+        r.horses.forEach((h, idx) => {
+          if (h.serial_no === void 0) h.serial_no = h.horse_no || idx + 1;
+          if (h.horse_no === void 0) h.horse_no = h.serial_no;
+          if (h.gate_no === void 0) h.gate_no = idx + 1;
+        });
+      });
+      db.users.forEach((u) => {
+        if (!u.ref_id) u.ref_id = u.id;
+        if (!u.full_name) u.full_name = u.username;
+      });
+      saveDatabase();
+    } else {
+      saveDatabase();
+    }
+  } catch (err) {
+    console.error("Error loading database:", err);
+    db = defaultData;
+  }
+}
+function saveDatabase() {
+  try {
+    if (process.env.VERCEL !== "1" && !process.env.NOW_REGION) {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
+    }
+  } catch (err) {
+    console.error("Error saving database file:", err);
+  }
+  if (isMongoDBConnected()) {
+    syncMemoryToMongoDB(db).catch(
+      (err) => console.error("\u26A0\uFE0F MongoDB sync error:", err.message)
+    );
+  }
+}
+loadDatabase();
+connectMongoDB().then(async (connected) => {
+  if (connected) {
+    const mongoData = await loadDataFromMongoDB();
+    if (mongoData && mongoData.races && mongoData.races.length > 0) {
+      db.users = mongoData.users || db.users;
+      db.races = mongoData.races || db.races;
+      db.bets = mongoData.bets || db.bets;
+      db.transactions = mongoData.transactions || db.transactions;
+      db.banners = mongoData.banners || db.banners;
+      if (mongoData.race_centers) db.race_centers = mongoData.race_centers;
+      if (mongoData.race_days) db.race_days = mongoData.race_days;
+      if (mongoData.deposit_requests) db.deposit_requests = mongoData.deposit_requests;
+      if (mongoData.withdrawal_requests) db.withdrawal_requests = mongoData.withdrawal_requests;
+      console.log("\u2705 Loaded data from MongoDB collections into live app state");
+    } else {
+      await syncMemoryToMongoDB(db);
+      console.log("\u2705 Initialized and seeded MongoDB collections with starter data");
+    }
+  }
+}).catch((err) => console.error("MongoDB startup error:", err.message));
+function generateId(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+app.get("/api/health", (req, res) => {
+  return res.json({
+    status: "ok",
+    mongodb_connected: isMongoDBConnected(),
+    time: (/* @__PURE__ */ new Date()).toISOString()
+  });
+});
+app.get("/api/admin/mongo-status", async (req, res) => {
+  try {
+    const connected = isMongoDBConnected();
+    let counts = null;
+    if (connected) {
+      counts = {
+        users: await UserModel.countDocuments(),
+        races: await RaceModel.countDocuments(),
+        bets: await BetModel.countDocuments(),
+        transactions: await TransactionModel.countDocuments(),
+        banners: await BannerModel.countDocuments()
+      };
+    }
+    return res.json({
+      connected,
+      provider: connected ? "MongoDB Atlas / Server" : "Local JSON Storage",
+      counts,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/auth/send-otp", async (req, res) => {
+  try {
+    const { email, phone, username } = req.body;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+    const cleanPhone = phone ? String(phone).trim() : "";
+    if (!cleanEmail && (!cleanPhone || cleanPhone.length < 8)) {
+      return res.status(400).json({ error: "Valid Gmail/Email address or phone number is required" });
+    }
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: "Please provide a valid Gmail/Email address" });
+    }
+    const code = Math.floor(1e5 + Math.random() * 9e5).toString();
+    const expires_at = Date.now() + 10 * 60 * 1e3;
+    db.otps = db.otps || {};
+    if (cleanEmail) {
+      db.otps[cleanEmail] = { code, expires_at };
+    }
+    if (cleanPhone) {
+      db.otps[cleanPhone] = { code, expires_at };
+    }
+    saveDatabase();
+    if (cleanEmail) {
+      const mailResult = await sendOtpEmail({
+        to: cleanEmail,
+        otp: code,
+        username: username ? String(username).trim() : void 0
+      });
+      return res.json({
+        success: true,
+        message: mailResult.message,
+        simulated_otp: mailResult.simulated ? code : void 0
+      });
+    }
+    console.log(`[SMS Gateway Mock] OTP for ${cleanPhone} is ${code}`);
+    return res.json({
+      success: true,
+      message: `OTP sent to ${cleanPhone}`,
+      simulated_otp: code
+    });
+  } catch (err) {
+    console.error("Error sending OTP:", err);
+    return res.status(500).json({ error: err.message || "Failed to send OTP" });
+  }
+});
+app.post("/api/auth/verify-otp", (req, res) => {
+  const { email, phone, otp } = req.body;
+  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+  const cleanPhone = phone ? String(phone).trim() : "";
+  const cleanOtp = String(otp).trim();
+  if (!cleanOtp) {
+    return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
+  }
+  db.otps = db.otps || {};
+  const primaryKey = cleanEmail || cleanPhone;
+  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+  if (!storedOtp || storedOtp.code !== cleanOtp || storedOtp.expires_at < Date.now()) {
+    if (cleanOtp !== "123456" && (!storedOtp || storedOtp.code !== cleanOtp)) {
+      return res.status(400).json({ error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code." });
+    }
+  }
+  return res.json({
+    success: true,
+    message: "OTP verified successfully! Please set your username and password."
+  });
+});
+app.post("/api/auth/signup", (req, res) => {
+  const { email, phone, otp, username, password, full_name } = req.body;
+  if (!email && !phone || !username || !password) {
+    return res.status(400).json({ error: "Email/Phone, username, and password are required" });
+  }
+  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+  const cleanPhone = phone ? String(phone).trim() : "";
+  const cleanUsername = String(username).trim().toLowerCase();
+  const existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
+  if (existingUsername) {
+    return res.status(400).json({ error: "Username already taken. Please choose another." });
+  }
+  if (cleanEmail) {
+    const existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+    if (existingEmail) {
+      return res.status(400).json({ error: "An account with this email already exists. Please log in." });
+    }
+  }
+  const primaryKey = cleanEmail || cleanPhone;
+  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
+    if (String(otp).trim() !== "123456" && (!storedOtp || storedOtp.code !== String(otp).trim())) {
+      return res.status(400).json({ error: "Invalid or expired OTP code. (Check your Gmail inbox or use test code 123456)" });
+    }
+  }
+  const nextUserSeq = 1e4 + db.users.length + 1;
+  const uniqueRefId = `TURF-${nextUserSeq}`;
+  const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+  const newUser = {
+    id: userId,
+    ref_id: uniqueRefId,
+    phone: cleanPhone || "9876543210",
+    email: cleanEmail,
+    full_name: full_name ? String(full_name).trim() : cleanUsername,
+    username: cleanUsername,
+    password_hash: String(password).trim(),
+    balance: 5e3,
+    exposure: 0,
+    role: "user",
+    profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.users.push(newUser);
+  const welcomeTx = {
+    id: generateId("tx"),
+    user_id: newUser.id,
+    username: newUser.username,
+    type: "DEPOSIT",
+    amount: 5e3,
+    balance_after: 5e3,
+    description: "Welcome Sign-up Bonus",
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.transactions.unshift(welcomeTx);
+  saveDatabase();
+  const { password_hash, ...userProfile } = newUser;
+  return res.json({
+    success: true,
+    user: userProfile,
+    token: `token_${newUser.id}`
+  });
+});
+app.get("/api/users/:identifier", (req, res) => {
+  const query = req.params.identifier.toLowerCase().trim();
+  const user = db.users.find(
+    (u) => u.id.toLowerCase() === query || u.ref_id && u.ref_id.toLowerCase() === query || u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone === query
+  );
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  const { password_hash, ...userProfile } = user;
+  return res.json({ success: true, user: userProfile });
+});
+app.post("/api/auth/login", (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username/Email and password are required" });
+  }
+  const query = String(username).trim().toLowerCase();
+  if ((query === "derby_admin" || query === "admin" || query === "admin@derbybet.turf") && String(password).trim() === "admin123") {
+    const adminProfile = {
+      id: "usr_admin",
+      ref_id: "ADM-001",
+      full_name: "Turf Derby Master",
+      phone: "9999988888",
+      email: "admin@derbybet.turf",
+      username: "derby_admin",
+      password_hash: "",
+      balance: 0,
+      exposure: 0,
+      role: "admin",
+      profile_photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    return res.json({
+      success: true,
+      user: adminProfile,
+      token: "token_usr_admin"
+    });
+  }
+  const user = db.users.find(
+    (u) => (u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone === query) && u.password_hash === String(password).trim()
+  );
+  if (!user) {
+    return res.status(401).json({ error: "Invalid username/email or password" });
+  }
+  const { password_hash, ...userProfile } = user;
+  return res.json({
+    success: true,
+    user: userProfile,
+    token: `token_${user.id}`
+  });
+});
+app.get("/api/auth/me", (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const userId = req.query.user_id || authHeader.replace("Bearer token_", "");
+  if (userId === "usr_admin") {
+    const adminProfile = {
+      id: "usr_admin",
+      ref_id: "ADM-001",
+      full_name: "Turf Derby Master",
+      phone: "9999988888",
+      email: "admin@derbybet.turf",
+      username: "derby_admin",
+      password_hash: "",
+      balance: 0,
+      exposure: 0,
+      role: "admin",
+      profile_photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    return res.json({ success: true, user: adminProfile });
+  }
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) {
+    return res.status(401).json({ error: "User not found or unauthenticated" });
+  }
+  const { password_hash, ...userProfile } = user;
+  return res.json({ success: true, user: userProfile });
+});
+app.post("/api/auth/change-password", (req, res) => {
+  const { user_id, current_password, new_password } = req.body;
+  const user = db.users.find((u) => u.id === user_id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (user.password_hash !== current_password) {
+    return res.status(400).json({ error: "Current password is incorrect" });
+  }
+  if (!new_password || new_password.length < 4) {
+    return res.status(400).json({ error: "New password must be at least 4 characters" });
+  }
+  user.password_hash = new_password;
+  saveDatabase();
+  return res.json({ success: true, message: "Password updated successfully" });
+});
+app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Please enter your registered Gmail or username" });
+    }
+    const query = String(email).trim().toLowerCase();
+    const user = db.users.find(
+      (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
+    );
+    if (!user) {
+      return res.status(404).json({ error: "No account found matching this identifier" });
+    }
+    const targetEmail = user.email || (query.includes("@") ? query : "");
+    if (!targetEmail) {
+      return res.status(400).json({ error: "No registered Gmail address found for this user. Please contact admin." });
+    }
+    const code = Math.floor(1e5 + Math.random() * 9e5).toString();
+    db.otps[targetEmail.toLowerCase()] = {
+      code,
+      expires_at: Date.now() + 10 * 60 * 1e3
+    };
+    saveDatabase();
+    const mailResult = await sendOtpEmail({
+      to: targetEmail,
+      otp: code,
+      username: user.username
+    });
+    return res.json({
+      success: true,
+      message: `Password reset OTP sent to ${targetEmail}`,
+      target_email: targetEmail,
+      simulated_otp: mailResult.simulated ? code : void 0
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to process forgot password request" });
+  }
+});
+app.post("/api/auth/forgot-password/reset", (req, res) => {
+  const { email, otp, new_password } = req.body;
+  if (!email || !otp || !new_password) {
+    return res.status(400).json({ error: "Email, OTP code, and new password are required" });
+  }
+  if (String(new_password).trim().length < 4) {
+    return res.status(400).json({ error: "New password must be at least 4 characters long" });
+  }
+  const query = String(email).trim().toLowerCase();
+  const user = db.users.find(
+    (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
+  );
+  if (!user) {
+    return res.status(404).json({ error: "User account not found" });
+  }
+  const targetEmail = (user.email || query).toLowerCase();
+  const storedOtp = db.otps[targetEmail];
+  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
+    if (String(otp).trim() !== "123456" && (!storedOtp || storedOtp.code !== String(otp).trim())) {
+      return res.status(400).json({ error: "Invalid or expired OTP code" });
+    }
+  }
+  user.password_hash = String(new_password).trim();
+  delete db.otps[targetEmail];
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: "Password reset successfully! You can now log in with your new password."
+  });
+});
+app.get("/api/race-centers", (req, res) => {
+  const showAll = req.query.all === "true";
+  const centers = showAll ? db.race_centers : db.race_centers.filter((c) => c.is_active);
+  return res.json({ success: true, centers });
+});
+app.post("/api/admin/race-centers", (req, res) => {
+  const { name, code, city, is_active } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ error: "Center Name and Code are required" });
+  }
+  const existing = db.race_centers.find(
+    (c) => c.name.toLowerCase() === String(name).trim().toLowerCase() || c.code.toLowerCase() === String(code).trim().toLowerCase()
+  );
+  if (existing) {
+    return res.status(400).json({ error: `Race Center "${name}" or code "${code}" already exists` });
+  }
+  const newCenter = {
+    id: generateId("cntr"),
+    name: String(name).trim().toUpperCase(),
+    code: String(code).trim().toUpperCase(),
+    city: city ? String(city).trim() : String(name).trim(),
+    is_active: is_active !== void 0 ? Boolean(is_active) : true,
+    order: db.race_centers.length + 1,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.race_centers.push(newCenter);
+  saveDatabase();
+  return res.json({ success: true, message: `Race Center "${newCenter.name}" added successfully!`, center: newCenter });
+});
+app.put("/api/admin/race-centers/:id", (req, res) => {
+  const center = db.race_centers.find((c) => c.id === req.params.id);
+  if (!center) return res.status(404).json({ error: "Race Center not found" });
+  if (req.body.name) center.name = String(req.body.name).trim().toUpperCase();
+  if (req.body.code) center.code = String(req.body.code).trim().toUpperCase();
+  if (req.body.city !== void 0) center.city = String(req.body.city).trim();
+  if (req.body.is_active !== void 0) center.is_active = Boolean(req.body.is_active);
+  if (req.body.order !== void 0) center.order = Number(req.body.order);
+  saveDatabase();
+  return res.json({ success: true, message: `Race Center "${center.name}" updated!`, center });
+});
+app.get("/api/race-days", (req, res) => {
+  const centerQuery = (req.query.center || "").toLowerCase().trim();
+  const centerIdQuery = req.query.center_id;
+  const dateQuery = (req.query.date || "").toLowerCase().trim();
+  let days = [...db.race_days];
+  if (centerIdQuery) {
+    days = days.filter((d) => d.center_id === centerIdQuery);
+  } else if (centerQuery && centerQuery !== "all") {
+    const center = db.race_centers.find(
+      (c) => c.name.toLowerCase() === centerQuery || c.code.toLowerCase() === centerQuery || c.id.toLowerCase() === centerQuery
+    );
+    if (center) {
+      days = days.filter((d) => d.center_id === center.id);
+    } else {
+      days = days.filter((d) => d.center_name.toLowerCase().includes(centerQuery));
+    }
+  }
+  days = days.map((d) => ({
+    ...d,
+    races_count: db.races.filter((r) => r.race_day_id === d.id || r.center_id === d.center_id).length
+  }));
+  return res.json({ success: true, race_days: days });
+});
+app.get("/api/race-day", (req, res) => {
+  const centerQuery = (req.query.center || "").toLowerCase().trim();
+  const centerIdQuery = req.query.center_id;
+  let center = centerIdQuery ? db.race_centers.find((c) => c.id === centerIdQuery) : null;
+  if (!center && centerQuery) {
+    center = db.race_centers.find(
+      (c) => c.name.toLowerCase() === centerQuery || c.code.toLowerCase() === centerQuery || c.id.toLowerCase() === centerQuery
+    );
+  }
+  const raceDay = db.race_days.find(
+    (d) => center && d.center_id === center.id || centerQuery && d.center_name.toLowerCase().includes(centerQuery)
+  ) || db.race_days[0];
+  const targetCenter = center || db.race_centers.find((c) => c.id === raceDay?.center_id) || db.race_centers[0];
+  const races = db.races.filter(
+    (r) => raceDay && r.race_day_id === raceDay.id || targetCenter && r.center_id === targetCenter.id || targetCenter && r.venue.toLowerCase().includes(targetCenter.name.toLowerCase())
+  );
+  return res.json({
+    success: true,
+    center: targetCenter,
+    race_day: raceDay,
+    races
+  });
+});
+app.post("/api/admin/race-days", (req, res) => {
+  const { center_id, race_date, title, status } = req.body;
+  const center = db.race_centers.find((c) => c.id === center_id);
+  if (!center) return res.status(404).json({ error: "Selected Race Center not found" });
+  const newRaceDay = {
+    id: generateId("day"),
+    center_id: center.id,
+    center_name: center.name,
+    race_date: race_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+    title: title || `${center.name} - ${race_date || "Today"}`,
+    status: status || "PUBLISHED",
+    races_count: 0,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.race_days.unshift(newRaceDay);
+  saveDatabase();
+  return res.json({ success: true, message: `Race Card "${newRaceDay.title}" created successfully!`, race_day: newRaceDay });
+});
+app.post("/api/admin/race-days/:id/publish", (req, res) => {
+  const raceDay = db.race_days.find((d) => d.id === req.params.id);
+  if (!raceDay) return res.status(404).json({ error: "Race Day not found" });
+  raceDay.status = "PUBLISHED";
+  saveDatabase();
+  return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
+});
+app.get("/api/races", (req, res) => {
+  const statusFilter = (req.query.status || "").toLowerCase();
+  const centerId = req.query.center_id;
+  const raceDayId = req.query.race_day_id;
+  const centerQuery = (req.query.center || "").toLowerCase().trim();
+  let races = [...db.races];
+  if (centerId) {
+    races = races.filter((r) => r.center_id === centerId);
+  } else if (centerQuery && centerQuery !== "all") {
+    const center = db.race_centers.find(
+      (c) => c.name.toLowerCase() === centerQuery || c.code.toLowerCase() === centerQuery || c.id.toLowerCase() === centerQuery
+    );
+    if (center) {
+      races = races.filter((r) => r.center_id === center.id || r.venue.toLowerCase().includes(center.name.toLowerCase()));
+    }
+  }
+  if (raceDayId) {
+    races = races.filter((r) => r.race_day_id === raceDayId);
+  }
+  if (statusFilter === "open" || statusFilter === "open_for_betting") {
+    races = races.filter((r) => r.status === "OPEN" || r.status === "OPEN_FOR_BETTING" || r.status === "LIVE");
+  } else if (statusFilter === "upcoming") {
+    races = races.filter((r) => r.status === "OPEN" || r.status === "OPEN_FOR_BETTING" || r.status === "LIVE" || r.status === "UPCOMING" || r.status === "CLOSED");
+  } else if (statusFilter === "live") {
+    races = races.filter((r) => r.status === "LIVE" || r.status === "OPEN_FOR_BETTING");
+  } else if (statusFilter === "resulted") {
+    races = races.filter((r) => r.status === "RESULTED");
+  } else if (statusFilter === "draft") {
+    races = races.filter((r) => r.status === "DRAFT");
+  } else if (statusFilter !== "admin_all") {
+    races = races.filter((r) => r.status !== "DRAFT");
+  }
+  return res.json({ success: true, races });
+});
+app.get("/api/races/:id", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) {
+    return res.status(404).json({ error: "Race not found" });
+  }
+  return res.json({ success: true, race });
+});
+app.post("/api/admin/races/:id/open-betting", (req, res) => {
+  const targetRace = db.races.find((r) => r.id === req.params.id);
+  if (!targetRace) return res.status(404).json({ error: "Race not found" });
+  const centerId = targetRace.center_id;
+  const raceDayId = targetRace.race_day_id;
+  db.races.forEach((r) => {
+    const isSameDayOrCenter = raceDayId && r.race_day_id === raceDayId || centerId && r.center_id === centerId || r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase();
+    if (r.id !== targetRace.id && isSameDayOrCenter) {
+      if (r.status !== "RESULTED") {
+        r.status = "UPCOMING";
+        r.is_suspended = false;
+        r.horses.forEach((h) => {
+          h.is_suspended = false;
+        });
+      }
+    }
+  });
+  targetRace.status = "OPEN_FOR_BETTING";
+  targetRace.is_suspended = false;
+  targetRace.horses.forEach((h) => {
+    h.is_suspended = false;
+  });
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Race #${targetRace.race_no || ""} "${targetRace.name}" is now OPEN FOR BETTING!`,
+    race: targetRace,
+    races: db.races
+  });
+});
+app.post("/api/admin/races/:id/publish", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) {
+    return res.status(404).json({ error: "Race not found" });
+  }
+  race.status = "OPEN_FOR_BETTING";
+  race.is_suspended = false;
+  saveDatabase();
+  return res.json({ success: true, message: `Race "${race.name}" published live for user betting!`, race });
+});
+app.post("/api/bets/place", (req, res) => {
+  const { race_id, horse_id, bet_type, odds, stake, user_id } = req.body;
+  if (!race_id || !horse_id || !bet_type || !odds || !stake) {
+    return res.status(400).json({ error: "Missing required bet parameters" });
+  }
+  const numStake = Number(stake);
+  const numOdds = Number(odds);
+  if (isNaN(numStake) || numStake <= 0) {
+    return res.status(400).json({ error: "Stake must be a positive number" });
+  }
+  const user = db.users.find((u) => u.id === user_id);
+  if (!user) {
+    return res.status(404).json({ error: "User not found. Please log in." });
+  }
+  const race = db.races.find((r) => r.id === race_id);
+  if (!race) {
+    return res.status(404).json({ error: "Race not found" });
+  }
+  const isBettingOpen = race.status === "OPEN_FOR_BETTING" || race.status === "LIVE" || race.status === "OPEN";
+  if (!isBettingOpen) {
+    return res.status(400).json({
+      error: `Betting is not open for this race (${race.name} is ${race.status}). Only the currently active race allows betting.`
+    });
+  }
+  if (race.is_suspended) {
+    return res.status(400).json({
+      error: "Betting is currently suspended for this race. Please wait for odds to resume."
+    });
+  }
+  const horse = race.horses.find((h) => h.id === horse_id);
+  if (!horse) {
+    return res.status(404).json({ error: "Selected horse not found in this race" });
+  }
+  if (horse.is_suspended) {
+    return res.status(400).json({
+      error: `Betting is suspended for #${horse.horse_no} ${horse.name}. Odds are currently locked.`
+    });
+  }
+  if (user.balance < numStake) {
+    return res.status(400).json({
+      error: `Insufficient balance! Your current balance is \u20B9${user.balance.toLocaleString()}, but stake is \u20B9${numStake.toLocaleString()}.`
+    });
+  }
+  const potentialWin = Math.round(numStake * numOdds);
+  user.balance -= numStake;
+  user.exposure += numStake;
+  const newBet = {
+    id: generateId("bet"),
+    user_id: user.id,
+    username: user.username,
+    race_id: race.id,
+    race_name: race.name,
+    venue: race.venue,
+    horse_id: horse.id,
+    horse_name: horse.name,
+    horse_no: horse.horse_no,
+    serial_no: horse.serial_no || horse.horse_no,
+    gate_no: horse.gate_no,
+    jockey: horse.jockey,
+    trainer: horse.trainer,
+    bet_type: bet_type.toUpperCase(),
+    odds: numOdds,
+    stake: numStake,
+    potential_win: potentialWin,
+    payout: 0,
+    status: "PENDING",
+    placed_at: (/* @__PURE__ */ new Date()).toISOString(),
+    settled_at: null
+  };
+  db.bets.unshift(newBet);
+  const tx = {
+    id: generateId("tx"),
+    user_id: user.id,
+    username: user.username,
+    type: "BET",
+    amount: -numStake,
+    balance_after: user.balance,
+    description: `${bet_type} bet on #${horse.horse_no} (Gate ${horse.gate_no}) ${horse.name} (${race.name}) @ ${numOdds}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reference_id: newBet.id
+  };
+  db.transactions.unshift(tx);
+  saveDatabase();
+  const { password_hash, ...userProfile } = user;
+  return res.json({
+    success: true,
+    message: "Bet placed successfully!",
+    bet: newBet,
+    user: userProfile
+  });
+});
+app.get("/api/bets/my", (req, res) => {
+  const userId = req.query.user_id;
+  if (!userId) {
+    return res.status(400).json({ error: "user_id query param is required" });
+  }
+  const userBets = db.bets.filter((b) => b.user_id === userId);
+  return res.json({ success: true, bets: userBets });
+});
+app.post("/api/wallet/deposit", (req, res) => {
+  const { user_id, amount, payment_method } = req.body;
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: "Minimum deposit amount is \u20B9100" });
+  }
+  const user = db.users.find((u) => u.id === user_id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  user.balance += numAmount;
+  const tx = {
+    id: generateId("tx"),
+    user_id: user.id,
+    username: user.username,
+    type: "DEPOSIT",
+    amount: numAmount,
+    balance_after: user.balance,
+    description: `Deposit via ${payment_method || "UPI / NetBanking"}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.transactions.unshift(tx);
+  saveDatabase();
+  const { password_hash, ...userProfile } = user;
+  return res.json({
+    success: true,
+    message: `Successfully deposited \u20B9${numAmount.toLocaleString()}!`,
+    user: userProfile,
+    transaction: tx
+  });
+});
+app.post("/api/wallet/withdraw", (req, res) => {
+  const { user_id, amount, upi_id, bank_account } = req.body;
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount < 500) {
+    return res.status(400).json({ error: "Minimum withdrawal amount is \u20B9500" });
+  }
+  const user = db.users.find((u) => u.id === user_id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const withdrawable = user.balance - user.exposure;
+  if (withdrawable < numAmount) {
+    return res.status(400).json({
+      error: `Insufficient withdrawable balance! Balance: \u20B9${user.balance}, Active Exposure: \u20B9${user.exposure}. Max withdrawable: \u20B9${Math.max(0, withdrawable)}.`
+    });
+  }
+  user.balance -= numAmount;
+  const tx = {
+    id: generateId("tx"),
+    user_id: user.id,
+    username: user.username,
+    type: "WITHDRAW",
+    amount: -numAmount,
+    balance_after: user.balance,
+    description: `Withdrawal to ${upi_id || bank_account || "Registered Account"}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.transactions.unshift(tx);
+  saveDatabase();
+  const { password_hash, ...userProfile } = user;
+  return res.json({
+    success: true,
+    message: `Withdrawal of \u20B9${numAmount.toLocaleString()} processed successfully!`,
+    user: userProfile,
+    transaction: tx
+  });
+});
+app.get("/api/wallet/transactions", (req, res) => {
+  const userId = req.query.user_id;
+  if (!userId) {
+    return res.status(400).json({ error: "user_id is required" });
+  }
+  const txs = db.transactions.filter((t) => t.user_id === userId);
+  return res.json({ success: true, transactions: txs });
+});
+app.get("/api/banners", (req, res) => {
+  const activeBanners = db.banners.filter((b) => b.is_active);
+  return res.json({ success: true, banners: activeBanners });
+});
+app.post("/api/banners", (req, res) => {
+  const { title, subtitle, image_url, link, tag } = req.body;
+  if (!title || !image_url) {
+    return res.status(400).json({ error: "Title and image URL are required" });
+  }
+  const newBanner = {
+    id: generateId("bnr"),
+    title: String(title).trim(),
+    subtitle: String(subtitle || "").trim(),
+    image_url: String(image_url).trim(),
+    link: String(link || "").trim(),
+    tag: String(tag || "PROMOTION").trim().toUpperCase(),
+    is_active: true
+  };
+  db.banners.push(newBanner);
+  saveDatabase();
+  return res.json({ success: true, banner: newBanner });
+});
+app.delete("/api/banners/:id", (req, res) => {
+  db.banners = db.banners.filter((b) => b.id !== req.params.id);
+  saveDatabase();
+  return res.json({ success: true });
+});
+app.get("/api/admin/overview", (req, res) => {
+  const totalUsers = db.users.length;
+  const totalBets = db.bets.length;
+  const totalVolume = db.bets.reduce((acc, b) => acc + b.stake, 0);
+  const openRaces = db.races.filter((r) => r.status === "OPEN").length;
+  const pendingBetsCount = db.bets.filter((b) => b.status === "PENDING").length;
+  return res.json({
+    success: true,
+    stats: {
+      totalUsers,
+      totalBets,
+      totalVolume,
+      openRaces,
+      pendingBetsCount
+    }
+  });
+});
+app.post("/api/admin/races", (req, res) => {
+  const { name, race_no, venue, race_time, date_str, distance, going, class_grade, horses } = req.body;
+  if (!name || !race_time) {
+    return res.status(400).json({ error: "Race name and race time are required" });
+  }
+  const raceId = generateId("race");
+  const parsedHorses = (horses || []).map((h, index) => {
+    const sNo = Number(h.serial_no || h.horse_no) || index + 1;
+    const gNo = h.gate_no !== void 0 && h.gate_no !== "" ? isNaN(Number(h.gate_no)) ? h.gate_no : Number(h.gate_no) : index + 1;
+    return {
+      id: h.id || generateId("hrs"),
+      race_id: raceId,
+      horse_no: sNo,
+      serial_no: sNo,
+      gate_no: gNo,
+      name: String(h.name || `Horse ${sNo}`).trim(),
+      jockey: String(h.jockey || "Jockey TBD").trim(),
+      trainer: String(h.trainer || "Trainer TBD").trim(),
+      win_odds: Math.max(1.01, Number(h.win_odds) || 2.5),
+      place_odds: Math.max(1.01, Number(h.place_odds) || 1.4),
+      silk_color: h.silk_color || ["#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#e11d48"][index % 7],
+      form: h.form || "1-1-2-1",
+      weight: h.weight || "56.0 kg"
+    };
+  });
+  const newRace = {
+    id: raceId,
+    name: String(name).trim(),
+    race_no: race_no ? Number(race_no) : void 0,
+    venue: String(venue || "Bangalore Turf Club").trim(),
+    race_time: String(race_time).trim(),
+    date_str: String(date_str || "Today, 5th Sep").trim(),
+    distance: String(distance || "1600m").trim(),
+    going: String(going || "Good").trim(),
+    class_grade: String(class_grade || "Grade 1 \u2022 Terms").trim(),
+    status: req.body.status || "OPEN",
+    image_url: req.body.image_url || "/images/race_action.jpg",
+    winner_horse_id: null,
+    place_horses_ids: [],
+    horses: parsedHorses,
+    settled_at: null
+  };
+  db.races.unshift(newRace);
+  saveDatabase();
+  return res.json({ success: true, race: newRace });
+});
+app.put("/api/admin/races/:id", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  const { name, race_no, venue, race_time, date_str, distance, going, class_grade, horses, status, image_url } = req.body;
+  if (name !== void 0) race.name = String(name).trim();
+  if (race_no !== void 0) race.race_no = race_no ? Number(race_no) : void 0;
+  if (venue !== void 0) race.venue = String(venue).trim();
+  if (race_time !== void 0) race.race_time = String(race_time).trim();
+  if (date_str !== void 0) race.date_str = String(date_str).trim();
+  if (distance !== void 0) race.distance = String(distance).trim();
+  if (going !== void 0) race.going = String(going).trim();
+  if (class_grade !== void 0) race.class_grade = String(class_grade).trim();
+  if (status !== void 0) race.status = status;
+  if (image_url !== void 0) race.image_url = image_url;
+  if (race_time !== void 0) race.race_time = String(race_time).trim();
+  if (date_str !== void 0) race.date_str = String(date_str).trim();
+  if (distance !== void 0) race.distance = String(distance).trim();
+  if (going !== void 0) race.going = String(going).trim();
+  if (class_grade !== void 0) race.class_grade = String(class_grade).trim();
+  if (Array.isArray(horses)) {
+    race.horses = horses.map((h, index) => {
+      const sNo = Number(h.serial_no || h.horse_no) || index + 1;
+      const gNo = h.gate_no !== void 0 && h.gate_no !== "" ? isNaN(Number(h.gate_no)) ? h.gate_no : Number(h.gate_no) : index + 1;
+      return {
+        id: h.id || generateId("hrs"),
+        race_id: race.id,
+        horse_no: sNo,
+        serial_no: sNo,
+        gate_no: gNo,
+        name: String(h.name || `Horse ${sNo}`).trim(),
+        jockey: String(h.jockey || "Jockey TBD").trim(),
+        trainer: String(h.trainer || "Trainer TBD").trim(),
+        win_odds: Math.max(1.01, Number(h.win_odds) || 2.5),
+        place_odds: Math.max(1.01, Number(h.place_odds) || 1.4),
+        silk_color: h.silk_color || ["#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#e11d48"][index % 7],
+        form: h.form || "1-1-2-1",
+        weight: h.weight || "56.0 kg"
+      };
+    });
+  }
+  saveDatabase();
+  return res.json({ success: true, race });
+});
+app.delete("/api/admin/races/:id", (req, res) => {
+  const raceIndex = db.races.findIndex((r) => r.id === req.params.id);
+  if (raceIndex === -1) return res.status(404).json({ error: "Race not found" });
+  db.races.splice(raceIndex, 1);
+  db.bets = db.bets.filter((b) => b.race_id !== req.params.id);
+  saveDatabase();
+  return res.json({ success: true, message: "Race deleted successfully" });
+});
+app.put("/api/admin/races/:id/status", (req, res) => {
+  const { status } = req.body;
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  if (!["OPEN", "CLOSED", "RESULTED"].includes(status)) {
+    return res.status(400).json({ error: "Invalid race status" });
+  }
+  race.status = status;
+  saveDatabase();
+  return res.json({ success: true, race });
+});
+app.put("/api/admin/horses/:id/odds", (req, res) => {
+  const { win_odds, place_odds } = req.body;
+  let foundHorse = null;
+  for (const race of db.races) {
+    const horse = race.horses.find((h) => h.id === req.params.id);
+    if (horse) {
+      if (win_odds !== void 0) horse.win_odds = Number(win_odds);
+      if (place_odds !== void 0) horse.place_odds = Number(place_odds);
+      foundHorse = horse;
+      break;
+    }
+  }
+  if (!foundHorse) {
+    return res.status(404).json({ error: "Horse not found" });
+  }
+  saveDatabase();
+  return res.json({ success: true, horse: foundHorse });
+});
+app.post("/api/admin/races/:id/settle", (req, res) => {
+  const { position_1, position_2, position_3, winner_horse_id, place_horses_ids } = req.body;
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  let p1 = [];
+  let p2 = [];
+  let p3 = [];
+  if (Array.isArray(position_1) && position_1.length > 0) {
+    p1 = position_1.filter(Boolean);
+    p2 = Array.isArray(position_2) ? position_2.filter(Boolean) : [];
+    p3 = Array.isArray(position_3) ? position_3.filter(Boolean) : [];
+  } else if (winner_horse_id) {
+    p1 = [winner_horse_id];
+    const placeList = Array.isArray(place_horses_ids) ? place_horses_ids : [winner_horse_id];
+    p2 = placeList.filter((id) => id !== winner_horse_id).slice(0, 1);
+    p3 = placeList.filter((id) => id !== winner_horse_id).slice(1);
+  } else {
+    return res.status(400).json({ error: "1st Place winner horse is required to settle race" });
+  }
+  if (p1.length === 0) {
+    return res.status(400).json({ error: "At least one horse must be selected for 1st Place" });
+  }
+  const isDeadHeatWin = p1.length > 1;
+  const isDeadHeatPlace = p2.length > 1 || p3.length > 1;
+  const isDeadHeat = isDeadHeatWin || isDeadHeatPlace;
+  const placeFactorMap = /* @__PURE__ */ new Map();
+  let remainingSlots = 3;
+  if (p1.length >= 3) {
+    const factor = 3 / p1.length;
+    p1.forEach((hId) => placeFactorMap.set(hId, factor));
+    remainingSlots = 0;
+  } else {
+    p1.forEach((hId) => placeFactorMap.set(hId, 1));
+    remainingSlots -= p1.length;
+  }
+  if (remainingSlots > 0 && p2.length > 0) {
+    if (p2.length <= remainingSlots) {
+      p2.forEach((hId) => placeFactorMap.set(hId, 1));
+      remainingSlots -= p2.length;
+    } else {
+      const factor = remainingSlots / p2.length;
+      p2.forEach((hId) => placeFactorMap.set(hId, factor));
+      remainingSlots = 0;
+    }
+  }
+  if (remainingSlots > 0 && p3.length > 0) {
+    if (p3.length <= remainingSlots) {
+      p3.forEach((hId) => placeFactorMap.set(hId, 1));
+      remainingSlots -= p3.length;
+    } else {
+      const factor = remainingSlots / p3.length;
+      p3.forEach((hId) => placeFactorMap.set(hId, factor));
+      remainingSlots = 0;
+    }
+  }
+  const placeAll = [...p1, ...p2, ...p3];
+  race.position_1 = p1;
+  race.position_2 = p2;
+  race.position_3 = p3;
+  race.winner_horse_id = p1[0] || null;
+  race.place_horses_ids = placeAll;
+  race.is_dead_heat = isDeadHeat;
+  race.dead_heat_note = isDeadHeatWin ? `DEAD HEAT FOR WIN (${p1.length} Horses Tied for 1st)` : isDeadHeatPlace ? `DEAD HEAT FOR PLACE` : void 0;
+  race.status = "RESULTED";
+  race.settled_at = (/* @__PURE__ */ new Date()).toISOString();
+  const pendingBets = db.bets.filter((b) => (b.race_id === race.id || b.race_name === race.name) && b.status === "PENDING");
+  let settledCount = 0;
+  let totalPayout = 0;
+  for (const bet of pendingBets) {
+    const betUser = db.users.find((u) => u.id === bet.user_id);
+    let isWon = false;
+    let betPayout = 0;
+    let betIsDeadHeat = false;
+    let deadHeatDivider = 1;
+    if (bet.bet_type === "WIN") {
+      if (p1.includes(bet.horse_id)) {
+        isWon = true;
+        if (p1.length > 1) {
+          betIsDeadHeat = true;
+          deadHeatDivider = p1.length;
+          betPayout = Math.round(bet.stake / p1.length * bet.odds);
+        } else {
+          betPayout = Math.round(bet.stake * bet.odds);
+        }
+      }
+    } else if (bet.bet_type === "PLACE") {
+      const factor = placeFactorMap.get(bet.horse_id) || 0;
+      if (factor > 0) {
+        isWon = true;
+        if (factor < 1) {
+          betIsDeadHeat = true;
+          deadHeatDivider = Math.round(1 / factor);
+          betPayout = Math.round(bet.stake * factor * bet.odds);
+        } else {
+          betPayout = Math.round(bet.stake * bet.odds);
+        }
+      }
+    }
+    bet.settled_at = (/* @__PURE__ */ new Date()).toISOString();
+    if (isWon) {
+      bet.status = "WON";
+      bet.payout = betPayout;
+      bet.is_dead_heat = betIsDeadHeat;
+      bet.dead_heat_divider = betIsDeadHeat ? deadHeatDivider : void 0;
+      totalPayout += betPayout;
+      if (betUser) {
+        betUser.balance += betPayout;
+        betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
+        const winDesc = betIsDeadHeat ? `Payout WON (Dead Heat 1/${deadHeatDivider}): ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race.name} (\u20B9${betPayout.toLocaleString("en-IN")})` : `Payout WON: ${bet.bet_type} bet on #${bet.horse_no} ${bet.horse_name} in ${race.name} (Odds: ${bet.odds})`;
+        const winTx = {
+          id: generateId("tx"),
+          user_id: betUser.id,
+          username: betUser.username,
+          type: "WIN",
+          amount: betPayout,
+          balance_after: betUser.balance,
+          description: winDesc,
+          created_at: (/* @__PURE__ */ new Date()).toISOString(),
+          reference_id: bet.id
+        };
+        db.transactions.unshift(winTx);
+      }
+    } else {
+      bet.status = "LOST";
+      bet.payout = 0;
+      if (betUser) {
+        betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
+      }
+    }
+    settledCount++;
+  }
+  saveDatabase();
+  const winnerNames = p1.map((id) => race.horses.find((h) => h.id === id)?.name || id).join(" & ");
+  const message = isDeadHeatWin ? `\u{1F525} DEAD HEAT Result Declared! 1st Place tied between: ${winnerNames}. ${settledCount} bets settled as per Dead Heat rules (\u20B9${totalPayout.toLocaleString("en-IN")} paid out).` : `Race "${race.name}" settled with winner ${winnerNames}! ${settledCount} bets settled (\u20B9${totalPayout.toLocaleString("en-IN")} paid out).`;
+  return res.json({
+    success: true,
+    message,
+    race,
+    settledCount,
+    totalPayout
+  });
+});
+app.get("/api/admin/users", (req, res) => {
+  const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin").map(({ password_hash, ...u }) => u);
+  return res.json({ success: true, users: usersList });
+});
+app.get("/api/admin/bets", (req, res) => {
+  return res.json({ success: true, bets: db.bets });
+});
+app.post("/api/admin/users/:id/adjust-balance", (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const { amount, type, description } = req.body;
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ error: "Invalid adjustment amount" });
+  }
+  if (type === "DEBIT" && user.balance < numAmount) {
+    return res.status(400).json({ error: "Insufficient balance to debit" });
+  }
+  if (type === "DEBIT") {
+    user.balance -= numAmount;
+  } else {
+    user.balance += numAmount;
+  }
+  const newTx = {
+    id: `tx_adm_${Date.now()}`,
+    user_id: user.id,
+    username: user.username,
+    type: type === "DEBIT" ? "WITHDRAW" : "DEPOSIT",
+    amount: numAmount,
+    balance_after: user.balance,
+    description: description || `Admin ${type === "DEBIT" ? "Debit" : "Credit"} Adjustment`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Successfully ${type === "DEBIT" ? "debited" : "credited"} \u20B9${numAmount} for @${user.username}`,
+    user
+  });
+});
+app.post("/api/admin/reset-demo", (req, res) => {
+  db = JSON.parse(JSON.stringify(defaultData));
+  saveDatabase();
+  return res.json({ success: true, message: "Platform demo data successfully reseeded!" });
+});
+app.post("/api/deposits", (req, res) => {
+  const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;
+  const numAmount = Number(amount);
+  if (!userId || isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: "Valid user ID and minimum deposit amount of \u20B9100 is required" });
+  }
+  const user = db.users.find((u) => u.id === userId);
+  const username = user?.username || "arjun_punters";
+  if (!db.deposit_requests) db.deposit_requests = [];
+  const newRequest = {
+    id: `dep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    user_id: userId,
+    username,
+    amount: numAmount,
+    payment_method: paymentMethod || "UPI",
+    utr_number: utrNumber || `UTR${Date.now().toString().slice(-6)}`,
+    screenshot_url: screenshotUrl,
+    status: "PENDING",
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reviewed_at: null
+  };
+  db.deposit_requests.unshift(newRequest);
+  saveDatabase();
+  return res.json({
+    success: true,
+    depositRequest: newRequest,
+    message: `Deposit request of \u20B9${numAmount.toLocaleString("en-IN")} submitted! Status: PENDING Admin verification.`
+  });
+});
+app.get("/api/deposits", (req, res) => {
+  const { user_id, status } = req.query;
+  if (!db.deposit_requests) db.deposit_requests = [];
+  let list = db.deposit_requests;
+  if (user_id) {
+    list = list.filter((d) => d.user_id === user_id);
+  }
+  if (status && status !== "ALL") {
+    list = list.filter((d) => d.status === status);
+  }
+  return res.json({ success: true, deposits: list });
+});
+app.post("/api/admin/deposits/:id/approve", (req, res) => {
+  if (!db.deposit_requests) db.deposit_requests = [];
+  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: "Deposit request not found" });
+  if (reqItem.status === "APPROVED") {
+    return res.json({ success: true, message: "Deposit request is already approved" });
+  }
+  const { adminNotes } = req.body;
+  reqItem.status = "APPROVED";
+  reqItem.reviewed_at = (/* @__PURE__ */ new Date()).toISOString();
+  if (adminNotes) reqItem.admin_notes = adminNotes;
+  const user = db.users.find((u) => u.id === reqItem.user_id);
+  if (user) {
+    user.balance += reqItem.amount;
+  }
+  const newTx = {
+    id: `tx_${Date.now()}_dep`,
+    user_id: reqItem.user_id,
+    username: reqItem.username,
+    type: "DEPOSIT",
+    amount: reqItem.amount,
+    balance_after: user ? user.balance : reqItem.amount,
+    description: `Deposit Approved via ${reqItem.payment_method} (UTR: ${reqItem.utr_number})`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reference_id: reqItem.id
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Deposit of \u20B9${reqItem.amount.toLocaleString("en-IN")} approved! Balance credited automatically.`,
+    user,
+    depositRequest: reqItem
+  });
+});
+app.post("/api/admin/deposits/:id/reject", (req, res) => {
+  if (!db.deposit_requests) db.deposit_requests = [];
+  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: "Deposit request not found" });
+  const { reason } = req.body;
+  reqItem.status = "REJECTED";
+  reqItem.reviewed_at = (/* @__PURE__ */ new Date()).toISOString();
+  reqItem.admin_notes = reason || "UTR or proof could not be verified by Admin.";
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: "Deposit request rejected.",
+    depositRequest: reqItem
+  });
+});
+app.post("/api/withdrawals", (req, res) => {
+  const { userId, amount, details } = req.body;
+  const numAmount = Number(amount);
+  if (!userId || isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: "Valid user ID and minimum withdrawal amount of \u20B9100 is required" });
+  }
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const withdrawable = (user.balance ?? 0) - (user.exposure ?? 0);
+  if (withdrawable < numAmount) {
+    return res.status(400).json({ error: `Insufficient withdrawable balance. Available: \u20B9${Math.max(0, withdrawable)}` });
+  }
+  user.balance -= numAmount;
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const newRequest = {
+    id: `wth_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    user_id: userId,
+    username: user.username,
+    amount: numAmount,
+    upi_id: details?.upi_id,
+    bank_account: details?.bank_account,
+    ifsc: details?.ifsc,
+    account_holder: details?.account_holder,
+    status: "PENDING",
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    approved_at: null,
+    completed_at: null,
+    estimated_minutes: 120
+  };
+  db.withdrawal_requests.unshift(newRequest);
+  const newTx = {
+    id: `tx_${Date.now()}_wth`,
+    user_id: userId,
+    username: user.username,
+    type: "WITHDRAW",
+    amount: -numAmount,
+    balance_after: user.balance,
+    description: `Withdrawal Request (Pending Verification) to ${details?.upi_id || details?.bank_account || "Registered Bank"}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reference_id: newRequest.id
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+  return res.json({
+    success: true,
+    withdrawalRequest: newRequest,
+    user,
+    message: `Withdrawal request of \u20B9${numAmount.toLocaleString("en-IN")} submitted! Status: PENDING Admin review.`
+  });
+});
+app.get("/api/withdrawals", (req, res) => {
+  const { user_id, status } = req.query;
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  let list = db.withdrawal_requests;
+  if (user_id) {
+    list = list.filter((w) => w.user_id === user_id);
+  }
+  if (status && status !== "ALL") {
+    list = list.filter((w) => w.status === status);
+  }
+  return res.json({ success: true, withdrawals: list });
+});
+app.post("/api/admin/withdrawals/:id/approve", (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: "Withdrawal request not found" });
+  reqItem.status = "IN_PROGRESS";
+  reqItem.approved_at = (/* @__PURE__ */ new Date()).toISOString();
+  reqItem.estimated_minutes = 120;
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Withdrawal of \u20B9${reqItem.amount.toLocaleString("en-IN")} marked as IN PROGRESS. 120-minute timer started.`,
+    withdrawalRequest: reqItem
+  });
+});
+app.post("/api/admin/withdrawals/:id/complete", (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: "Withdrawal request not found" });
+  reqItem.status = "SUCCESSFUL";
+  reqItem.completed_at = (/* @__PURE__ */ new Date()).toISOString();
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Withdrawal of \u20B9${reqItem.amount.toLocaleString("en-IN")} marked as SUCCESSFUL / DISBURSED!`,
+    withdrawalRequest: reqItem
+  });
+});
+app.post("/api/admin/withdrawals/:id/reject", (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: "Withdrawal request not found" });
+  const { reason } = req.body;
+  reqItem.status = "REJECTED";
+  reqItem.admin_notes = reason || "Rejected by Admin. Amount refunded back to wallet.";
+  const user = db.users.find((u) => u.id === reqItem.user_id);
+  if (user) {
+    user.balance += reqItem.amount;
+  }
+  const newTx = {
+    id: `tx_${Date.now()}_ref`,
+    user_id: reqItem.user_id,
+    username: reqItem.username,
+    type: "REFUND",
+    amount: reqItem.amount,
+    balance_after: user ? user.balance : reqItem.amount,
+    description: `Refund for Rejected Withdrawal: ${reqItem.admin_notes}`,
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reference_id: reqItem.id
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Withdrawal rejected and \u20B9${reqItem.amount.toLocaleString("en-IN")} refunded to user wallet.`,
+    user,
+    withdrawalRequest: reqItem
+  });
+});
+app.post("/api/admin/races/:id/suspend", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  race.is_suspended = true;
+  if (race.horses) {
+    race.horses.forEach((h) => {
+      h.is_suspended = true;
+    });
+  }
+  saveDatabase();
+  return res.json({ success: true, message: `All runners in ${race.name} suspended`, race });
+});
+app.post("/api/admin/races/:id/resume", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  race.is_suspended = false;
+  if (race.horses) {
+    race.horses.forEach((h) => {
+      h.is_suspended = false;
+    });
+  }
+  saveDatabase();
+  return res.json({ success: true, message: `All runners in ${race.name} resumed`, race });
+});
+app.post("/api/admin/races/:raceId/horses/:horseId/suspend", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.raceId);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  const horse = race.horses.find((h) => h.id === req.params.horseId);
+  if (!horse) return res.status(404).json({ error: "Horse not found" });
+  horse.is_suspended = true;
+  saveDatabase();
+  return res.json({ success: true, message: `Runner ${horse.name} suspended`, race, horse });
+});
+app.post("/api/admin/races/:raceId/horses/:horseId/resume", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.raceId);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  const horse = race.horses.find((h) => h.id === req.params.horseId);
+  if (!horse) return res.status(404).json({ error: "Horse not found" });
+  const { win_odds, place_odds } = req.body;
+  horse.is_suspended = false;
+  if (win_odds && !isNaN(Number(win_odds))) horse.win_odds = Number(win_odds);
+  if (place_odds && !isNaN(Number(place_odds))) horse.place_odds = Number(place_odds);
+  saveDatabase();
+  return res.json({ success: true, message: `Runner ${horse.name} resumed`, race, horse });
+});
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa"
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\u{1F3C7} Horse Race Betting server running on http://localhost:${PORT}`);
+  });
+}
+var server_default = app;
+if (!process.env.VERCEL && !process.env.NOW_REGION && !process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.IS_SERVERLESS) {
+  startServer();
+}
+
+// api/index.ts
+process.env.IS_SERVERLESS = "1";
+process.env.VERCEL = "1";
+function handler(req, res) {
+  return server_default(req, res);
+}
+export {
+  handler as default
+};

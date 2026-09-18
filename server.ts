@@ -353,7 +353,15 @@ function loadDatabase() {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       db = JSON.parse(content);
       
-      // Ensure race_centers and race_days exist
+      // Ensure collections and otps exist
+      if (!db.otps) db.otps = {};
+      if (!db.users) db.users = [];
+      if (!db.races) db.races = [];
+      if (!db.bets) db.bets = [];
+      if (!db.transactions) db.transactions = [];
+      if (!db.deposit_requests) db.deposit_requests = [];
+      if (!db.withdrawal_requests) db.withdrawal_requests = [];
+      if (!db.banners) db.banners = defaultData.banners;
       if (!db.race_centers || db.race_centers.length === 0) {
         db.race_centers = defaultData.race_centers;
       }
@@ -514,6 +522,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires_at = Date.now() + 10 * 60 * 1000; // 10 mins
 
+    db.otps = db.otps || {};
     if (cleanEmail) {
       db.otps[cleanEmail] = { code, expires_at };
     }
@@ -558,6 +567,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(400).json({ error: 'Please enter the 6-digit OTP code' });
   }
 
+  db.otps = db.otps || {};
   const primaryKey = cleanEmail || cleanPhone;
   const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
 
