@@ -248,8 +248,10 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 3-second Live Market Odds Fluctuation Engine
+  // 3-second Live Market Odds Fluctuation Engine (Only active on user screens, paused on admin)
   useEffect(() => {
+    if (currentRoute === 'admin') return;
+
     const oddsInterval = setInterval(() => {
       setRaces((prevRaces) => {
         const activeRaces = prevRaces.filter(

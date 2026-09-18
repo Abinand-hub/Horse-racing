@@ -57,9 +57,9 @@ interface AdminPanelProps {
 
 // Preset matching the user's handwritten race sheet
 const HORSE_IMAGE_PRESETS = [
-  { id: 'action', url: '/images/race_action.jpg', label: 'Galloping Action (Golden Hour)' },
-  { id: 'jockey', url: '/images/jockey_hero.jpg', label: 'Jockey Silk Hero' },
-  { id: 'runner', url: '/images/horse_runner.jpg', label: 'Dark Turf Thoroughbred' },
+  { id: 'action', url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80', label: 'Galloping Action (Golden Hour)' },
+  { id: 'jockey', url: 'https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=600&q=80', label: 'Jockey Silk Hero' },
+  { id: 'runner', url: 'https://images.unsplash.com/photo-1566251037378-5e04e3bec343?auto=format&fit=crop&w=600&q=80', label: 'Dark Turf Thoroughbred' },
 ];
 
 const HANDWRITTEN_SHEET_PRESET = {
@@ -643,9 +643,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Level 2: Create Race Day Handler
   const handleCreateRaceDay = async (e: React.FormEvent) => {
     e.preventDefault();
-    const center = raceCenters.find((c) => c.id === newDayCenterId);
+    const targetCenterId = newDayCenterId || (raceCenters && raceCenters.length > 0 ? raceCenters[0].id : 'cntr_mysore');
+    const center = (raceCenters || []).find((c) => c.id === targetCenterId) || raceCenters[0];
     if (!center) {
-      setActionMessage('Please select a valid Race Center');
+      alert('Please create a Race Center first before creating a Race Day card.');
       return;
     }
     try {
@@ -659,7 +660,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         status: 'PUBLISHED',
       });
       soundManager.playClick();
-      setActionMessage(`📅 ${res.message} • Directing to Add Race...`);
       setNewDayTitle('');
       await loadAdminData();
 
@@ -668,13 +668,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setNewRaceCenterId(res.race_day.center_id);
         setNewRaceDayId(res.race_day.id);
         setNewVenue(`${center.name} Turf Club`);
-        setActiveTab('add_race');
+      } else {
+        setNewRaceCenterId(center.id);
+        setNewVenue(`${center.name} Turf Club`);
       }
-
-      setTimeout(() => setActionMessage(null), 3500);
+      setActiveTab('add_race');
+      setActionMessage(`✅ Race Day "${title}" Created & Published! Add races below.`);
+      setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to create race day');
-      setTimeout(() => setActionMessage(null), 3500);
+      alert(err.message || 'Failed to create race day');
     } finally {
       setIsLoading(false);
     }
@@ -905,8 +907,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateRace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRaceName.trim()) {
-      setActionMessage('⚠️ Please provide a race name (e.g. The Rock of Gibraltar Plate)');
-      setTimeout(() => setActionMessage(null), 3000);
+      alert('⚠️ Please provide a Name of the Race (e.g. The Rock of Gibraltar Plate)');
       return;
     }
     const finalStatus = newRaceStatus || 'UPCOMING';
@@ -919,7 +920,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         serial_no: Number(h.serial_no) || (i + 1),
         horse_no: Number(h.serial_no) || (i + 1),
         gate_no: h.gate_no !== undefined && h.gate_no !== '' ? h.gate_no : (i + 1),
-        name: h.name.trim(),
+        name: h.name.trim().toUpperCase(),
         jockey: (h.jockey || 'TBD').trim(),
         trainer: (h.trainer || 'TBD').trim(),
         win_odds: Number(h.win_odds) || Number((2.20 + (i * 0.45)).toFixed(2)),
@@ -929,8 +930,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }));
 
     if (validRunners.length === 0) {
-      setActionMessage('⚠️ Please add at least 1 runner (or click "Bulk Paste Horses")');
-      setTimeout(() => setActionMessage(null), 3000);
+      alert('⚠️ Please enter at least 1 runner in the table below (or click "Bulk Paste Horses" or "Fill Demo (7 Horses)")');
       return;
     }
 
@@ -948,27 +948,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         going: newGoing || 'Good',
         class_grade: newClassGrade || 'Grade 1 • Terms',
         status: finalStatus,
-        image_url: newRaceImage || '/images/race_action.jpg',
+        image_url: newRaceImage || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
         horses: validRunners,
       });
 
       if (finalStatus === 'LIVE') {
         soundManager.playRaceBugle();
-        setActionMessage(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`);
+        alert(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`);
         setAdminRaceFilter('live');
+        setActiveTab('live');
       } else {
         soundManager.playBetPlaced();
-        setActionMessage(`⏱ Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`);
+        alert(`🚀 Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`);
         setAdminRaceFilter('upcoming');
+        setActiveTab('upcoming');
       }
       await onRefreshData();
       await loadAdminData();
       handleClearForm();
-      setActiveTab('races');
-      setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to publish race');
-      setTimeout(() => setActionMessage(null), 3500);
+      alert(err.message || 'Failed to publish race');
     } finally {
       setIsLoading(false);
     }
