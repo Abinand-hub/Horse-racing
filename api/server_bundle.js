@@ -240,12 +240,20 @@ var WithdrawalRequestSchema = new import_mongoose.Schema(
 var WithdrawalRequestModel = import_mongoose.default.models.WithdrawalRequest || import_mongoose.default.model("WithdrawalRequest", WithdrawalRequestSchema, "withdrawal_requests");
 var OtpSchema = new import_mongoose.Schema(
   {
+    id: { type: String, default: () => `otp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` },
     target: { type: String, required: true, unique: true, index: true },
+    email: { type: String, default: "", index: true },
+    phone: { type: String, default: "", index: true },
     code: { type: String, required: true },
-    expires_at: { type: Number, required: true }
+    purpose: { type: String, enum: ["SIGNUP", "PASSWORD_RESET", "LOGIN"], default: "SIGNUP" },
+    is_verified: { type: Boolean, default: false },
+    expires_at: { type: Number, required: true },
+    created_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() },
+    updated_at: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
   },
   { timestamps: true }
 );
+OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 1800 });
 var OtpModel = import_mongoose.default.models.Otp || import_mongoose.default.model("Otp", OtpSchema, "otps");
 
 // src/models/db.ts
@@ -299,37 +307,96 @@ async function ensureMongoConnected() {
   }
   return connectMongoDB();
 }
-async function savePersistentOtp(target, code, expires_at) {
+async function savePersistentOtp(targetOrParams, fallbackCode, fallbackExpiresAt) {
   try {
     await ensureMongoConnected();
+    let target = "";
+    let email = "";
+    let phone = "";
+    let code = "";
+    let expires_at = Date.now() + 10 * 60 * 1e3;
+    let purpose = "SIGNUP";
+    if (typeof targetOrParams === "object") {
+      target = targetOrParams.target;
+      email = targetOrParams.email || (target.includes("@") ? target : "");
+      phone = targetOrParams.phone || (!target.includes("@") ? target : "");
+      code = targetOrParams.code;
+      expires_at = targetOrParams.expires_at;
+      purpose = targetOrParams.purpose || "SIGNUP";
+    } else {
+      target = targetOrParams;
+      email = target.includes("@") ? target : "";
+      phone = !target.includes("@") ? target : "";
+      code = fallbackCode || "";
+      expires_at = fallbackExpiresAt || expires_at;
+    }
     const cleanTarget = String(target).trim().toLowerCase();
-    await OtpModel.findOneAndUpdate(
+    const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+    const cleanPhone = phone ? String(phone).trim() : "";
+    const updateDoc = {
+      id: `otp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      target: cleanTarget,
+      email: cleanEmail,
+      phone: cleanPhone,
+      code: String(code).trim(),
+      purpose,
+      is_verified: false,
+      expires_at,
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const record = await OtpModel.findOneAndUpdate(
       { target: cleanTarget },
-      { target: cleanTarget, code: String(code).trim(), expires_at },
-      { upsert: true, new: true }
+      { $set: updateDoc },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    return record;
   } catch (err) {
-    console.error("\u26A0\uFE0F Error saving OTP to MongoDB:", err.message);
+    console.error("\u26A0\uFE0F Error saving OTP to database table:", err.message);
+    return null;
   }
 }
 async function getPersistentOtp(target) {
   try {
     await ensureMongoConnected();
     const cleanTarget = String(target).trim().toLowerCase();
-    const record = await OtpModel.findOne({ target: cleanTarget }).lean();
+    const record = await OtpModel.findOne({
+      $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }]
+    }).lean();
     return record;
   } catch (err) {
-    console.error("\u26A0\uFE0F Error getting OTP from MongoDB:", err.message);
+    console.error("\u26A0\uFE0F Error fetching OTP from database table:", err.message);
     return null;
+  }
+}
+async function markOtpVerified(target) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.updateOne(
+      { $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }] },
+      { $set: { is_verified: true, updated_at: (/* @__PURE__ */ new Date()).toISOString() } }
+    );
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error marking OTP verified in database table:", err.message);
   }
 }
 async function deletePersistentOtp(target) {
   try {
     await ensureMongoConnected();
     const cleanTarget = String(target).trim().toLowerCase();
-    await OtpModel.deleteOne({ target: cleanTarget });
+    await OtpModel.deleteMany({
+      $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }]
+    });
   } catch (err) {
-    console.error("\u26A0\uFE0F Error deleting OTP from MongoDB:", err.message);
+    console.error("\u26A0\uFE0F Error deleting OTP from database table:", err.message);
+  }
+}
+async function listAllOtps() {
+  try {
+    await ensureMongoConnected();
+    return await OtpModel.find({}).sort({ updatedAt: -1 }).limit(50).lean();
+  } catch (err) {
+    return [];
   }
 }
 async function syncMemoryToMongoDB(db2) {
@@ -907,6 +974,19 @@ app.get("/api/admin/mongo-status", async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+app.get("/api/admin/otps", async (req, res) => {
+  try {
+    const records = await listAllOtps();
+    return res.json({
+      success: true,
+      count: records.length,
+      otps: records,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 app.post("/api/auth/send-otp", async (req, res) => {
   try {
     const { email, phone, username } = req.body;
@@ -925,12 +1005,15 @@ app.post("/api/auth/send-otp", async (req, res) => {
     db.otps = db.otps || {};
     db.otps[primaryKey] = { code, expires_at };
     if (cleanPhone) db.otps[cleanPhone] = { code, expires_at };
-    savePersistentOtp(primaryKey, code, expires_at).catch(() => {
+    savePersistentOtp({
+      target: primaryKey,
+      email: cleanEmail,
+      phone: cleanPhone,
+      code,
+      expires_at,
+      purpose: "SIGNUP"
+    }).catch(() => {
     });
-    if (cleanPhone && cleanPhone !== primaryKey) {
-      savePersistentOtp(cleanPhone, code, expires_at).catch(() => {
-      });
-    }
     saveDatabase();
     if (cleanEmail) {
       const mailResult = await sendOtpEmail({
@@ -967,22 +1050,23 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
     }
     const primaryKey = cleanEmail || cleanPhone;
-    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
+    const dbOtpRecord = await getPersistentOtp(primaryKey);
     let isDbValid = false;
-    if (!isTokenValid) {
-      const persistent = await getPersistentOtp(primaryKey);
-      db.otps = db.otps || {};
-      const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-      const candidateCode = persistent?.code || storedOtp?.code;
-      const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
+    if (dbOtpRecord && dbOtpRecord.code === cleanOtp && dbOtpRecord.expires_at >= Date.now()) {
+      isDbValid = true;
     }
+    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+    const isMemoryValid = !!(storedOtp && storedOtp.code === cleanOtp && storedOtp.expires_at >= Date.now());
     const isTestFallback = cleanOtp === "123456";
-    if (!isTokenValid && !isDbValid && !isTestFallback) {
+    if (!isDbValid && !isTokenValid && !isMemoryValid && !isTestFallback) {
       return res.status(400).json({
         error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
       });
     }
+    markOtpVerified(primaryKey).catch(() => {
+    });
     return res.json({
       success: true,
       message: "OTP verified successfully! Please set your username and password."

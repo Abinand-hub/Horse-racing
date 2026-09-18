@@ -77,18 +77,61 @@ export async function ensureMongoConnected(): Promise<boolean> {
   return connectMongoDB();
 }
 
-// Helpers for OTP Persistence across serverless functions
-export async function savePersistentOtp(target: string, code: string, expires_at: number) {
+// Helpers for Dedicated OTP Generation Table in Database
+export async function savePersistentOtp(
+  targetOrParams: string | { target: string; email?: string; phone?: string; code: string; expires_at: number; purpose?: 'SIGNUP' | 'PASSWORD_RESET' | 'LOGIN' },
+  fallbackCode?: string,
+  fallbackExpiresAt?: number
+) {
   try {
     await ensureMongoConnected();
+    let target = '';
+    let email = '';
+    let phone = '';
+    let code = '';
+    let expires_at = Date.now() + 10 * 60 * 1000;
+    let purpose = 'SIGNUP';
+
+    if (typeof targetOrParams === 'object') {
+      target = targetOrParams.target;
+      email = targetOrParams.email || (target.includes('@') ? target : '');
+      phone = targetOrParams.phone || (!target.includes('@') ? target : '');
+      code = targetOrParams.code;
+      expires_at = targetOrParams.expires_at;
+      purpose = targetOrParams.purpose || 'SIGNUP';
+    } else {
+      target = targetOrParams;
+      email = target.includes('@') ? target : '';
+      phone = !target.includes('@') ? target : '';
+      code = fallbackCode || '';
+      expires_at = fallbackExpiresAt || expires_at;
+    }
+
     const cleanTarget = String(target).trim().toLowerCase();
-    await OtpModel.findOneAndUpdate(
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
+
+    const updateDoc = {
+      id: `otp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      target: cleanTarget,
+      email: cleanEmail,
+      phone: cleanPhone,
+      code: String(code).trim(),
+      purpose,
+      is_verified: false,
+      expires_at,
+      updated_at: new Date().toISOString(),
+    };
+
+    const record = await OtpModel.findOneAndUpdate(
       { target: cleanTarget },
-      { target: cleanTarget, code: String(code).trim(), expires_at },
-      { upsert: true, new: true }
+      { $set: updateDoc },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    return record;
   } catch (err: any) {
-    console.error('⚠️ Error saving OTP to MongoDB:', err.message);
+    console.error('⚠️ Error saving OTP to database table:', err.message);
+    return null;
   }
 }
 
@@ -96,11 +139,26 @@ export async function getPersistentOtp(target: string) {
   try {
     await ensureMongoConnected();
     const cleanTarget = String(target).trim().toLowerCase();
-    const record = await OtpModel.findOne({ target: cleanTarget }).lean();
+    const record = await OtpModel.findOne({
+      $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }],
+    }).lean();
     return record;
   } catch (err: any) {
-    console.error('⚠️ Error getting OTP from MongoDB:', err.message);
+    console.error('⚠️ Error fetching OTP from database table:', err.message);
     return null;
+  }
+}
+
+export async function markOtpVerified(target: string) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.updateOne(
+      { $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }] },
+      { $set: { is_verified: true, updated_at: new Date().toISOString() } }
+    );
+  } catch (err: any) {
+    console.error('⚠️ Error marking OTP verified in database table:', err.message);
   }
 }
 
@@ -108,9 +166,20 @@ export async function deletePersistentOtp(target: string) {
   try {
     await ensureMongoConnected();
     const cleanTarget = String(target).trim().toLowerCase();
-    await OtpModel.deleteOne({ target: cleanTarget });
+    await OtpModel.deleteMany({
+      $or: [{ target: cleanTarget }, { email: cleanTarget }, { phone: cleanTarget }],
+    });
   } catch (err: any) {
-    console.error('⚠️ Error deleting OTP from MongoDB:', err.message);
+    console.error('⚠️ Error deleting OTP from database table:', err.message);
+  }
+}
+
+export async function listAllOtps() {
+  try {
+    await ensureMongoConnected();
+    return await OtpModel.find({}).sort({ updatedAt: -1 }).limit(50).lean();
+  } catch (err: any) {
+    return [];
   }
 }
 

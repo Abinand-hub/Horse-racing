@@ -11,7 +11,9 @@ import {
   ensureMongoConnected,
   savePersistentOtp,
   getPersistentOtp,
+  markOtpVerified,
   deletePersistentOtp,
+  listAllOtps,
   lastMongoError,
 } from './src/models/db';
 import {
@@ -549,6 +551,21 @@ app.get('/api/admin/mongo-status', async (req, res) => {
   }
 });
 
+// GET /api/admin/otps (Fetch latest OTP table records from database)
+app.get('/api/admin/otps', async (req, res) => {
+  try {
+    const records = await listAllOtps();
+    return res.json({
+      success: true,
+      count: records.length,
+      otps: records,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ----------------------------------------------------
 // AUTH APIS
 // ----------------------------------------------------
@@ -579,11 +596,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
     db.otps[primaryKey] = { code, expires_at };
     if (cleanPhone) db.otps[cleanPhone] = { code, expires_at };
 
-    // Persistent storage in MongoDB Atlas (non-blocking fallback)
-    savePersistentOtp(primaryKey, code, expires_at).catch(() => {});
-    if (cleanPhone && cleanPhone !== primaryKey) {
-      savePersistentOtp(cleanPhone, code, expires_at).catch(() => {});
-    }
+    // Persistent storage in dedicated Database OTP table (upserts for same user every time)
+    savePersistentOtp({
+      target: primaryKey,
+      email: cleanEmail,
+      phone: cleanPhone,
+      code,
+      expires_at,
+      purpose: 'SIGNUP',
+    }).catch(() => {});
     saveDatabase();
 
     if (cleanEmail) {
@@ -628,27 +649,31 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
     const primaryKey = cleanEmail || cleanPhone;
 
-    // 1. Cryptographic HMAC Token Verification (Instant & 100% reliable on Vercel Serverless)
+    // 1. Fetch OTP directly from Database Table
+    const dbOtpRecord = await getPersistentOtp(primaryKey);
+    let isDbValid = false;
+    if (dbOtpRecord && dbOtpRecord.code === cleanOtp && dbOtpRecord.expires_at >= Date.now()) {
+      isDbValid = true;
+    }
+
+    // 2. Cryptographic HMAC Token Verification (Instant & reliable across all serverless instances)
     const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
 
-    // 2. Persistent Mongo & In-Memory check fallback
-    let isDbValid = false;
-    if (!isTokenValid) {
-      const persistent = await getPersistentOtp(primaryKey);
-      db.otps = db.otps || {};
-      const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
-      const candidateCode = persistent?.code || storedOtp?.code;
-      const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
-    }
+    // 3. In-memory check fallback
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
+    const isMemoryValid = !!(storedOtp && storedOtp.code === cleanOtp && storedOtp.expires_at >= Date.now());
 
     const isTestFallback = cleanOtp === '123456';
 
-    if (!isTokenValid && !isDbValid && !isTestFallback) {
+    if (!isDbValid && !isTokenValid && !isMemoryValid && !isTestFallback) {
       return res.status(400).json({
         error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.',
       });
     }
+
+    // Mark as verified in Database OTP Table
+    markOtpVerified(primaryKey).catch(() => {});
 
     return res.json({
       success: true,

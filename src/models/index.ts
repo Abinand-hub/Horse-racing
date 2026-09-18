@@ -406,23 +406,41 @@ export const WithdrawalRequestModel: Model<IWithdrawalRequest> =
   mongoose.models.WithdrawalRequest || mongoose.model<IWithdrawalRequest>('WithdrawalRequest', WithdrawalRequestSchema, 'withdrawal_requests');
 
 // ==========================================
-// 12. OTP SCHEMA & MODEL
+// 12. OTP TABLE SCHEMA & MODEL (Dedicated OTP Generation Table)
 // ==========================================
 export interface IOtp extends Document {
+  id: string;
   target: string;
+  email?: string;
+  phone?: string;
   code: string;
+  purpose: 'SIGNUP' | 'PASSWORD_RESET' | 'LOGIN';
+  is_verified: boolean;
   expires_at: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export const OtpSchema = new Schema<IOtp>(
   {
+    id: { type: String, default: () => `otp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` },
     target: { type: String, required: true, unique: true, index: true },
+    email: { type: String, default: '', index: true },
+    phone: { type: String, default: '', index: true },
     code: { type: String, required: true },
+    purpose: { type: String, enum: ['SIGNUP', 'PASSWORD_RESET', 'LOGIN'], default: 'SIGNUP' },
+    is_verified: { type: Boolean, default: false },
     expires_at: { type: Number, required: true },
+    created_at: { type: String, default: () => new Date().toISOString() },
+    updated_at: { type: String, default: () => new Date().toISOString() },
   },
   { timestamps: true }
 );
 
+// TTL index to automatically expire records after 30 minutes
+OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 1800 });
+
 export const OtpModel: Model<IOtp> =
   mongoose.models.Otp || mongoose.model<IOtp>('Otp', OtpSchema, 'otps');
+
 
