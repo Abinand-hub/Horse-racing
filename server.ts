@@ -1183,16 +1183,34 @@ app.delete('/api/admin/race-days/:id', (req, res) => {
 // GET /api/admin/overview
 app.get('/api/admin/overview', async (req, res) => {
   try {
-    const realUsers = db.users.filter((u) => u.role !== 'admin');
-    const totalBets = db.bets.length;
-    const totalVolume = db.bets.reduce((sum, b) => sum + (b.stake || 0), 0);
-    const pendingBets = db.bets.filter((b) => b.status === 'PENDING').length;
-    const openRaces = db.races.filter((r) => r.status === 'OPEN' || r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length;
+    let totalUsers = 0;
+    let totalBets = 0;
+    let totalVolume = 0;
+    let pendingBets = 0;
+    let openRaces = 0;
+
+    if (isMongoDBConnected()) {
+      totalUsers = await UserModel.countDocuments({ role: { $ne: 'admin' } });
+      totalBets = await BetModel.countDocuments();
+      const volumeAgg = await BetModel.aggregate([
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]);
+      totalVolume = volumeAgg[0]?.total || 0;
+      pendingBets = await BetModel.countDocuments({ status: 'PENDING' });
+      openRaces = await RaceModel.countDocuments({ status: { $in: ['OPEN', 'LIVE', 'OPEN_FOR_BETTING', 'UPCOMING'] } });
+    } else {
+      const realUsers = db.users.filter((u) => u.role !== 'admin');
+      totalUsers = realUsers.length;
+      totalBets = db.bets.length;
+      totalVolume = db.bets.reduce((sum, b) => sum + (b.amount || b.stake || 0), 0);
+      pendingBets = db.bets.filter((b) => b.status === 'PENDING').length;
+      openRaces = db.races.filter((r) => r.status === 'OPEN' || r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING' || r.status === 'UPCOMING').length;
+    }
 
     return res.json({
       success: true,
       stats: {
-        totalUsers: realUsers.length,
+        totalUsers,
         totalBets,
         totalVolume,
         openRaces,
@@ -1579,26 +1597,6 @@ app.delete('/api/banners/:id', (req, res) => {
 // ----------------------------------------------------
 // ADMIN APIS
 // ----------------------------------------------------
-
-// 1. Overview stats
-app.get('/api/admin/overview', (req, res) => {
-  const totalUsers = db.users.length;
-  const totalBets = db.bets.length;
-  const totalVolume = db.bets.reduce((acc, b) => acc + b.stake, 0);
-  const openRaces = db.races.filter((r) => r.status === 'OPEN').length;
-  const pendingBetsCount = db.bets.filter((b) => b.status === 'PENDING').length;
-
-  return res.json({
-    success: true,
-    stats: {
-      totalUsers,
-      totalBets,
-      totalVolume,
-      openRaces,
-      pendingBetsCount,
-    },
-  });
-});
 
 // 2. Add Race with Horses & Odds (Manual Admin Entry)
 app.post('/api/admin/races', (req, res) => {

@@ -83,10 +83,18 @@ const HANDWRITTEN_SHEET_PRESET = {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   onBack,
-  races,
+  races: initialRaces,
   banners,
   onRefreshData,
 }) => {
+  const [races, setRaces] = useState<Race[]>(initialRaces || []);
+
+  useEffect(() => {
+    if (initialRaces) {
+      setRaces(initialRaces);
+    }
+  }, [initialRaces]);
+
   const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'finished' | 'lifecycle' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'races'>('live');
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
@@ -751,92 +759,145 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleUpdateOdds = async (horseId: string, winOdds: number, placeOdds: number) => {
     try {
-      await api.updateHorseOdds(horseId, winOdds, placeOdds);
       soundManager.playChip();
-      setActionMessage('Odds updated live!');
-      await onRefreshData();
-      setTimeout(() => setActionMessage(null), 2500);
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) => ({
+          ...r,
+          horses: r.horses.map((h) =>
+            h.id === horseId ? { ...h, win_odds: winOdds, place_odds: placeOdds } : h
+          ),
+        }))
+      );
+      notify('Odds updated live!', 'success');
+      api.updateHorseOdds(horseId, winOdds, placeOdds).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to update odds', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to update odds');
-      setTimeout(() => setActionMessage(null), 3000);
+      notify(err.message || 'Failed to update odds', 'error');
     }
   };
 
   const handleSuspendHorse = async (raceId: string, horseId: string) => {
     try {
-      const updatedRace = await api.suspendHorse(raceId, horseId);
       soundManager.playClick();
-      if (updatedRace) {
-        const horse = updatedRace.horses.find((h) => h.id === horseId);
-        setActionMessage(`🚫 Runner #${horse?.serial_no || horse?.horse_no} ${horse?.name} is SUSPENDED. Users see "Odds Changing".`);
-      }
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3500);
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) => {
+          if (r.id !== raceId) return r;
+          return {
+            ...r,
+            horses: r.horses.map((h) => (h.id === horseId ? { ...h, is_suspended: true } : h)),
+          };
+        })
+      );
+      notify('🚫 Runner suspended in real-time. Users see "Odds Changing".', 'info');
+
+      api.suspendHorse(raceId, horseId).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to suspend runner', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to suspend runner');
+      notify(err.message || 'Failed to suspend runner', 'error');
     }
   };
 
   const handleResumeHorse = async (raceId: string, horseId: string) => {
     try {
-      const current = tempOdds[horseId];
-      const race = races.find((r) => r.id === raceId);
-      const horse = race?.horses.find((h) => h.id === horseId);
-      const winVal = current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : horse?.win_odds;
-      const placeVal = current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : horse?.place_odds;
-
-      const updatedRace = await api.resumeHorse(raceId, horseId, winVal, placeVal);
       soundManager.playChip();
-      if (updatedRace) {
-        const h = updatedRace.horses.find((item) => item.id === horseId);
-        setActionMessage(`✅ Runner #${h?.serial_no || h?.horse_no} ${h?.name} RESUMED! Live Odds: WIN ${h?.win_odds}x, PLACE ${h?.place_odds}x`);
-      }
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3500);
+      const current = tempOdds[horseId];
+      const targetRace = races.find((r) => r.id === raceId);
+      const targetHorse = targetRace?.horses.find((h) => h.id === horseId);
+      const winVal = current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : (targetHorse?.win_odds || 2.5);
+      const placeVal = current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : (targetHorse?.place_odds || 1.5);
+
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) => {
+          if (r.id !== raceId) return r;
+          return {
+            ...r,
+            horses: r.horses.map((h) =>
+              h.id === horseId
+                ? { ...h, is_suspended: false, win_odds: winVal, place_odds: placeVal }
+                : h
+            ),
+          };
+        })
+      );
+      notify(`✅ Runner resumed! Live Odds: WIN ${winVal}x, PLACE ${placeVal}x`, 'success');
+
+      api.resumeHorse(raceId, horseId, winVal, placeVal).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to resume runner', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to resume runner');
+      notify(err.message || 'Failed to resume runner', 'error');
     }
   };
 
   const handleSuspendAll = async (raceId: string) => {
     try {
-      const updatedRace = await api.suspendAll(raceId);
       soundManager.playClick();
-      if (updatedRace) {
-        setActionMessage(`🚫 ALL RUNNERS in "${updatedRace.name}" SUSPENDED. Users see "Odds Changing" across all tiles.`);
-      }
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3500);
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) => {
+          if (r.id !== raceId) return r;
+          return {
+            ...r,
+            is_suspended: true,
+            horses: r.horses.map((h) => ({ ...h, is_suspended: true })),
+          };
+        })
+      );
+      notify('🚫 ALL RUNNERS in race SUSPENDED.', 'warning');
+
+      api.suspendAll(raceId).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to suspend all runners', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to suspend all runners');
+      notify(err.message || 'Failed to suspend all runners', 'error');
     }
   };
 
   const handleResumeAll = async (raceId: string) => {
     try {
-      const race = races.find((r) => r.id === raceId);
-      const oddsMap: Record<string, { win_odds?: number; place_odds?: number }> = {};
-      race?.horses.forEach((h) => {
-        const current = tempOdds[h.id];
-        oddsMap[h.id] = {
-          win_odds: current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : h.win_odds,
-          place_odds: current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : h.place_odds,
-        };
-      });
-
-      const updatedRace = await api.resumeAll(raceId, oddsMap);
       soundManager.playChip();
-      if (updatedRace) {
-        setActionMessage(`✅ ALL RUNNERS in "${updatedRace.name}" RESUMED! All new odds are now live on user screens.`);
-      }
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3500);
+      const targetRace = races.find((r) => r.id === raceId);
+      const oddsMap: Record<string, { win_odds?: number; place_odds?: number }> = {};
+
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) => {
+          if (r.id !== raceId) return r;
+          return {
+            ...r,
+            is_suspended: false,
+            horses: r.horses.map((h) => {
+              const current = tempOdds[h.id];
+              const wVal = current?.win_odds !== undefined && current.win_odds !== '' ? parseFloat(String(current.win_odds)) : h.win_odds;
+              const pVal = current?.place_odds !== undefined && current.place_odds !== '' ? parseFloat(String(current.place_odds)) : h.place_odds;
+              oddsMap[h.id] = { win_odds: wVal, place_odds: pVal };
+              return { ...h, is_suspended: false, win_odds: wVal, place_odds: pVal };
+            }),
+          };
+        })
+      );
+      notify('✅ ALL RUNNERS RESUMED! Live odds updated on user screens.', 'success');
+
+      api.resumeAll(raceId, oddsMap).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to resume all runners', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to resume all runners');
+      notify(err.message || 'Failed to resume all runners', 'error');
     }
   };
 
@@ -862,58 +923,74 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleMakeRaceLive = async (race: Race) => {
     try {
-      setIsLoading(true);
-      await api.updateRaceStatus(race.id, 'LIVE');
       soundManager.playRaceBugle();
-      setActionMessage(`⚡ Race "${race.name}" is now LIVE! Visible in Live Races on user page.`);
-      await onRefreshData();
-      await loadAdminData();
+      // 0ms Instant UI update
+      setRaces((prev) =>
+        prev.map((r) => (r.id === race.id ? { ...r, status: 'LIVE' } : r))
+      );
+      setSelectedOddsRaceId(race.id);
       setActiveTab('live');
       setAdminRaceFilter('live');
-      setTimeout(() => setActionMessage(null), 4000);
+      notify(`⚡ Race "${race.name}" is now LIVE! Visible in Live Races.`, 'success');
+
+      // Background server sync
+      api.updateRaceStatus(race.id, 'LIVE').then(() => {
+        onRefreshData();
+        loadAdminData(true);
+      }).catch((err: any) => {
+        console.error('Failed to sync live race:', err);
+        notify(err.message || 'Failed to update live status on server', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to make race live');
-      setTimeout(() => setActionMessage(null), 3500);
-    } finally {
-      setIsLoading(false);
+      notify(err.message || 'Failed to make race live', 'error');
     }
   };
 
   const handleMakeRaceUpcoming = async (race: Race) => {
     try {
-      setIsLoading(true);
-      await api.updateRaceStatus(race.id, 'UPCOMING');
       soundManager.playClick();
-      setActionMessage(`⏱ Race "${race.name}" moved to Upcoming Races.`);
-      await onRefreshData();
-      await loadAdminData();
+      // 0ms Instant UI update
+      setRaces((prev) =>
+        prev.map((r) => (r.id === race.id ? { ...r, status: 'UPCOMING' } : r))
+      );
+      setSelectedOddsRaceId(race.id);
       setActiveTab('upcoming');
       setAdminRaceFilter('upcoming');
-      setTimeout(() => setActionMessage(null), 3500);
+      notify(`⏱ Race "${race.name}" moved to Upcoming Races.`, 'info');
+
+      // Background server sync
+      api.updateRaceStatus(race.id, 'UPCOMING').then(() => {
+        onRefreshData();
+        loadAdminData(true);
+      }).catch((err: any) => {
+        console.error('Failed to sync upcoming race:', err);
+        notify(err.message || 'Failed to update status on server', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to update status');
-      setTimeout(() => setActionMessage(null), 3500);
-    } finally {
-      setIsLoading(false);
+      notify(err.message || 'Failed to update status', 'error');
     }
   };
 
   const handlePublishRace = async (raceId: string) => {
     try {
-      setIsLoading(true);
-      await api.updateRaceStatus(raceId, 'UPCOMING');
       soundManager.playBetPlaced();
-      setActionMessage('🚀 Race published to Upcoming Races! Visible on user page.');
-      await onRefreshData();
-      await loadAdminData();
+      // 0ms Instant UI update
+      setRaces((prev) =>
+        prev.map((r) => (r.id === raceId ? { ...r, status: 'UPCOMING' } : r))
+      );
       setActiveTab('upcoming');
       setAdminRaceFilter('upcoming');
-      setTimeout(() => setActionMessage(null), 3500);
+      notify('🚀 Race published to Upcoming Races!', 'success');
+
+      // Background server sync
+      api.updateRaceStatus(raceId, 'UPCOMING').then(() => {
+        onRefreshData();
+        loadAdminData(true);
+      }).catch((err: any) => {
+        notify(err.message || 'Failed to publish race', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to publish race');
-      setTimeout(() => setActionMessage(null), 3500);
-    } finally {
-      setIsLoading(false);
+      notify(err.message || 'Failed to publish race', 'error');
     }
   };
 
@@ -947,43 +1024,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
-    try {
-      setIsLoading(true);
-      await api.createRace({
-        name: newRaceName.trim(),
-        race_no: newRaceNo ? Number(newRaceNo) : 1,
-        center_id: newRaceCenterId || 'cntr_hyderabad',
-        race_day_id: newRaceDayId || undefined,
-        venue: newVenue || 'Hyderabad Race Club',
-        race_time: newTime || '1:55 PM',
-        date_str: 'Today',
-        distance: newDistance || '1400m',
-        going: newGoing || 'Good',
-        class_grade: newClassGrade || 'Grade 1 • Terms',
-        status: finalStatus,
-        image_url: newRaceImage || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
-        horses: validRunners,
-      });
+    const tempRaceId = `race_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const optimisticRace: Race = {
+      id: tempRaceId,
+      name: newRaceName.trim(),
+      race_no: newRaceNo ? Number(newRaceNo) : 1,
+      center_id: newRaceCenterId || 'cntr_hyderabad',
+      race_day_id: newRaceDayId || undefined,
+      venue: newVenue || 'Hyderabad Race Club',
+      race_time: newTime || '1:55 PM',
+      date_str: 'Today',
+      distance: newDistance || '1400m',
+      going: newGoing || 'Good',
+      class_grade: newClassGrade || 'Grade 1 • Terms',
+      status: finalStatus,
+      image_url: newRaceImage || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
+      horses: validRunners,
+    };
 
-      if (finalStatus === 'LIVE') {
-        soundManager.playRaceBugle();
-        notify(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`, 'success');
-        setAdminRaceFilter('live');
-        setActiveTab('live');
-      } else {
-        soundManager.playBetPlaced();
-        notify(`🚀 Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`, 'success');
-        setAdminRaceFilter('upcoming');
-        setActiveTab('upcoming');
+    // 0ms instant UI update
+    setRaces((prev) => [optimisticRace, ...prev]);
+    setSelectedOddsRaceId(tempRaceId);
+    handleClearForm();
+
+    if (finalStatus === 'LIVE') {
+      soundManager.playRaceBugle();
+      notify(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`, 'success');
+      setAdminRaceFilter('live');
+      setActiveTab('live');
+    } else {
+      soundManager.playBetPlaced();
+      notify(`🚀 Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`, 'success');
+      setAdminRaceFilter('upcoming');
+      setActiveTab('upcoming');
+    }
+
+    // Background server call
+    api.createRace({
+      name: optimisticRace.name,
+      race_no: optimisticRace.race_no,
+      center_id: optimisticRace.center_id,
+      race_day_id: optimisticRace.race_day_id,
+      venue: optimisticRace.venue,
+      race_time: optimisticRace.race_time,
+      date_str: optimisticRace.date_str,
+      distance: optimisticRace.distance,
+      going: optimisticRace.going,
+      class_grade: optimisticRace.class_grade,
+      status: optimisticRace.status,
+      image_url: optimisticRace.image_url,
+      horses: validRunners,
+    }).then(async (created) => {
+      if (created && created.id) {
+        setRaces((prev) => prev.map((r) => (r.id === tempRaceId ? created : r)));
+        setSelectedOddsRaceId((curr) => (curr === tempRaceId ? created.id : curr));
       }
       await onRefreshData();
-      await loadAdminData();
-      handleClearForm();
-    } catch (err: any) {
-      notify(err.message || 'Failed to publish race', 'error');
-    } finally {
-      setIsLoading(false);
-    }
+      await loadAdminData(true);
+    }).catch((err: any) => {
+      console.error('Failed to create race on server:', err);
+      notify(err.message || 'Failed to publish race on server', 'error');
+    });
   };
 
   const handleOpenEdit = (race: Race) => {
@@ -1240,26 +1341,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* Metrics Banner */}
-      {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Bettors</p>
-            <p className="text-lg sm:text-2xl font-black text-white mt-1 font-mono">{stats.totalUsers}</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
-            <p className="text-lg sm:text-2xl font-black text-indigo-400 mt-1 font-mono">{stats.totalBets}</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Turnover</p>
-            <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono truncate">₹{stats.totalVolume.toLocaleString()}</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Pending Bets In-Play</p>
-            <p className="text-lg sm:text-2xl font-black text-amber-400 mt-1 font-mono">{stats.pendingBetsCount}</p>
-          </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Bettors</p>
+          <p className="text-lg sm:text-2xl font-black text-white mt-1 font-mono">
+            {users.length > 0 ? users.filter((u) => u.role !== 'admin').length : (stats?.totalUsers || 0)}
+          </p>
         </div>
-      )}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
+          <p className="text-lg sm:text-2xl font-black text-indigo-400 mt-1 font-mono">
+            {allBets.length > 0 ? allBets.length : (stats?.totalBets || 0)}
+          </p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Turnover</p>
+          <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono truncate">
+            ₹{(allBets.length > 0 ? allBets.reduce((s, b) => s + (b.amount || 0), 0) : (stats?.totalVolume || 0)).toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Pending Bets In-Play</p>
+          <p className="text-lg sm:text-2xl font-black text-amber-400 mt-1 font-mono">
+            {allBets.length > 0 ? allBets.filter((b) => b.status === 'PENDING').length : (stats?.pendingBetsCount || 0)}
+          </p>
+        </div>
+      </div>
 
       {/* Admin Navigation Tabs */}
       <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
@@ -2200,13 +2307,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <h3 className="text-base sm:text-xl font-black text-white uppercase tracking-wider font-mono">
                             {activeRace.name}
                           </h3>
-                          {activeRace.status === 'LIVE' ? (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
-                              🔴 LIVE
+                          {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              <span>🔴 LIVE IN-PLAY</span>
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase">
-                              ⏱ {activeRace.status}
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase flex items-center gap-1.5">
+                              <Clock className="w-3 h-3 text-emerald-400" />
+                              <span>⏱️ UPCOMING</span>
                             </span>
                           )}
                         </div>
@@ -2228,13 +2337,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Master "SUSP ALL" / "RESUME ALL" Action Button */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    {/* Master "SUSP ALL" / "RESUME ALL" & Live Status Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <button
                         type="button"
                         id={`master-susp-all-btn-${activeRace.id}`}
                         onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
                           isAllSuspended
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
                             : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
@@ -2244,11 +2353,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span>{isAllSuspended ? 'RESUME ALL' : 'SUSP ALL'}</span>
                       </button>
 
-                      {activeRace.status !== 'LIVE' && (
+                      {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleMakeRaceUpcoming(activeRace)}
+                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-slate-700"
+                            title="Move race back to upcoming scheduled"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Move to Upcoming</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSettlingRace(activeRace);
+                              soundManager.playClick();
+                            }}
+                            className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+                          >
+                            <Trophy className="w-3.5 h-3.5" />
+                            <span>Settle Winners</span>
+                          </button>
+                        </div>
+                      ) : (
                         <button
                           type="button"
                           onClick={() => handleMakeRaceLive(activeRace)}
-                          className="px-3 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-rose-950/50 active:scale-95"
                         >
                           <Flame className="w-3.5 h-3.5 text-amber-200" />
                           <span>Make Live</span>
