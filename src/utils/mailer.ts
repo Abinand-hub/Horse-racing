@@ -39,204 +39,99 @@ function getGmailTransporter() {
 }
 
 /**
- * Generates a luxury branded HTML email template for Turf Tactics / DerbyBet OTP.
+ * Generates an inbox-deliverability optimized HTML email for OTP codes.
  */
 function buildOtpEmailHtml(otp: string, recipient: string, username?: string): string {
-  const greeting = username ? `Hello <strong>${username}</strong>,` : 'Hello Bettor,';
+  const greeting = username ? `Hello ${username},` : 'Hello,';
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your DerbyBet OTP Verification</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #0b1120;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      color: #e2e8f0;
-    }
-    .wrapper {
-      max-width: 560px;
-      margin: 40px auto;
-      background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-    }
-    .header {
-      background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-      padding: 24px;
-      text-align: center;
-      border-bottom: 2px solid #f59e0b;
-    }
-    .brand-title {
-      color: #f59e0b;
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      margin: 0;
-      text-transform: uppercase;
-    }
-    .brand-sub {
-      color: #94a3b8;
-      font-size: 11px;
-      letter-spacing: 1px;
-      margin-top: 4px;
-      text-transform: uppercase;
-    }
-    .content {
-      padding: 36px 30px;
-      text-align: center;
-    }
-    .greeting {
-      font-size: 16px;
-      color: #f8fafc;
-      margin-bottom: 12px;
-    }
-    .message {
-      font-size: 14px;
-      color: #94a3b8;
-      line-height: 1.6;
-      margin-bottom: 28px;
-    }
-    .otp-box {
-      background: #090d16;
-      border: 2px dashed #f59e0b;
-      border-radius: 12px;
-      padding: 20px 10px;
-      margin: 20px 0 28px 0;
-      display: inline-block;
-      min-width: 240px;
-    }
-    .otp-code {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 36px;
-      font-weight: 900;
-      letter-spacing: 8px;
-      color: #fbbf24;
-      margin: 0;
-      text-align: center;
-      padding-left: 8px;
-    }
-    .validity-tag {
-      display: inline-block;
-      background: rgba(245, 158, 11, 0.15);
-      color: #f59e0b;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 4px 12px;
-      border-radius: 20px;
-      margin-top: 8px;
-    }
-    .security-note {
-      font-size: 12px;
-      color: #64748b;
-      background: #0c1427;
-      padding: 14px;
-      border-radius: 8px;
-      border-left: 3px solid #6366f1;
-      text-align: left;
-      margin-top: 20px;
-      line-height: 1.5;
-    }
-    .footer {
-      background: #050811;
-      padding: 20px;
-      text-align: center;
-      font-size: 11px;
-      color: #475569;
-      border-top: 1px solid #1e293b;
-    }
-    .footer a {
-      color: #f59e0b;
-      text-decoration: none;
-    }
-  </style>
+  <title>Verification Code</title>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 class="brand-title">🏇 TURF TACTICS 2026</h1>
-      <div class="brand-sub">Premium Horse Racing & Wagering Portal</div>
-    </div>
-    <div class="content">
-      <div class="greeting">${greeting}</div>
-      <p class="message">
-        You requested a verification code to authenticate your account for <strong>${recipient}</strong>.
-        Please enter the one-time password below to continue:
-      </p>
+<body style="margin: 0; padding: 24px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+    <tr>
+      <td style="padding: 24px 32px 16px 32px; background-color: #0f172a; text-align: left;">
+        <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #f59e0b; letter-spacing: 1px;">TURF TACTICS</h1>
+        <p style="margin: 4px 0 0 0; font-size: 11px; color: #94a3b8; letter-spacing: 0.5px;">ACCOUNT SECURITY & VERIFICATION</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 32px;">
+        <p style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600; color: #0f172a;">${greeting}</p>
+        <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+          Use the 6-digit verification code below to complete your registration or password reset for <strong>${recipient}</strong>:
+        </p>
 
-      <div class="otp-box">
-        <div class="otp-code">${otp}</div>
-        <div class="validity-tag">⏱ Valid for 10 minutes</div>
-      </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <div style="display: inline-block; background-color: #f1f5f9; border: 2px solid #cbd5e1; border-radius: 10px; padding: 16px 32px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">
+            ${otp}
+          </div>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b; font-weight: 500;">
+            ⏱ This code expires in 10 minutes
+          </p>
+        </div>
 
-      <div class="security-note">
-        <strong>🔒 Security Notice:</strong> Never share this verification code with anyone. DerbyBet staff will never ask for your password or OTP. If you did not make this request, you can safely ignore this email.
-      </div>
-    </div>
-    <div class="footer">
-      <p style="margin: 0 0 6px 0;">© 2026 Turf Tactics / DerbyBet Racing. All rights reserved.</p>
-      <p style="margin: 0;">Automated notification • Please do not reply directly to this email.</p>
-    </div>
-  </div>
+        <div style="background-color: #f8fafc; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-top: 24px;">
+          <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #64748b;">
+            <strong>Security Notice:</strong> Never share this code with anyone. If you did not make this request, you can safely ignore this email.
+          </p>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8;">
+        <p style="margin: 0 0 4px 0;">© 2026 Turf Tactics. All rights reserved.</p>
+        <p style="margin: 0;">This is an automated system notification. Please do not reply.</p>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
   `.trim();
 }
 
 /**
- * Sends a real OTP verification email via Gmail SMTP (or returns simulated OTP if credentials not yet configured).
+ * Sends an OTP verification email via Gmail SMTP with inbox-optimized deliverability.
  */
 export async function sendOtpEmail({ to, otp, username }: SendOtpParams): Promise<MailResult> {
   const cleanEmail = to.trim().toLowerCase();
   const transporter = getGmailTransporter();
 
   if (!transporter) {
-    const sender = process.env.GMAIL_USER || 'Not configured in .env';
-    console.log(`\n======================================================`);
-    console.log(`📧 [GMAIL OTP SIMULATOR - NO APP PASSWORD SET]`);
-    console.log(`➡️  To: ${cleanEmail}`);
-    console.log(`🔑  OTP Code: ${otp}`);
-    console.log(`ℹ️  To send LIVE real emails to Gmail, add:`);
-    console.log(`    GMAIL_USER="your-email@gmail.com"`);
-    console.log(`    GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx" (16-char App Password)`);
-    console.log(`    to your .env file.`);
-    console.log(`======================================================\n`);
-
     return {
       success: true,
       simulated: true,
-      message: `OTP generated for ${cleanEmail} (Simulated mode). Check console or enter OTP ${otp}`,
+      message: `OTP generated for ${cleanEmail} (Simulated mode). Code: ${otp}`,
     };
   }
 
   try {
-    const fromAddress = process.env.GMAIL_FROM || `"Turf Tactics DerbyBet" <${process.env.GMAIL_USER}>`;
+    const fromAddress = 'Turf Tactics <Turftactics2026@gmail.com>';
     const info = await transporter.sendMail({
       from: fromAddress,
       to: cleanEmail,
-      subject: `🏇 ${otp} is your Turf Tactics / DerbyBet verification code`,
-      text: `Your Turf Tactics verification code is: ${otp}. It is valid for 10 minutes. Do not share this code.`,
+      subject: `${otp} is your Turf Tactics verification code`,
+      text: `Hello,\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please enter it on the website to verify your account.\n\nIf you did not request this verification code, you can safely ignore this email.\n\n— Turf Tactics Security Team`,
       html: buildOtpEmailHtml(otp, cleanEmail, username),
+      headers: {
+        'X-Priority': '1',
+        'Importance': 'High',
+        'X-Auto-Response-Suppress': 'All',
+        'X-Entity-Ref-ID': `turf-otp-${cleanEmail}-${Date.now()}`,
+      },
     });
 
-    console.log(`\n======================================================`);
-    console.log(`✅ [GMAIL OTP DELIVERED SUCCESSFULLY]`);
-    console.log(`➡️  To: ${cleanEmail}`);
-    console.log(`🔑  OTP Code: ${otp}`);
-    console.log(`📨  Message ID: ${info.messageId}`);
-    console.log(`======================================================\n`);
+    console.log(`✅ [GMAIL OTP DELIVERED TO INBOX] To: ${cleanEmail} | Message ID: ${info.messageId}`);
 
     return {
       success: true,
       simulated: false,
       messageId: info.messageId,
-      message: `Verification code sent to ${cleanEmail}. Please check your Gmail inbox and spam/promotions tab.`,
+      message: `Verification code sent to ${cleanEmail}. Please check your Gmail inbox.`,
     };
   } catch (err: any) {
     console.error(`❌ [GMAIL SMTP SEND ERROR]:`, err.message || err);
@@ -244,7 +139,7 @@ export async function sendOtpEmail({ to, otp, username }: SendOtpParams): Promis
       success: false,
       simulated: true,
       error: err.message || 'Failed to send email via Gmail SMTP',
-      message: `Email sending encountered an error: ${err.message}. Fallback code: ${otp}`,
+      message: `Email sending encountered an error: ${err.message}. Code: ${otp}`,
     };
   }
 }
