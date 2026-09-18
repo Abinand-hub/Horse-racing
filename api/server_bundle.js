@@ -1132,7 +1132,7 @@ app.post("/api/auth/signup", async (req, res) => {
       full_name: full_name ? String(full_name).trim() : cleanUsername,
       username: cleanUsername,
       password_hash: String(password).trim(),
-      balance: 5e3,
+      balance: 50,
       exposure: 0,
       role: "user",
       profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
@@ -1144,8 +1144,8 @@ app.post("/api/auth/signup", async (req, res) => {
       user_id: newUser.id,
       username: newUser.username,
       type: "DEPOSIT",
-      amount: 5e3,
-      balance_after: 5e3,
+      amount: 50,
+      balance_after: 50,
       description: "Welcome Sign-up Bonus",
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     };

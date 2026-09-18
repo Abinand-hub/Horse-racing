@@ -331,7 +331,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
               <Trophy className="w-3.5 h-3.5 text-[#e5b869] shrink-0" />
             </div>
             <p className="text-xl sm:text-2xl font-black text-white font-mono">
-              {bets.length > 0 ? bets.length : 4}
+              {bets.length}
             </p>
             <p className="text-[10px] text-slate-500 font-medium">Total selections</p>
           </div>
