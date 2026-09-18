@@ -1167,6 +1167,15 @@ app.get('/api/race-days', (req, res) => {
   const centerIdQuery = req.query.center_id as string;
   const dateQuery = (req.query.date as string || '').toLowerCase().trim();
 
+  // Deduplicate race days by center + date
+  const seenKeys = new Set<string>();
+  db.race_days = db.race_days.filter((d) => {
+    const key = `${d.center_id}_${d.race_date}`;
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
+
   let days = [...db.race_days];
 
   if (centerIdQuery) {
@@ -1234,12 +1243,32 @@ app.post('/api/admin/race-days', (req, res) => {
   const center = db.race_centers.find((c) => c.id === center_id);
   if (!center) return res.status(404).json({ error: 'Selected Race Center not found' });
 
+  const cleanDate = race_date ? String(race_date).trim() : new Date().toISOString().split('T')[0];
+  const cleanTitle = title ? String(title).trim() : `${center.name} - ${cleanDate}`;
+
+  // Check if a Race Day card for this center and date already exists (prevent duplicates)
+  let existingDay = db.race_days.find((d) => d.center_id === center.id && d.race_date === cleanDate);
+
+  if (existingDay) {
+    existingDay.title = cleanTitle;
+    existingDay.status = status || 'PUBLISHED';
+    saveDatabase();
+    ensureMongoConnected().then(() => {
+      RaceDayModel.findOneAndUpdate({ id: existingDay!.id }, existingDay, { upsert: true, new: true }).catch(() => {});
+    }).catch(() => {});
+    return res.json({
+      success: true,
+      message: `Race Card "${existingDay.title}" updated & published!`,
+      race_day: existingDay,
+    });
+  }
+
   const newRaceDay: RaceDay = {
     id: generateId('day'),
     center_id: center.id,
     center_name: center.name,
-    race_date: race_date || new Date().toISOString().split('T')[0],
-    title: title || `${center.name} - ${race_date || 'Today'}`,
+    race_date: cleanDate,
+    title: cleanTitle,
     status: status || 'PUBLISHED',
     races_count: 0,
     created_at: new Date().toISOString(),
@@ -1247,7 +1276,16 @@ app.post('/api/admin/race-days', (req, res) => {
 
   db.race_days.unshift(newRaceDay);
   saveDatabase();
-  return res.json({ success: true, message: `Race Card "${newRaceDay.title}" created successfully!`, race_day: newRaceDay });
+
+  ensureMongoConnected().then(() => {
+    RaceDayModel.findOneAndUpdate({ id: newRaceDay.id }, newRaceDay, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
+
+  return res.json({
+    success: true,
+    message: `Race Card "${newRaceDay.title}" created successfully!`,
+    race_day: newRaceDay,
+  });
 });
 
 // POST /api/admin/race-days/:id/publish
@@ -1256,6 +1294,9 @@ app.post('/api/admin/race-days/:id/publish', (req, res) => {
   if (!raceDay) return res.status(404).json({ error: 'Race Day not found' });
   raceDay.status = 'PUBLISHED';
   saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
   return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
 });
 
@@ -1263,7 +1304,9 @@ app.post('/api/admin/race-days/:id/publish', (req, res) => {
 app.delete('/api/admin/race-days/:id', (req, res) => {
   const { id } = req.params;
   db.race_days = db.race_days.filter((d) => d.id !== id);
-  RaceDayModel.deleteOne({ id }).catch(() => {});
+  ensureMongoConnected().then(() => {
+    RaceDayModel.deleteOne({ id }).catch(() => {});
+  }).catch(() => {});
   saveDatabase();
   return res.json({ success: true, message: 'Race Day deleted successfully!' });
 });

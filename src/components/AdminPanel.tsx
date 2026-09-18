@@ -2978,7 +2978,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-1"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>+ Add Race to Day</span>
+                            <span>Add Race to Card</span>
                           </button>
                           <button
                             type="button"
