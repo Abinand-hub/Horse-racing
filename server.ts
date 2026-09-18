@@ -11,6 +11,21 @@ const PORT = Number(process.env.PORT) || 3005;
 
 app.use(express.json());
 
+// CORS & Vercel URL Rewriting normalizer
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  // Ensure /api prefix matches consistently
+  if (!req.url.startsWith('/api') && !req.url.startsWith('/dist') && !req.url.startsWith('/images') && !req.url.startsWith('/sounds')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
 // In-memory + File Storage system
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
