@@ -23,6 +23,8 @@ import {
   TransactionModel,
   BannerModel,
   OtpModel,
+  RaceDayModel,
+  RaceCenterModel,
 } from './src/models/index';
 import { sendOtpEmail } from './src/utils/mailer';
 

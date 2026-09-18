@@ -199,7 +199,7 @@ var RaceDaySchema = new import_mongoose.Schema(
   },
   { timestamps: true }
 );
-var RaceDayModel2 = import_mongoose.default.models.RaceDay || import_mongoose.default.model("RaceDay", RaceDaySchema, "race_days");
+var RaceDayModel = import_mongoose.default.models.RaceDay || import_mongoose.default.model("RaceDay", RaceDaySchema, "race_days");
 var DepositRequestSchema = new import_mongoose.Schema(
   {
     id: { type: String, required: true, unique: true, index: true },
@@ -441,7 +441,7 @@ async function syncMemoryToMongoDB(db2) {
     }
     if (db2.race_days?.length) {
       for (const rd of db2.race_days) {
-        await RaceDayModel2.findOneAndUpdate({ id: rd.id }, rd, { upsert: true, new: true });
+        await RaceDayModel.findOneAndUpdate({ id: rd.id }, rd, { upsert: true, new: true });
       }
     }
     if (db2.deposit_requests?.length) {
@@ -467,7 +467,7 @@ async function loadDataFromMongoDB() {
     const transactions = await TransactionModel.find({}).lean();
     const banners = await BannerModel.find({}).lean();
     const race_centers = await RaceCenterModel.find({}).lean();
-    const race_days = await RaceDayModel2.find({}).lean();
+    const race_days = await RaceDayModel.find({}).lean();
     const deposit_requests = await DepositRequestModel.find({}).lean();
     const withdrawal_requests = await WithdrawalRequestModel.find({}).lean();
     if (users.length > 0 || races.length > 0) {

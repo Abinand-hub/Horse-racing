@@ -267,7 +267,7 @@ export default function App() {
 
   // 3-second Live Market Odds Fluctuation Engine (Only active on user screens, paused on admin)
   useEffect(() => {
-    if (currentRoute === 'admin') return;
+    if (activeTab === 'admin' || window.location.hash.toLowerCase().includes('admin')) return;
 
     const oddsInterval = setInterval(() => {
       setRaces((prevRaces) => {
