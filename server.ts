@@ -2140,6 +2140,6 @@ async function startServer() {
 export { app, startServer };
 export default app;
 
-if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+if (!process.env.VERCEL && !process.env.NOW_REGION && !process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.IS_SERVERLESS) {
   startServer();
 }
