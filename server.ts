@@ -297,6 +297,7 @@ const defaultData: DBData = {
       races_count: 4,
       created_at: new Date().toISOString(),
     },
+  ],
   races: [],
   bets: [],
   transactions: [],
@@ -533,6 +534,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
   } catch (err: any) {
     console.error('Error sending OTP:', err);
     return res.status(500).json({ error: err.message || 'Failed to send OTP' });
+  }
+});
 // 2. Verify OTP for Sign Up
 app.post('/api/auth/verify-otp', (req, res) => {
   const { email, phone, otp } = req.body;

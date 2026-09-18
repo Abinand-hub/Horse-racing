@@ -497,11 +497,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           <Inbox className="w-3.5 h-3.5 text-amber-400" />
                           Enter 6-Digit OTP Code
                         </span>
-                        {otpHint && (
-                          <span className="text-emerald-400 text-[10px] font-mono">
-                            Preview: {otpHint}
-                          </span>
-                        )}
                       </div>
                       <div className="relative">
                         <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -796,11 +791,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
                   <span>6-Digit Verification Code</span>
-                  {forgotOtpHint && (
-                    <span className="text-emerald-400 text-[10px] font-mono">
-                      Preview: {forgotOtpHint}
-                    </span>
-                  )}
                 </label>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />

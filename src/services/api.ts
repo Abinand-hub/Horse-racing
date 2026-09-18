@@ -183,6 +183,23 @@ class FinancialBroadcastService {
   }
 }
 
+async function safeParseJson<T = any>(res: Response, fallbackError: string): Promise<T> {
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    if (!res.ok) {
+      throw new Error(fallbackError);
+    }
+    data = {};
+  }
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || fallbackError);
+  }
+  return data;
+}
+
 export const financialSync = new FinancialBroadcastService();
 
 export const api = {
@@ -197,9 +214,7 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
-      return data;
+      return await safeParseJson(res, 'Failed to send OTP. Please try again.');
     } catch (err: any) {
       const target = payload.email || payload.phone || 'your address';
       return { 
@@ -216,9 +231,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Invalid OTP code');
-    return data;
+    return await safeParseJson(res, 'Invalid or expired OTP verification code.');
   },
 
   async signup(params: { email?: string; phone?: string; otp: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
@@ -227,8 +240,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Sign up failed');
+    const data = await safeParseJson(res, 'Sign up failed. Please check inputs and try again.');
     localStorage.setItem('derby_token', data.token);
     localStorage.setItem('derby_user', JSON.stringify(data.user));
     return data;
@@ -240,8 +252,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Invalid username or password');
+    const data = await safeParseJson(res, 'Invalid username or password.');
     localStorage.setItem('derby_token', data.token);
     localStorage.setItem('derby_user', JSON.stringify(data.user));
     return data;
@@ -253,9 +264,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to send reset code');
-    return data;
+    return await safeParseJson(res, 'Failed to send reset code to Gmail.');
   },
 
   async forgotPasswordReset(params: { email: string; otp: string; new_password: string }): Promise<{ success: boolean; message: string }> {
@@ -264,9 +273,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to reset password');
-    return data;
+    return await safeParseJson(res, 'Failed to reset password.');
   },
 
   async getMe(userId?: string): Promise<User | null> {

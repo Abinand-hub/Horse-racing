@@ -12,6 +12,7 @@ import {
   Trash2, 
   Upload, 
   Users, 
+  Search,
   Coins, 
   ArrowLeft, 
   RefreshCw, 

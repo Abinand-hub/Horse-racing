@@ -18,8 +18,9 @@ interface MailResult {
  * Creates and returns a Nodemailer transporter configured for Gmail SMTP.
  */
 function getGmailTransporter() {
-  const user = process.env.GMAIL_USER || process.env.EMAIL_USER || '';
-  const pass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || process.env.EMAIL_PASS || '';
+  const user = process.env.GMAIL_USER || process.env.EMAIL_USER || 'Turftactics2026@gmail.com';
+  const rawPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || process.env.EMAIL_PASS || 'hqjy mzlv mdvz vysq';
+  const pass = rawPass.replace(/\s+/g, '');
 
   if (!user || !pass) {
     return null;

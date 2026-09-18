@@ -14,11 +14,11 @@ import {
 let isConnected = false;
 
 export async function connectMongoDB(uri?: string): Promise<boolean> {
-  const mongoUri = uri || process.env.MONGODB_URI || process.env.MONGO_URL;
-  if (!mongoUri) {
-    console.log('ℹ️ No MONGODB_URI found in environment. Running in JSON persistence mode.');
-    return false;
-  }
+  const mongoUri =
+    uri ||
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URL ||
+    'mongodb+srv://turftactics2026_db_user:Turftactics2026@clusterhorse.mxwgoze.mongodb.net/derbybet?retryWrites=true&w=majority&appName=ClusterHorse';
 
   try {
     if (mongoose.connection.readyState === 1) {
