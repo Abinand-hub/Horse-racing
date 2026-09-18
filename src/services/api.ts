@@ -119,6 +119,72 @@ class RealtimeOddsService {
 
 export const realtimeOdds = new RealtimeOddsService();
 
+class FinancialBroadcastService {
+  private channel: BroadcastChannel | null = null;
+  private listeners: Set<() => void> = new Set();
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        this.channel = new BroadcastChannel('derby_financial_sync');
+        this.channel.onmessage = () => {
+          this.notify();
+        };
+      } catch (e) {}
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('derby_financial_event', () => {
+        this.notify();
+      });
+
+      window.addEventListener('storage', (e) => {
+        if (
+          e.key === 'derby_last_financial_event' ||
+          e.key === 'derby_deposit_requests' ||
+          e.key === 'derby_withdrawal_requests' ||
+          e.key === 'derby_user' ||
+          e.key === 'derby_custom_txs'
+        ) {
+          this.notify();
+        }
+      });
+    }
+  }
+
+  broadcast() {
+    if (this.channel) {
+      try {
+        this.channel.postMessage({ timestamp: Date.now() });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('derby_financial_event'));
+        localStorage.setItem('derby_last_financial_event', String(Date.now()));
+      } catch {}
+    }
+    this.notify();
+  }
+
+  subscribe(callback: () => void): () => void {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((cb) => {
+      try {
+        cb();
+      } catch {}
+    });
+  }
+}
+
+export const financialSync = new FinancialBroadcastService();
+
 export const api = {
   // Auth
   async sendOtp(phone: string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
@@ -830,6 +896,7 @@ export const api = {
         list.unshift(dep);
       }
       localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
+      financialSync.broadcast();
     } catch {}
   },
 
@@ -1174,6 +1241,7 @@ export const api = {
         list.unshift(wth);
       }
       localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+      financialSync.broadcast();
     } catch {}
   },
 

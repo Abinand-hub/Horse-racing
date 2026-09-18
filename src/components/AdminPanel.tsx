@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, financialSync } from '../services/api';
 import { soundManager } from '../utils/audio';
 import { Banner, Bet, Horse, Race, RaceCenter, RaceDay, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
 import { 
@@ -339,6 +339,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     loadAdminData();
+    // Realtime polling every 4 seconds for new incoming deposit/withdrawal submissions
+    const interval = setInterval(() => {
+      loadAdminData();
+    }, 4000);
+
+    const unsubscribe = financialSync.subscribe(() => {
+      loadAdminData();
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, []);
 
   // Financial Handlers

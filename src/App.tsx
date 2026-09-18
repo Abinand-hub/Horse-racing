@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, realtimeOdds } from './services/api';
+import { api, realtimeOdds, financialSync } from './services/api';
 import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User, UserNotification, DepositRequest, WithdrawalRequest } from './types';
 import { Header } from './components/Header';
 import { BannerSlider } from './components/BannerSlider';
@@ -337,8 +337,20 @@ export default function App() {
   useEffect(() => {
     if (user?.id) {
       loadUserFinancials();
-      const interval = setInterval(loadNotifications, 12000);
-      return () => clearInterval(interval);
+      // Background polling every 3 seconds for live balance & payment approvals
+      const interval = setInterval(() => {
+        loadUserFinancials();
+      }, 3000);
+
+      // Realtime cross-tab & storage event subscription for instant sync
+      const unsubscribe = financialSync.subscribe(() => {
+        loadUserFinancials();
+      });
+
+      return () => {
+        clearInterval(interval);
+        unsubscribe();
+      };
     }
   }, [user?.id]);
 
