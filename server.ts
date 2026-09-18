@@ -11,6 +11,7 @@ import {
   savePersistentOtp,
   getPersistentOtp,
   deletePersistentOtp,
+  lastMongoError,
 } from './src/models/db';
 import {
   UserModel,
@@ -498,6 +499,7 @@ app.get('/api/health', async (req, res) => {
   return res.json({
     status: 'ok',
     mongodb_connected: connected,
+    mongo_error: lastMongoError,
     time: new Date().toISOString(),
   });
 });

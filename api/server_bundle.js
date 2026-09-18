@@ -248,12 +248,12 @@ var OtpSchema = new import_mongoose.Schema(
 var OtpModel = import_mongoose.default.models.Otp || import_mongoose.default.model("Otp", OtpSchema, "otps");
 
 // src/models/db.ts
-var isConnected = false;
-var connectPromise = null;
+var lastMongoError = null;
 async function connectMongoDB(uri) {
   const fallbackUri = Buffer.from("bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl", "base64").toString("utf-8");
   const mongoUri = uri || process.env.MONGODB_URI || process.env.MONGO_URL || fallbackUri;
   if (!mongoUri) {
+    lastMongoError = "No MongoDB URI provided";
     return false;
   }
   if (import_mongoose2.default.connection.readyState === 1) {
@@ -270,13 +270,16 @@ async function connectMongoDB(uri) {
         return true;
       }
       await import_mongoose2.default.connect(mongoUri, {
-        serverSelectionTimeoutMS: 8e3,
+        serverSelectionTimeoutMS: 1e4,
+        connectTimeoutMS: 1e4,
         maxPoolSize: 10
       });
       isConnected = true;
+      lastMongoError = null;
       console.log("\u2705 Connected to MongoDB Atlas successfully! Collections active: users, otps, races, bets, etc.");
       return true;
     } catch (err) {
+      lastMongoError = `${err.name}: ${err.message}`;
       console.error("\u26A0\uFE0F MongoDB connection error:", err.message);
       isConnected = false;
       return false;
@@ -859,6 +862,7 @@ app.get("/api/health", async (req, res) => {
   return res.json({
     status: "ok",
     mongodb_connected: connected,
+    mongo_error: lastMongoError,
     time: (/* @__PURE__ */ new Date()).toISOString()
   });
 });

@@ -12,8 +12,7 @@ import {
   OtpModel,
 } from './index';
 
-let isConnected = false;
-let connectPromise: Promise<boolean> | null = null;
+export let lastMongoError: string | null = null;
 
 export async function connectMongoDB(uri?: string): Promise<boolean> {
   const fallbackUri = Buffer.from('bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl', 'base64').toString('utf-8');
@@ -24,6 +23,7 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
     fallbackUri;
 
   if (!mongoUri) {
+    lastMongoError = 'No MongoDB URI provided';
     return false;
   }
 
@@ -44,14 +44,17 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
       }
 
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 8000,
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
         maxPoolSize: 10,
       });
 
       isConnected = true;
+      lastMongoError = null;
       console.log('✅ Connected to MongoDB Atlas successfully! Collections active: users, otps, races, bets, etc.');
       return true;
     } catch (err: any) {
+      lastMongoError = `${err.name}: ${err.message}`;
       console.error('⚠️ MongoDB connection error:', err.message);
       isConnected = false;
       return false;
