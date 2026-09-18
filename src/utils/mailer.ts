@@ -39,53 +39,111 @@ function getGmailTransporter() {
 }
 
 /**
- * Generates an inbox-deliverability optimized HTML email for OTP codes.
+ * Generates a luxurious branded HTML email template for DerbyBet / Turf Tactics OTP codes.
  */
 function buildOtpEmailHtml(otp: string, recipient: string, username?: string): string {
-  const greeting = username ? `Hello ${username},` : 'Hello,';
+  const greeting = username ? `Hello <strong style="color: #ffffff;">${username}</strong>,` : 'Hello Bettor,';
+  const digits = otp.split('');
+
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verification Code</title>
+  <title>DerbyBet Turf Verification Code</title>
 </head>
-<body style="margin: 0; padding: 24px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+<body style="margin: 0; padding: 30px 10px; background-color: #030806; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
     <tr>
-      <td style="padding: 24px 32px 16px 32px; background-color: #0f172a; text-align: left;">
-        <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #f59e0b; letter-spacing: 1px;">TURF TACTICS</h1>
-        <p style="margin: 4px 0 0 0; font-size: 11px; color: #94a3b8; letter-spacing: 0.5px;">ACCOUNT SECURITY & VERIFICATION</p>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding: 32px;">
-        <p style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600; color: #0f172a;">${greeting}</p>
-        <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
-          Use the 6-digit verification code below to complete your registration or password reset for <strong>${recipient}</strong>:
-        </p>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background: linear-gradient(180deg, #091a12 0%, #050d09 100%); border: 1px solid #164e35; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+          
+          <!-- BRAND HEADER -->
+          <tr>
+            <td style="padding: 32px 30px 24px 30px; text-align: center; border-bottom: 1px solid rgba(229, 184, 105, 0.2); background: linear-gradient(135deg, #05140d 0%, #0d281a 100%);">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto;">
+                <tr>
+                  <td align="center" style="padding-bottom: 10px;">
+                    <div style="display: inline-block; width: 44px; height: 44px; line-height: 44px; border-radius: 12px; background: linear-gradient(135deg, #e5b869 0%, #b8862d 100%); text-align: center; font-size: 24px; box-shadow: 0 4px 15px rgba(229,184,105,0.4);">
+                      🏇
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 900; color: #ffffff; letter-spacing: 2px; text-transform: uppercase;">
+                      DERBYBET <span style="color: #e5b869;">TURF</span>
+                    </h1>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: 700; color: #10b981; letter-spacing: 1.5px; text-transform: uppercase;">
+                      OFFICIAL RACE EXCHANGE • VERIFICATION
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-        <div style="text-align: center; margin: 28px 0;">
-          <div style="display: inline-block; background-color: #f1f5f9; border: 2px solid #cbd5e1; border-radius: 10px; padding: 16px 32px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">
-            ${otp}
-          </div>
-          <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b; font-weight: 500;">
-            ⏱ This code expires in 10 minutes
-          </p>
-        </div>
+          <!-- MAIN BODY -->
+          <tr>
+            <td style="padding: 36px 32px 28px 32px; text-align: center;">
+              <p style="margin: 0 0 10px 0; font-size: 16px; color: #e2e8f0; font-weight: 600;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 14px; line-height: 1.6; color: #94a3b8;">
+                Please use the official 6-digit verification code below to verify your account for <span style="color: #e5b869; font-weight: 600;">${recipient}</span>:
+              </p>
 
-        <div style="background-color: #f8fafc; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-top: 24px;">
-          <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #64748b;">
-            <strong>Security Notice:</strong> Never share this code with anyone. If you did not make this request, you can safely ignore this email.
-          </p>
-        </div>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8;">
-        <p style="margin: 0 0 4px 0;">© 2026 Turf Tactics. All rights reserved.</p>
-        <p style="margin: 0;">This is an automated system notification. Please do not reply.</p>
+              <!-- 6-DIGIT OTP DISPLAY BOXES -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto 16px auto;">
+                <tr>
+                  ${digits
+                    .map(
+                      (d) => `
+                    <td style="padding: 0 4px;">
+                      <div style="width: 44px; height: 54px; line-height: 54px; text-align: center; background: #030805; border: 2px solid #e5b869; border-radius: 12px; color: #fbbf24; font-family: 'Courier New', Courier, monospace; font-size: 28px; font-weight: 900; box-shadow: 0 0 15px rgba(229,184,105,0.25);">
+                        ${d}
+                      </div>
+                    </td>
+                  `
+                    )
+                    .join('')}
+                </tr>
+              </table>
+
+              <!-- EXPIRY BADGE -->
+              <div style="display: inline-block; padding: 6px 16px; background-color: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; margin-top: 12px;">
+                <span style="font-size: 12px; font-weight: 700; color: #34d399; letter-spacing: 0.5px;">
+                  ⏱ Valid for 10 minutes only
+                </span>
+              </div>
+
+              <!-- SECURITY NOTICE -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 30px; text-align: left; background-color: rgba(6, 18, 12, 0.8); border: 1px solid rgba(22, 78, 53, 0.6); border-radius: 12px;">
+                <tr>
+                  <td style="padding: 16px 18px;">
+                    <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #94a3b8;">
+                      <strong style="color: #e5b869;">🔒 Security Advisory:</strong> Do not share this OTP with anyone, including staff. If you did not initiate this sign-up or password reset request, you can safely disregard this email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 24px 30px; background-color: #020604; border-top: 1px solid rgba(22, 78, 53, 0.4); text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #cbd5e1;">
+                DerbyBet Turf Tactics • Live Horse Racing Exchange
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #64748b;">
+                © 2026 DerbyBet Turf. All rights reserved. Automated security notification.
+              </p>
+            </td>
+          </tr>
+
+        </table>
       </td>
     </tr>
   </table>
@@ -95,7 +153,7 @@ function buildOtpEmailHtml(otp: string, recipient: string, username?: string): s
 }
 
 /**
- * Sends an OTP verification email via Gmail SMTP with inbox-optimized deliverability.
+ * Sends a luxury styled OTP verification email via Gmail SMTP with inbox-optimized deliverability.
  */
 export async function sendOtpEmail({ to, otp, username }: SendOtpParams): Promise<MailResult> {
   const cleanEmail = to.trim().toLowerCase();
@@ -114,8 +172,8 @@ export async function sendOtpEmail({ to, otp, username }: SendOtpParams): Promis
     const info = await transporter.sendMail({
       from: fromAddress,
       to: cleanEmail,
-      subject: `${otp} is your Turf Tactics verification code`,
-      text: `Hello,\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please enter it on the website to verify your account.\n\nIf you did not request this verification code, you can safely ignore this email.\n\n— Turf Tactics Security Team`,
+      subject: `${otp} is your DerbyBet Turf verification code`,
+      text: `Hello,\n\nYour 6-digit DerbyBet Turf verification code is: ${otp}\n\nThis code is valid for 10 minutes.\n\nNever share this code with anyone.\n\n— DerbyBet Turf Security Team`,
       html: buildOtpEmailHtml(otp, cleanEmail, username),
       headers: {
         'X-Priority': '1',
@@ -125,7 +183,7 @@ export async function sendOtpEmail({ to, otp, username }: SendOtpParams): Promis
       },
     });
 
-    console.log(`✅ [GMAIL OTP DELIVERED TO INBOX] To: ${cleanEmail} | Message ID: ${info.messageId}`);
+    console.log(`✅ [GMAIL LUXURY OTP DELIVERED TO INBOX] To: ${cleanEmail} | Message ID: ${info.messageId}`);
 
     return {
       success: true,
