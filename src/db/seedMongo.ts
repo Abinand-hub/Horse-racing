@@ -32,13 +32,30 @@ async function seedMongoDB() {
     const raw = fs.readFileSync(dataPath, 'utf-8');
     const data = JSON.parse(raw);
 
-    console.log('📦 Seeding collections...');
+    console.log('🧹 Purging old dummy data from MongoDB collections...');
+    
+    // Wipe all previous dummy matches, horses, bets, transactions, deposit & withdrawal requests
+    await RaceModel.deleteMany({});
+    await HorseModel.deleteMany({});
+    await BetModel.deleteMany({});
+    await TransactionModel.deleteMany({});
+    await DepositRequestModel.deleteMany({});
+    await WithdrawalRequestModel.deleteMany({});
+    // Remove dummy users (keep none or only re-seed fresh admin)
+    await UserModel.deleteMany({});
+    await BannerModel.deleteMany({});
+    await RaceCenterModel.deleteMany({});
+    await RaceDayModel.deleteMany({});
+
+    console.log('  ✓ Purged old races, horses, bets, transactions, requests, and non-admin users.');
+
+    console.log('📦 Seeding fresh clean baseline collections...');
 
     if (data.users?.length) {
       for (const u of data.users) {
         await UserModel.findOneAndUpdate({ id: u.id }, u, { upsert: true, new: true });
       }
-      console.log(`  ✓ Seeded ${data.users.length} users into 'users' collection`);
+      console.log(`  ✓ Seeded ${data.users.length} admin user(s) into 'users' collection`);
     }
 
     if (data.races?.length) {
@@ -51,6 +68,8 @@ async function seedMongoDB() {
         }
       }
       console.log(`  ✓ Seeded ${data.races.length} races into 'races' & 'horses' collections`);
+    } else {
+      console.log('  ✓ Races collection initialized empty (ready for admin to add real races).');
     }
 
     if (data.bets?.length) {
@@ -58,6 +77,8 @@ async function seedMongoDB() {
         await BetModel.findOneAndUpdate({ id: b.id }, b, { upsert: true, new: true });
       }
       console.log(`  ✓ Seeded ${data.bets.length} bets into 'bets' collection`);
+    } else {
+      console.log('  ✓ Bets collection initialized empty.');
     }
 
     if (data.transactions?.length) {
@@ -65,6 +86,8 @@ async function seedMongoDB() {
         await TransactionModel.findOneAndUpdate({ id: t.id }, t, { upsert: true, new: true });
       }
       console.log(`  ✓ Seeded ${data.transactions.length} transactions into 'transactions' collection`);
+    } else {
+      console.log('  ✓ Transactions collection initialized empty.');
     }
 
     if (data.banners?.length) {
@@ -88,7 +111,7 @@ async function seedMongoDB() {
       console.log(`  ✓ Seeded ${data.race_days.length} race days into 'race_days' collection`);
     }
 
-    console.log('🎉 MongoDB database successfully initialized with all 6 required collections!');
+    console.log('🎉 MongoDB database successfully initialized fresh with clean collections!');
   } catch (err: any) {
     console.error('❌ Seeding error:', err.message);
   } finally {
