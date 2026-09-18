@@ -42,6 +42,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpToken, setOtpToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpHint, setOtpHint] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Forgot Password fields
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotOtpToken, setForgotOtpToken] = useState<string | null>(null);
   const [forgotOtpSent, setForgotOtpSent] = useState(false);
   const [forgotOtpHint, setForgotOtpHint] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -114,6 +116,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         username: fullName.trim(),
       });
 
+      if (res.otp_token) {
+        setOtpToken(res.otp_token);
+      }
       setOtpSent(true);
       setCountdown(60);
       setSuccessMsg(`Verification code sent to your Gmail: ${cleanEmail}`);
@@ -151,6 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         email: cleanEmail,
         phone: phone.trim(),
         otp: cleanOtp,
+        otp_token: otpToken || undefined,
       });
 
       setOtpVerified(true);
@@ -190,6 +196,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         email: cleanEmail,
         phone: phone.trim(),
         otp: otp.trim(),
+        otp_token: otpToken || undefined,
         username: cleanUsername,
         password: password.trim(),
       });
@@ -238,6 +245,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setSuccessMsg(null);
 
       const res = await api.forgotPasswordSendOtp(cleanEmail);
+      if (res.otp_token) {
+        setForgotOtpToken(res.otp_token);
+      }
       setForgotOtpSent(true);
       setCountdown(60);
       setSuccessMsg(res.message || 'Reset code sent to your Gmail inbox');
@@ -278,6 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = await api.forgotPasswordReset({
         email: forgotEmail.trim().toLowerCase(),
         otp: forgotOtp.trim(),
+        otp_token: forgotOtpToken || undefined,
         new_password: newPassword.trim(),
       });
 

@@ -204,7 +204,7 @@ export const financialSync = new FinancialBroadcastService();
 
 export const api = {
   // Auth
-  async sendOtp(params: { email?: string; phone?: string; username?: string } | string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
+  async sendOtp(params: { email?: string; phone?: string; username?: string } | string): Promise<{ success: boolean; message: string; otp_token?: string; simulated_otp?: string }> {
     const payload = typeof params === 'string' 
       ? (params.includes('@') ? { email: params } : { phone: params })
       : params;
@@ -225,7 +225,7 @@ export const api = {
     }
   },
 
-  async verifyOtp(params: { email?: string; phone?: string; otp: string }): Promise<{ success: boolean; message: string }> {
+  async verifyOtp(params: { email?: string; phone?: string; otp: string; otp_token?: string }): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${API_BASE}/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -234,7 +234,7 @@ export const api = {
     return await safeParseJson(res, 'Invalid or expired OTP verification code.');
   },
 
-  async signup(params: { email?: string; phone?: string; otp: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
+  async signup(params: { email?: string; phone?: string; otp: string; otp_token?: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -258,7 +258,7 @@ export const api = {
     return data;
   },
 
-  async forgotPasswordSendOtp(email: string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
+  async forgotPasswordSendOtp(email: string): Promise<{ success: boolean; message: string; otp_token?: string; simulated_otp?: string }> {
     const res = await fetch(`${API_BASE}/auth/forgot-password/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -267,7 +267,7 @@ export const api = {
     return await safeParseJson(res, 'Failed to send reset code to Gmail.');
   },
 
-  async forgotPasswordReset(params: { email: string; otp: string; new_password: string }): Promise<{ success: boolean; message: string }> {
+  async forgotPasswordReset(params: { email: string; otp: string; otp_token?: string; new_password: string }): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${API_BASE}/auth/forgot-password/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

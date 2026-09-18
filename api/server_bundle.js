@@ -37,6 +37,7 @@ module.exports = __toCommonJS(server_exports);
 var import_express = __toESM(require("express"), 1);
 var import_fs = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
 var import_config = require("dotenv/config");
 
 // src/models/db.ts
@@ -270,9 +271,9 @@ async function connectMongoDB(uri) {
         return true;
       }
       await import_mongoose2.default.connect(mongoUri, {
-        serverSelectionTimeoutMS: 1e4,
-        connectTimeoutMS: 1e4,
-        maxPoolSize: 10
+        serverSelectionTimeoutMS: 2500,
+        connectTimeoutMS: 2500,
+        maxPoolSize: 5
       });
       isConnected = true;
       lastMongoError = null;
@@ -595,8 +596,27 @@ Never share this code with anyone.
 // server.ts
 var app = (0, import_express.default)();
 var PORT = Number(process.env.PORT) || 3005;
+var OTP_SECRET = process.env.OTP_SECRET || "derbybet_turf_otp_super_secret_key_2026";
+function generateOtpToken(target, code, expires_at) {
+  const cleanTarget = String(target).trim().toLowerCase();
+  const cleanCode = String(code).trim();
+  const payload = `${cleanTarget}:${cleanCode}:${expires_at}`;
+  const hmac = import_crypto.default.createHmac("sha256", OTP_SECRET).update(payload).digest("hex");
+  return `${expires_at}.${hmac}`;
+}
+function verifyOtpToken(target, code, token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return false;
+  const [expStr, expectedHmac] = token.split(".");
+  const expires_at = Number(expStr);
+  if (!expires_at || expires_at < Date.now()) return false;
+  const cleanTarget = String(target).trim().toLowerCase();
+  const cleanCode = String(code).trim();
+  const payload = `${cleanTarget}:${cleanCode}:${expires_at}`;
+  const hmac = import_crypto.default.createHmac("sha256", OTP_SECRET).update(payload).digest("hex");
+  return hmac === expectedHmac;
+}
 app.use(import_express.default.json());
-app.use(async (req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -606,12 +626,9 @@ app.use(async (req, res, next) => {
   if (!req.url.startsWith("/api") && !req.url.startsWith("/dist") && !req.url.startsWith("/images") && !req.url.startsWith("/sounds")) {
     req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
   }
-  if (req.url.startsWith("/api")) {
-    try {
-      await ensureMongoConnected();
-    } catch (e) {
-      console.warn("Mongo auto-connect notice:", e.message);
-    }
+  if (!isMongoDBConnected()) {
+    ensureMongoConnected().catch(() => {
+    });
   }
   next();
 });
@@ -903,13 +920,16 @@ app.post("/api/auth/send-otp", async (req, res) => {
     }
     const code = Math.floor(1e5 + Math.random() * 9e5).toString();
     const expires_at = Date.now() + 10 * 60 * 1e3;
-    db.otps = db.otps || {};
     const primaryKey = cleanEmail || cleanPhone;
+    const otp_token = generateOtpToken(primaryKey, code, expires_at);
+    db.otps = db.otps || {};
     db.otps[primaryKey] = { code, expires_at };
     if (cleanPhone) db.otps[cleanPhone] = { code, expires_at };
-    await savePersistentOtp(primaryKey, code, expires_at);
+    savePersistentOtp(primaryKey, code, expires_at).catch(() => {
+    });
     if (cleanPhone && cleanPhone !== primaryKey) {
-      await savePersistentOtp(cleanPhone, code, expires_at);
+      savePersistentOtp(cleanPhone, code, expires_at).catch(() => {
+      });
     }
     saveDatabase();
     if (cleanEmail) {
@@ -921,6 +941,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
       return res.json({
         success: true,
         message: mailResult.message,
+        otp_token,
         simulated_otp: mailResult.simulated ? code : void 0
       });
     }
@@ -928,6 +949,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
     return res.json({
       success: true,
       message: `OTP sent to ${cleanPhone}`,
+      otp_token,
       simulated_otp: code
     });
   } catch (err) {
@@ -937,7 +959,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
 });
 app.post("/api/auth/verify-otp", async (req, res) => {
   try {
-    const { email, phone, otp } = req.body;
+    const { email, phone, otp, otp_token } = req.body;
     const cleanEmail = email ? String(email).trim().toLowerCase() : "";
     const cleanPhone = phone ? String(phone).trim() : "";
     const cleanOtp = String(otp || "").trim();
@@ -945,14 +967,18 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
     }
     const primaryKey = cleanEmail || cleanPhone;
-    const persistent = await getPersistentOtp(primaryKey);
-    db.otps = db.otps || {};
-    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-    const candidateCode = persistent?.code || storedOtp?.code;
-    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
+    let isDbValid = false;
+    if (!isTokenValid) {
+      const persistent = await getPersistentOtp(primaryKey);
+      db.otps = db.otps || {};
+      const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+      const candidateCode = persistent?.code || storedOtp?.code;
+      const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
+    }
     const isTestFallback = cleanOtp === "123456";
-    if (!isMatch && !isTestFallback) {
+    if (!isTokenValid && !isDbValid && !isTestFallback) {
       return res.status(400).json({
         error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
       });
@@ -968,7 +994,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 });
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, phone, otp, username, password, full_name } = req.body;
+    const { email, phone, otp, otp_token, username, password, full_name } = req.body;
     if (!email && !phone || !username || !password) {
       return res.status(400).json({ error: "Email/Phone, username, and password are required" });
     }
@@ -978,8 +1004,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const cleanOtp = String(otp || "").trim();
     let existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
     if (!existingUsername) {
-      await ensureMongoConnected();
-      const mongoUser = await UserModel.findOne({ username: cleanUsername }).lean();
+      const mongoUser = await UserModel.findOne({ username: cleanUsername }).lean().catch(() => null);
       if (mongoUser) existingUsername = mongoUser;
     }
     if (existingUsername) {
@@ -988,8 +1013,7 @@ app.post("/api/auth/signup", async (req, res) => {
     if (cleanEmail) {
       let existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
       if (!existingEmail) {
-        await ensureMongoConnected();
-        const mongoUser = await UserModel.findOne({ email: cleanEmail }).lean();
+        const mongoUser = await UserModel.findOne({ email: cleanEmail }).lean().catch(() => null);
         if (mongoUser) existingEmail = mongoUser;
       }
       if (existingEmail) {
@@ -997,14 +1021,18 @@ app.post("/api/auth/signup", async (req, res) => {
       }
     }
     const primaryKey = cleanEmail || cleanPhone;
-    const persistent = await getPersistentOtp(primaryKey);
-    db.otps = db.otps || {};
-    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-    const candidateCode = persistent?.code || storedOtp?.code;
-    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
+    let isDbValid = false;
+    if (!isTokenValid) {
+      const persistent = await getPersistentOtp(primaryKey);
+      db.otps = db.otps || {};
+      const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+      const candidateCode = persistent?.code || storedOtp?.code;
+      const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
+    }
     const isTestFallback = cleanOtp === "123456";
-    if (!isMatch && !isTestFallback) {
+    if (!isTokenValid && !isDbValid && !isTestFallback) {
       return res.status(400).json({
         error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
       });
@@ -1038,15 +1066,14 @@ app.post("/api/auth/signup", async (req, res) => {
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     };
     db.transactions.unshift(welcomeTx);
-    await ensureMongoConnected();
-    try {
-      await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
-      await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
-      await deletePersistentOtp(primaryKey);
-      if (cleanPhone) await deletePersistentOtp(cleanPhone);
-    } catch (e) {
-      console.error("MongoDB persist error on signup:", e.message);
-    }
+    UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true }).catch(() => {
+    });
+    TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true }).catch(() => {
+    });
+    deletePersistentOtp(primaryKey).catch(() => {
+    });
+    if (cleanPhone) deletePersistentOtp(cleanPhone).catch(() => {
+    });
     delete db.otps[primaryKey];
     if (cleanPhone) delete db.otps[cleanPhone];
     saveDatabase();
@@ -1224,9 +1251,11 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
     }
     const code = Math.floor(1e5 + Math.random() * 9e5).toString();
     const expires_at = Date.now() + 10 * 60 * 1e3;
+    const otp_token = generateOtpToken(targetEmail, code, expires_at);
     db.otps = db.otps || {};
     db.otps[targetEmail.toLowerCase()] = { code, expires_at };
-    await savePersistentOtp(targetEmail.toLowerCase(), code, expires_at);
+    savePersistentOtp(targetEmail.toLowerCase(), code, expires_at).catch(() => {
+    });
     saveDatabase();
     const mailResult = await sendOtpEmail({
       to: targetEmail,
@@ -1237,6 +1266,7 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
       success: true,
       message: `Password reset OTP sent to ${targetEmail}`,
       target_email: targetEmail,
+      otp_token,
       simulated_otp: mailResult.simulated ? code : void 0
     });
   } catch (err) {
@@ -1245,7 +1275,7 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
 });
 app.post("/api/auth/forgot-password/reset", async (req, res) => {
   try {
-    const { email, otp, new_password } = req.body;
+    const { email, otp, otp_token, new_password } = req.body;
     if (!email || !otp || !new_password) {
       return res.status(400).json({ error: "Email, OTP code, and new password are required" });
     }
@@ -1257,29 +1287,35 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
       (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
     );
     if (!user) {
-      await ensureMongoConnected();
       const mongoUser = await UserModel.findOne({
         $or: [{ email: query }, { username: query }, { phone: query }]
-      }).lean();
+      }).lean().catch(() => null);
       if (mongoUser) user = mongoUser;
     }
     if (!user) {
       return res.status(404).json({ error: "User account not found" });
     }
     const targetEmail = (user.email || query).toLowerCase();
-    const persistent = await getPersistentOtp(targetEmail);
-    db.otps = db.otps || {};
-    const storedOtp = db.otps[targetEmail];
-    const candidateCode = persistent?.code || storedOtp?.code;
-    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-    const isMatch = candidateCode && candidateCode === String(otp).trim() && candidateExpiry >= Date.now();
-    const isTestFallback = String(otp).trim() === "123456";
-    if (!isMatch && !isTestFallback) {
+    const cleanOtp = String(otp).trim();
+    const isTokenValid = verifyOtpToken(targetEmail, cleanOtp, otp_token);
+    let isDbValid = false;
+    if (!isTokenValid) {
+      const persistent = await getPersistentOtp(targetEmail);
+      db.otps = db.otps || {};
+      const storedOtp = db.otps[targetEmail];
+      const candidateCode = persistent?.code || storedOtp?.code;
+      const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
+    }
+    const isTestFallback = cleanOtp === "123456";
+    if (!isTokenValid && !isDbValid && !isTestFallback) {
       return res.status(400).json({ error: "Invalid or expired OTP code" });
     }
     user.password_hash = String(new_password).trim();
-    await UserModel.findOneAndUpdate({ id: user.id }, { password_hash: String(new_password).trim() });
-    await deletePersistentOtp(targetEmail);
+    UserModel.findOneAndUpdate({ id: user.id }, { password_hash: String(new_password).trim() }).catch(() => {
+    });
+    deletePersistentOtp(targetEmail).catch(() => {
+    });
     delete db.otps[targetEmail];
     saveDatabase();
     return res.json({
