@@ -708,9 +708,13 @@ app.post('/api/auth/signup', async (req, res) => {
     };
     db.transactions.unshift(welcomeTx);
 
-    // Save asynchronously to MongoDB Atlas
-    UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true }).catch(() => {});
-    TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true }).catch(() => {});
+    // Save asynchronously to MongoDB Atlas with active connection guarantee
+    ensureMongoConnected().then(async () => {
+      await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
+      await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
+    }).catch((err) => {
+      console.warn('Async Mongo save note:', err?.message || err);
+    });
     deletePersistentOtp(primaryKey).catch(() => {});
     if (cleanPhone) deletePersistentOtp(cleanPhone).catch(() => {});
 
@@ -853,7 +857,9 @@ app.post('/api/auth/login', async (req, res) => {
   // 3. User account check
   if (!user) {
     return res.status(401).json({
-      error: `No registered account found for "${username}". Please check spelling or click Sign Up.`,
+      error: `No registered account found for "${username}". Please click "Sign Up" below to create your Bettor account with ₹50 bonus.`,
+      can_register: true,
+      suggested_username: username,
     });
   }
 

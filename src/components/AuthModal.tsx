@@ -747,9 +747,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {error && (
-                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                    <span className="leading-snug">{error}</span>
+                  </div>
+                  
+                  {(error.toLowerCase().includes('not found') || error.toLowerCase().includes('sign up') || error.toLowerCase().includes('register') || error.toLowerCase().includes('no registered')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (loginIdentifier.includes('@')) {
+                          setEmail(loginIdentifier.trim());
+                        } else {
+                          setUsername(loginIdentifier.trim());
+                          setFullName(loginIdentifier.trim());
+                        }
+                        switchMode('signup');
+                      }}
+                      className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow mt-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Create Bettor Account Now (Sign Up + ₹50 Bonus)</span>
+                    </button>
+                  )}
                 </div>
               )}
 

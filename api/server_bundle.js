@@ -1085,9 +1085,11 @@ app.post("/api/auth/signup", async (req, res) => {
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     };
     db.transactions.unshift(welcomeTx);
-    UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true }).catch(() => {
-    });
-    TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true }).catch(() => {
+    ensureMongoConnected().then(async () => {
+      await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
+      await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
+    }).catch((err) => {
+      console.warn("Async Mongo save note:", err?.message || err);
     });
     deletePersistentOtp(primaryKey).catch(() => {
     });
@@ -1199,7 +1201,9 @@ app.post("/api/auth/login", async (req, res) => {
   }
   if (!user) {
     return res.status(401).json({
-      error: `No registered account found for "${username}". Please check spelling or click Sign Up.`
+      error: `No registered account found for "${username}". Please click "Sign Up" below to create your Bettor account with \u20B950 bonus.`,
+      can_register: true,
+      suggested_username: username
     });
   }
   const isMatch = user.password_hash === cleanPass || user.password_hash === String(password) || cleanPass === "admin123" && user.role === "admin";
