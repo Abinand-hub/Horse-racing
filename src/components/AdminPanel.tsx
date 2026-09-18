@@ -1350,10 +1350,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Metrics Banner */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Bettors</p>
-          <p className="text-lg sm:text-2xl font-black text-white mt-1 font-mono">
-            {users.length > 0 ? users.filter((u) => u.role !== 'admin').length : (stats?.totalUsers || 0)}
-          </p>
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Registered Users</p>
+          <div className="flex items-baseline justify-between mt-1">
+            <p className="text-lg sm:text-2xl font-black text-white font-mono">
+              {users.length > 0 ? users.filter((u) => u.role !== 'admin').length : (stats?.totalUsers || 0)}
+            </p>
+            <span className="text-[10px] text-amber-400 font-mono font-bold">
+              {new Set((allBets || []).map((b) => b.user_id)).size} Active Bettors
+            </span>
+          </div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
@@ -3489,12 +3494,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Total Registered</span>
-              <strong className="text-base sm:text-lg font-black text-white font-mono">{users.length} Accounts</strong>
+              <strong className="text-base sm:text-lg font-black text-white font-mono">{users.filter((u) => u.role !== 'admin').length} Accounts</strong>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block font-medium">Bettors (Users)</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Active Bettors (Wagered)</span>
               <strong className="text-base sm:text-lg font-black text-amber-400 font-mono">
-                {users.filter(u => u.role !== 'admin').length} Punters
+                {new Set((allBets || []).map((b) => b.user_id)).size} Punters
               </strong>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
