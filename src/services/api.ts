@@ -1015,7 +1015,14 @@ export const api = {
       console.warn('Backend getDepositRequests fallback:', e);
     }
 
-    let filtered = list;
+    let filtered = list.filter(
+      (r) =>
+        r &&
+        r.user_id !== 'usr_arjun' &&
+        r.user_id !== 'usr_rahul' &&
+        r.username !== 'arjun_punters' &&
+        r.username !== 'rahul_derby'
+    );
     if (userId) {
       filtered = filtered.filter((r) => r.user_id === userId);
     }
@@ -1311,7 +1318,14 @@ export const api = {
       console.warn('Backend getWithdrawalRequests fallback:', e);
     }
 
-    let filtered = list;
+    let filtered = list.filter(
+      (w) =>
+        w &&
+        w.user_id !== 'usr_arjun' &&
+        w.user_id !== 'usr_rahul' &&
+        w.username !== 'arjun_punters' &&
+        w.username !== 'rahul_derby'
+    );
     if (userId) {
       filtered = filtered.filter((w) => w.user_id === userId);
     }

@@ -364,9 +364,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }, []);
 
   // Load Admin Data
-  const loadAdminData = async () => {
+  const loadAdminData = async (isBackground = false) => {
     try {
-      setIsLoading(true);
+      if (!isBackground) setIsLoading(true);
       const [statsData, usersData, betsData, depositsData, withdrawalsData, centersData, daysData] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
@@ -389,19 +389,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       console.error('Error loading admin data:', err);
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAdminData();
-    // Realtime polling every 4 seconds for new incoming deposit/withdrawal submissions
+    loadAdminData(false);
+    // Realtime background polling every 5 seconds for new incoming deposit/withdrawal submissions
     const interval = setInterval(() => {
-      loadAdminData();
-    }, 4000);
+      loadAdminData(true);
+    }, 5000);
 
     const unsubscribe = financialSync.subscribe(() => {
-      loadAdminData();
+      loadAdminData(true);
     });
 
     return () => {
