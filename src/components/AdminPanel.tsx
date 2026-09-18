@@ -84,7 +84,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   banners,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'lifecycle' | 'finished' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'races'>('lifecycle');
+  const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'finished' | 'lifecycle' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'races'>('live');
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
   const [auditRace, setAuditRace] = useState<Race | null>(null);
@@ -524,10 +524,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         position_3: p3,
       });
       soundManager.playWinPayout();
-      setActionMessage(res.message || 'Race settled and payouts distributed!');
+      setActionMessage(res.message || '🏆 Race settled and payouts distributed! Results and financial ledger updated in Finished Races.');
       setSettlingRace(null);
       await onRefreshData();
       await loadAdminData();
+      setActiveTab('finished');
       setTimeout(() => setActionMessage(null), 4500);
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to settle race');
@@ -636,9 +637,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsLoading(true);
       const res = await api.openRaceForBetting(race.id);
       soundManager.playClick();
-      setActionMessage(`🟢 Race #${race.race_no || ''} "${race.name}" is now OPEN FOR BETTING! All other races in this center are closed.`);
+      setActionMessage(`🟢 Race #${race.race_no || ''} "${race.name}" is now OPEN FOR BETTING! Switched to Live Races lifecycle.`);
       await onRefreshData();
       await loadAdminData();
+      setActiveTab('live');
       setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to open race for betting');
@@ -770,6 +772,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage(`⚡ Race "${race.name}" is now LIVE! Visible in Live Races on user page.`);
       await onRefreshData();
       await loadAdminData();
+      setActiveTab('live');
       setAdminRaceFilter('live');
       setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
@@ -788,6 +791,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage(`⏱ Race "${race.name}" moved to Upcoming Races.`);
       await onRefreshData();
       await loadAdminData();
+      setActiveTab('upcoming');
       setAdminRaceFilter('upcoming');
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
@@ -806,6 +810,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage('🚀 Race published to Upcoming Races! Visible on user page.');
       await onRefreshData();
       await loadAdminData();
+      setActiveTab('upcoming');
       setAdminRaceFilter('upcoming');
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
@@ -1128,22 +1133,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Admin Navigation Tabs */}
       <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
+        {/* TAB 1: LIVE RACES ONLY */}
         <button
-          id="admin-tab-lifecycle"
-          onClick={() => setActiveTab('lifecycle')}
+          id="admin-tab-live"
+          onClick={() => setActiveTab('live')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'lifecycle' || activeTab === 'races'
+            activeTab === 'live' || activeTab === 'lifecycle' || activeTab === 'races'
               ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md font-black'
               : 'text-rose-400 hover:text-white hover:bg-slate-800'
           }`}
         >
           <Flame className="w-3.5 h-3.5" />
-          <span>Race Lifecycle & Control</span>
+          <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
           {races.some((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') && (
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
           )}
         </button>
 
+        {/* TAB 2: PUBLISHED & UPCOMING RACES */}
+        <button
+          id="admin-tab-upcoming"
+          onClick={() => setActiveTab('upcoming')}
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+            activeTab === 'upcoming'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md font-black'
+              : 'text-emerald-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>⏱️ Published Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+        </button>
+
+        {/* TAB 3: FINISHED & SETTLED */}
         <button
           id="admin-tab-finished"
           onClick={() => setActiveTab('finished')}
@@ -1154,7 +1175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Trophy className="w-3.5 h-3.5" />
-          <span>Finished Races & Audit ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
+          <span>🏆 Finished Races & Audit ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
         </button>
 
         <button
@@ -1162,11 +1183,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           onClick={() => setActiveTab('masters')}
           className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
             activeTab === 'masters'
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm font-black'
-              : 'text-emerald-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm font-black'
+              : 'text-indigo-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <Globe className="w-3.5 h-3.5 text-emerald-400" />
+          <Globe className="w-3.5 h-3.5 text-indigo-400" />
           <span>Race Centers & Days ({(raceCenters || []).length})</span>
         </button>
 
@@ -1256,17 +1277,250 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
       </div>
 
-      {/* TAB 1: RACE LIFECYCLE & LIVE CONTROL */}
-      {(activeTab === 'lifecycle' || activeTab === 'races') && (
+      {/* TAB 1: ONLY SHOW LIVE RACE LIFECYCLE */}
+      {(activeTab === 'live' || activeTab === 'lifecycle' || activeTab === 'races') && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                <Flame className="w-5 h-5 text-rose-500" />
-                <span>Race Lifecycle & Live Dispatch</span>
+                <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
+                <span>🔴 Live Races Lifecycle & Settle</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Monitor upcoming races with live countdown timers, launch 1-click LIVE betting, and settle official winners
+                Manage active in-play races, adjust live odds, suspend runners, and settle winners with 1-click payouts
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('upcoming')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-slate-700 transition cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>View Published Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('add_race')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer shadow-md"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Race Fixture</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ACTIVE LIVE RACES COCKPITS */}
+          {(() => {
+            const liveRaces = races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING');
+            if (liveRaces.length > 0) {
+              return (
+                <div className="space-y-6">
+                  {liveRaces.map((liveRace) => {
+                    const liveBets = getRaceBets(liveRace.id);
+                    const liveTurnover = getRaceTurnover(liveRace.id);
+                    return (
+                      <div
+                        key={liveRace.id}
+                        className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-[#1a080d] via-slate-900 to-[#0b101d] border-2 border-rose-500/70 shadow-[0_0_35px_rgba(244,63,94,0.25)] space-y-4 animate-in fade-in duration-300"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-rose-500/30">
+                          <div className="flex items-center gap-2.5">
+                            <span className="relative flex h-3.5 w-3.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
+                            </span>
+                            <div>
+                              <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/50 text-[10px] sm:text-xs font-black uppercase tracking-wider">
+                                🔴 ACTIVE LIVE RACE IN-PLAY
+                              </span>
+                              <h3 className="text-lg sm:text-xl font-black text-white mt-0.5">
+                                {liveRace.name}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {/* Cockpit KPI Badges */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                              <span className="text-slate-400 block text-[10px]">In-Play Bets</span>
+                              <strong className="text-amber-400 font-mono font-black">{liveBets.length} Bets</strong>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                              <span className="text-slate-400 block text-[10px]">Live Turnover</span>
+                              <strong className="text-emerald-400 font-mono font-black">₹{liveTurnover.toLocaleString()}</strong>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                              <span className="text-slate-400 block text-[10px]">Runners Field</span>
+                              <strong className="text-white font-mono font-bold">{liveRace.horses.length} Runners</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Race Meta info bar */}
+                        <div className="flex items-center gap-3 text-xs flex-wrap text-slate-300">
+                          {liveRace.race_no && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[11px] border border-indigo-500/30">
+                              RACE #{liveRace.race_no}
+                            </span>
+                          )}
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            {liveRace.venue}
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-300 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            {liveRace.race_time}
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-400">{liveRace.distance}</span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-emerald-400 font-medium">Going: {liveRace.going || 'Good'}</span>
+                        </div>
+
+                        {/* Live Quick Odds Table */}
+                        <div className="bg-slate-950/90 rounded-2xl border border-slate-800/90 p-3 overflow-x-auto">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-2">
+                            <span>Live Runners & Odds Suspension Control</span>
+                            <button
+                              onClick={() => {
+                                setSelectedOddsRaceId(liveRace.id);
+                                setActiveTab('odds');
+                              }}
+                              className="text-xs text-rose-400 hover:text-rose-300 underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Sliders className="w-3 h-3" />
+                              <span>Open Full Live Odds Board</span>
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                            {liveRace.horses.map((horse) => (
+                              <div
+                                key={horse.id}
+                                className={`p-2 rounded-xl border flex items-center justify-between text-xs transition ${
+                                  horse.is_suspended
+                                    ? 'bg-rose-950/40 border-rose-500/40 opacity-75'
+                                    : 'bg-slate-900 border-slate-800'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] bg-slate-800 text-white shrink-0">
+                                    {horse.serial_no || horse.horse_no}
+                                  </span>
+                                  <div className="truncate">
+                                    <p className="font-bold text-white truncate">{horse.name}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">J: {horse.jockey}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                  {horse.is_suspended ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-black text-[9px] uppercase border border-rose-500/40">
+                                      SUSPENDED
+                                    </span>
+                                  ) : (
+                                    <div className="text-right font-mono">
+                                      <span className="text-amber-400 font-bold block text-[11px]">W:{horse.win_odds.toFixed(2)}</span>
+                                      <span className="text-emerald-400 text-[10px] block">P:{horse.place_odds.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleHorseSuspend(liveRace.id, horse.id)}
+                                    className={`p-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                      horse.is_suspended
+                                        ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600'
+                                        : 'bg-rose-600/20 text-rose-300 border-rose-500/30 hover:bg-rose-600 hover:text-white'
+                                    }`}
+                                    title={horse.is_suspended ? 'Resume Runner' : 'Suspend Runner'}
+                                  >
+                                    {horse.is_suspended ? 'RESUME' : 'SUSP'}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Cockpit Actions: Declare Settlement & Suspend All */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleRaceSuspendAll(liveRace.id)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                                liveRace.horses.every((h) => h.is_suspended)
+                                  ? 'bg-emerald-600 text-white border-emerald-400 hover:bg-emerald-500 shadow-md'
+                                  : 'bg-rose-600/30 text-rose-300 border-rose-500/40 hover:bg-rose-600 hover:text-white'
+                              }`}
+                            >
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>{liveRace.horses.every((h) => h.is_suspended) ? 'RESUME ALL RUNNERS' : 'SUSPEND ALL BETTING'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(liveRace.id, 'CLOSED')}
+                              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Lock / Close Wagering</span>
+                            </button>
+                          </div>
+
+                          {/* MAIN END LIVE & SETTLE BUTTON */}
+                          <button
+                            type="button"
+                            id={`live-declare-result-btn-${liveRace.id}`}
+                            onClick={() => handleOpenSettle(liveRace)}
+                            className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xl shadow-amber-950/50 flex items-center justify-center gap-2 ring-2 ring-amber-400/40 active:scale-95"
+                          >
+                            <Trophy className="w-4 h-4 text-slate-950" />
+                            <span>🏆 END LIVE & SETTLE WINNERS</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            return (
+              <div className="p-8 sm:p-10 rounded-3xl bg-slate-900/90 border border-dashed border-slate-800 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
+                  <Flame className="w-7 h-7" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1.5">
+                  <h4 className="text-base sm:text-lg font-black text-white">No Live Race In-Play Right Now</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    There are currently no races active in the live lifecycle. Switch to the <strong>"Published Races"</strong> tab to select a race and click <strong>"Make Live (Open Betting)"</strong>.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setActiveTab('upcoming')}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition cursor-pointer active:scale-95"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Go to Published Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length}) →</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* TAB 2: PUBLISHED & UPCOMING RACES LIFECYCLE */}
+      {activeTab === 'upcoming' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-emerald-400" />
+                <span>⏱️ Published Races & Upcoming Schedule</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Browse scheduled race fixtures with live countdown timers. Click <strong className="text-emerald-400">"Make Live"</strong> to launch the race into the Live lifecycle cockpit.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1280,402 +1534,204 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* SECTION 1: ACTIVE LIVE RACE COCKPIT */}
-          {(() => {
-            const liveRace = races.find((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING');
-            if (liveRace) {
-              const liveBets = getRaceBets(liveRace.id);
-              const liveTurnover = getRaceTurnover(liveRace.id);
-              return (
-                <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-[#1a080d] via-slate-900 to-[#0b101d] border-2 border-rose-500/70 shadow-[0_0_35px_rgba(244,63,94,0.25)] space-y-4 animate-in fade-in duration-300">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-rose-500/30">
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative flex h-3.5 w-3.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
-                      </span>
-                      <div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/50 text-[10px] sm:text-xs font-black uppercase tracking-wider">
-                          🔴 ACTIVE LIVE RACE IN-PLAY
+          {/* Sub-Filter: Center Selector Pills */}
+          <div className="space-y-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Filter by Race Center:</span>
+              </span>
+              <span className="text-[10px] text-slate-500">1 active live race per center</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
+              <button
+                onClick={() => setSelectedCenterFilter('all')}
+                className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
+                  selectedCenterFilter === 'all'
+                    ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                }`}
+              >
+                All Centers ({races.filter(r => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})
+              </button>
+              {(raceCenters || []).map((cntr) => {
+                const centerCount = (races || []).filter(r => 
+                  (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
+                  (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
+                ).length;
+                return (
+                  <button
+                    key={cntr.id}
+                    onClick={() => setSelectedCenterFilter(cntr.id)}
+                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
+                      selectedCenterFilter === cntr.id
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
+                        : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <span>{cntr.name}</span>
+                    <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Upcoming Races List */}
+          <div className="space-y-3">
+            {races
+              .filter((race) => {
+                if (selectedCenterFilter !== 'all') {
+                  const matchesCenter = race.center_id === selectedCenterFilter || 
+                    (race.venue && race.venue.toLowerCase().includes(selectedCenterFilter.replace('cntr_', '')));
+                  if (!matchesCenter) return false;
+                }
+                return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
+              })
+              .map((race) => (
+                <div
+                  key={race.id}
+                  className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-slate-700 p-4 sm:p-5 space-y-3 shadow-sm transition"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      {/* Race Image Thumbnail */}
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/80 shrink-0 shadow-md">
+                        <img
+                          src={race.image_url || '/images/race_action.jpg'}
+                          alt={race.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/images/race_action.jpg';
+                          }}
+                        />
+                        <span className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-center text-[9px] font-bold text-slate-300 py-0.5 backdrop-blur-xs">
+                          {race.distance}
                         </span>
-                        <h3 className="text-lg sm:text-xl font-black text-white mt-0.5">
-                          {liveRace.name}
-                        </h3>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          {race.race_no && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[11px] border border-indigo-500/30">
+                              RACE #{race.race_no}
+                            </span>
+                          )}
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {race.venue}
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-300 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {race.race_time}
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-400">{race.date_str || 'Today'}</span>
+                          {race.going && (
+                            <>
+                              <span className="text-slate-600">•</span>
+                              <span className="text-emerald-400">Going: {race.going}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="text-base font-bold text-white">
+                            {race.name}
+                          </h4>
+                          {/* Live Countdown Timer Badge */}
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider font-mono shadow-sm animate-pulse">
+                            <Timer className="w-3 h-3 text-emerald-400" />
+                            {getRaceCountdown(race.race_time)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Cockpit KPI Badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-                        <span className="text-slate-400 block text-[10px]">In-Play Bets</span>
-                        <strong className="text-amber-400 font-mono font-black">{liveBets.length} Bets</strong>
-                      </div>
-                      <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-                        <span className="text-slate-400 block text-[10px]">Live Turnover</span>
-                        <strong className="text-emerald-400 font-mono font-black">₹{liveTurnover.toLocaleString()}</strong>
-                      </div>
-                      <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-                        <span className="text-slate-400 block text-[10px]">Runners Field</span>
-                        <strong className="text-white font-mono font-bold">{liveRace.horses.length} Runners</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Race Meta info bar */}
-                  <div className="flex items-center gap-3 text-xs flex-wrap text-slate-300">
-                    {liveRace.race_no && (
-                      <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[11px] border border-indigo-500/30">
-                        RACE #{liveRace.race_no}
-                      </span>
-                    )}
-                    <span className="text-amber-400 font-bold flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {liveRace.venue}
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-300 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      {liveRace.race_time}
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-400">{liveRace.distance}</span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-emerald-400 font-medium">Going: {liveRace.going || 'Good'}</span>
-                  </div>
-
-                  {/* Live Quick Odds Table */}
-                  <div className="bg-slate-950/90 rounded-2xl border border-slate-800/90 p-3 overflow-x-auto">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-2">
-                      <span>Live Runners & Fixed Odds</span>
+                    {/* Status & Action controls */}
+                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full md:w-auto">
+                      {/* PRIMARY 1-CLICK ACTION: MAKE LIVE */}
                       <button
-                        onClick={() => {
-                          setSelectedOddsRaceId(liveRace.id);
-                          setActiveTab('odds');
-                        }}
-                        className="text-xs text-rose-400 hover:text-rose-300 underline font-bold flex items-center gap-1 cursor-pointer"
+                        id={`make-live-btn-${race.id}`}
+                        onClick={() => handleOpenRaceForBetting(race)}
+                        disabled={isLoading}
+                        className="col-span-2 sm:col-span-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50 border border-emerald-400/50 active:scale-95"
+                        title="Instantly open this race as LIVE in-play and start accepting user wagers"
                       >
-                        <Sliders className="w-3 h-3" />
-                        <span>Open Full Live Odds Board</span>
+                        <Play className="w-3.5 h-3.5 fill-current text-slate-950" />
+                        <span>⚡ MAKE LIVE (OPEN BETTING)</span>
+                      </button>
+
+                      <button
+                        id={`edit-upcoming-race-btn-${race.id}`}
+                        onClick={() => handleOpenEdit(race)}
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        id={`delete-upcoming-race-btn-${race.id}`}
+                        onClick={() => handleDeleteRace(race.id, race.name)}
+                        className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer flex items-center justify-center"
+                        title="Delete race fixture"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                      {liveRace.horses.map((horse) => (
+                  </div>
+
+                  {/* Runners Preview Grid */}
+                  <div className="bg-slate-950/70 rounded-xl border border-slate-800/80 p-3 overflow-x-auto">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-2">
+                      <span>Field Runners ({race.horses.length} entries)</span>
+                      <span className="text-slate-500 font-mono">S.No | Gate | Horse | Jockey | Trainer | Win / Place</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {race.horses.map((horse, idx) => (
                         <div
-                          key={horse.id}
-                          className={`p-2 rounded-xl border flex items-center justify-between text-xs transition ${
-                            horse.is_suspended
-                              ? 'bg-rose-950/40 border-rose-500/40 opacity-75'
-                              : 'bg-slate-900 border-slate-800'
-                          }`}
+                          key={horse.id || idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] bg-slate-800 text-white shrink-0">
+                            <span className="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] bg-indigo-500/20 text-indigo-300 shrink-0">
                               {horse.serial_no || horse.horse_no}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono font-bold shrink-0">
+                              G:{horse.gate_no !== undefined ? horse.gate_no : (horse.serial_no || horse.horse_no)}
                             </span>
                             <div className="truncate">
                               <p className="font-bold text-white truncate">{horse.name}</p>
-                              <p className="text-[10px] text-slate-400 truncate">J: {horse.jockey}</p>
+                              <p className="text-[10px] text-slate-400 truncate">
+                                J: {horse.jockey} • T: {horse.trainer}
+                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                            {horse.is_suspended ? (
-                              <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-black text-[9px] uppercase border border-rose-500/40">
-                                SUSPENDED
-                              </span>
-                            ) : (
-                              <div className="text-right font-mono">
-                                <span className="text-amber-400 font-bold block text-[11px]">W:{horse.win_odds.toFixed(2)}</span>
-                                <span className="text-emerald-400 text-[10px] block">P:{horse.place_odds.toFixed(2)}</span>
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleToggleHorseSuspend(liveRace.id, horse.id)}
-                              className={`p-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                                horse.is_suspended
-                                  ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600'
-                                  : 'bg-rose-600/20 text-rose-300 border-rose-500/30 hover:bg-rose-600 hover:text-white'
-                              }`}
-                              title={horse.is_suspended ? 'Resume Runner' : 'Suspend Runner'}
-                            >
-                              {horse.is_suspended ? 'RESUME' : 'SUSP'}
-                            </button>
+                          <div className="text-right shrink-0 ml-2 font-mono">
+                            <span className="text-amber-400 font-bold block text-[11px]">{horse.win_odds.toFixed(2)}</span>
+                            <span className="text-emerald-400 text-[10px] block">{horse.place_odds.toFixed(2)}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Cockpit Actions: Declare Settlement & Suspend All */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleRaceSuspendAll(liveRace.id)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
-                          liveRace.horses.every((h) => h.is_suspended)
-                            ? 'bg-emerald-600 text-white border-emerald-400 hover:bg-emerald-500 shadow-md'
-                            : 'bg-rose-600/30 text-rose-300 border-rose-500/40 hover:bg-rose-600 hover:text-white'
-                        }`}
-                      >
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        <span>{liveRace.horses.every((h) => h.is_suspended) ? 'RESUME ALL RUNNERS' : 'SUSPEND ALL BETTING'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(liveRace.id, 'CLOSED')}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Lock / Close Wagering</span>
-                      </button>
-                    </div>
-
-                    {/* MAIN SETTLEMENT BUTTON */}
-                    <button
-                      type="button"
-                      id="live-declare-result-btn"
-                      onClick={() => handleOpenSettle(liveRace)}
-                      className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xl shadow-amber-950/50 flex items-center justify-center gap-2 ring-2 ring-amber-400/40 active:scale-95"
-                    >
-                      <Trophy className="w-4 h-4 text-slate-950" />
-                      <span>🏆 DECLARE RESULT & SETTLE PAYOUTS</span>
-                    </button>
-                  </div>
                 </div>
-              );
-            }
+              ))}
 
-            return (
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-dashed border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-400">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-                    <Timer className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">No Live Race In-Play Right Now</h4>
-                    <p className="text-xs text-slate-400">
-                      Choose an upcoming race from the queue below and click <strong className="text-emerald-400">"Make Live (Open for Betting)"</strong> to start wagering.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* SECTION 2: UPCOMING RACES QUEUE WITH LIVE TIMERS */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm sm:text-base font-bold text-white">
-                  Upcoming Races Queue ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})
-                </h3>
-              </div>
-              <span className="text-xs text-slate-400">
-                Real-time timers counting down to post time
-              </span>
-            </div>
-
-            {/* Sub-Filter: Center Selector Pills */}
-            <div className="space-y-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>Filter by Race Center:</span>
-                </span>
-                <span className="text-[10px] text-slate-500">1 active live race per center</span>
-              </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
+            {races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length === 0 && (
+              <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
+                <p className="text-sm font-semibold text-slate-300">No Upcoming Races in Queue</p>
+                <p className="text-xs text-slate-500">Create a new race fixture under "Add New Race" or from "Race Centers & Days".</p>
                 <button
-                  onClick={() => setSelectedCenterFilter('all')}
-                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
-                    selectedCenterFilter === 'all'
-                      ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                  }`}
+                  onClick={() => setActiveTab('add_race')}
+                  className="mt-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer"
                 >
-                  All Centers ({races.length})
+                  + Create New Race Fixture
                 </button>
-                {(raceCenters || []).map((cntr) => {
-                  const centerCount = (races || []).filter(r => 
-                    r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase()))
-                  ).length;
-                  return (
-                    <button
-                      key={cntr.id}
-                      onClick={() => setSelectedCenterFilter(cntr.id)}
-                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
-                        selectedCenterFilter === cntr.id
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
-                          : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      <span>{cntr.name}</span>
-                      <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
-                    </button>
-                  );
-                })}
               </div>
-            </div>
-
-            {/* Upcoming Races List */}
-            <div className="space-y-3">
-              {races
-                .filter((race) => {
-                  if (selectedCenterFilter !== 'all') {
-                    const matchesCenter = race.center_id === selectedCenterFilter || 
-                      (race.venue && race.venue.toLowerCase().includes(selectedCenterFilter.replace('cntr_', '')));
-                    if (!matchesCenter) return false;
-                  }
-                  return race.status === 'UPCOMING' || race.status === 'OPEN' || race.status === 'DRAFT';
-                })
-                .map((race) => (
-                  <div
-                    key={race.id}
-                    className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-slate-700 p-4 sm:p-5 space-y-3 shadow-sm transition"
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-start gap-3.5">
-                        {/* Race Image Thumbnail */}
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/80 shrink-0 shadow-md">
-                          <img
-                            src={race.image_url || '/images/race_action.jpg'}
-                            alt={race.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/images/race_action.jpg';
-                            }}
-                          />
-                          <span className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-center text-[9px] font-bold text-slate-300 py-0.5 backdrop-blur-xs">
-                            {race.distance}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs flex-wrap">
-                            {race.race_no && (
-                              <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-black text-[11px] border border-indigo-500/30">
-                                RACE #{race.race_no}
-                              </span>
-                            )}
-                            <span className="text-amber-400 font-bold flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {race.venue}
-                            </span>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-slate-300 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              {race.race_time}
-                            </span>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-slate-400">{race.date_str || 'Today'}</span>
-                            {race.going && (
-                              <>
-                                <span className="text-slate-600">•</span>
-                                <span className="text-emerald-400">Going: {race.going}</span>
-                              </>
-                            )}
-                          </div>
-                          
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <h4 className="text-base font-bold text-white">
-                              {race.name}
-                            </h4>
-                            {/* Live Countdown Timer Badge */}
-                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider font-mono shadow-sm animate-pulse">
-                              <Timer className="w-3 h-3 text-emerald-400" />
-                              {getRaceCountdown(race.race_time)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Status & Action controls */}
-                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full md:w-auto">
-                        {/* PRIMARY 1-CLICK ACTION: MAKE LIVE */}
-                        <button
-                          id={`make-live-btn-${race.id}`}
-                          onClick={() => handleOpenRaceForBetting(race)}
-                          disabled={isLoading}
-                          className="col-span-2 sm:col-span-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50 border border-emerald-400/50 active:scale-95"
-                          title="Instantly open this race as LIVE in-play and start accepting user wagers"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current text-slate-950" />
-                          <span>⚡ MAKE LIVE (OPEN BETTING)</span>
-                        </button>
-
-                        <button
-                          id={`edit-upcoming-race-btn-${race.id}`}
-                          onClick={() => handleOpenEdit(race)}
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Edit</span>
-                        </button>
-
-                        <button
-                          id={`delete-upcoming-race-btn-${race.id}`}
-                          onClick={() => handleDeleteRace(race.id, race.name)}
-                          className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition cursor-pointer flex items-center justify-center"
-                          title="Delete race fixture"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Runners Preview Grid */}
-                    <div className="bg-slate-950/70 rounded-xl border border-slate-800/80 p-3 overflow-x-auto">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-2">
-                        <span>Field Runners ({race.horses.length} entries)</span>
-                        <span className="text-slate-500 font-mono">S.No | Gate | Horse | Jockey | Trainer | Win / Place</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {race.horses.map((horse, idx) => (
-                          <div
-                            key={horse.id || idx}
-                            className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] bg-indigo-500/20 text-indigo-300 shrink-0">
-                                {horse.serial_no || horse.horse_no}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono font-bold shrink-0">
-                                G:{horse.gate_no !== undefined ? horse.gate_no : (horse.serial_no || horse.horse_no)}
-                              </span>
-                              <div className="truncate">
-                                <p className="font-bold text-white truncate">{horse.name}</p>
-                                <p className="text-[10px] text-slate-400 truncate">
-                                  J: {horse.jockey} • T: {horse.trainer}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0 ml-2 font-mono">
-                              <span className="text-amber-400 font-bold block text-[11px]">{horse.win_odds.toFixed(2)}</span>
-                              <span className="text-emerald-400 text-[10px] block">{horse.place_odds.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-              {races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length === 0 && (
-                <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
-                  <p className="text-sm font-semibold text-slate-300">No Upcoming Races in Queue</p>
-                  <p className="text-xs text-slate-500">Create a new race fixture under "Add New Race" or from "Race Centers & Days".</p>
-                  <button
-                    onClick={() => setActiveTab('add_race')}
-                    className="mt-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer"
-                  >
-                    + Create New Race Fixture
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}
