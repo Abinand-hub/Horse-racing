@@ -598,12 +598,6 @@ export const api = {
 
   // Races
   async getRaces(status?: 'upcoming' | 'open' | 'live' | 'resulted' | 'all'): Promise<Race[]> {
-    let customRaces: Race[] = [];
-    try {
-      const raw = localStorage.getItem('derby_custom_races');
-      if (raw) customRaces = JSON.parse(raw);
-    } catch {}
-
     try {
       const query = status ? `?status=${status}` : '';
       const res = await fetch(`${API_BASE}/races${query}`);
@@ -612,13 +606,6 @@ export const api = {
         try {
           const data = JSON.parse(text);
           if (Array.isArray(data.races)) {
-            // Merge custom races from localStorage if any
-            const remoteMap = new Map(data.races.map((r: Race) => [r.id, r]));
-            for (const cr of customRaces) {
-              if (!remoteMap.has(cr.id)) {
-                data.races.unshift(cr);
-              }
-            }
             if (status === 'live') {
               return data.races.filter((r: Race) => r.status === 'LIVE');
             } else if (status === 'open') {
@@ -636,39 +623,15 @@ export const api = {
       console.warn('API getRaces failed:', e);
     }
     
-    // Return custom races created by user or empty array (no hardcoded dummy races)
-    const allRaces = customRaces;
-
-    if (status === 'live') {
-      return allRaces.filter((r) => r.status === 'LIVE');
-    } else if (status === 'open') {
-      return allRaces.filter((r) => r.status === 'OPEN' || r.status === 'UPCOMING' || r.status === 'LIVE');
-    } else if (status === 'upcoming') {
-      return allRaces.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT');
-    } else if (status === 'resulted') {
-      return allRaces.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED');
-    }
-    return allRaces;
+    return [];
   },
 
   async getRace(id: string): Promise<Race> {
-    try {
-      const res = await fetch(`${API_BASE}/races/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.race) return data.race;
-      }
-    } catch {}
-
-    try {
-      const raw = localStorage.getItem('derby_custom_races');
-      if (raw) {
-        const customRaces: Race[] = JSON.parse(raw);
-        const foundCustom = customRaces.find((r) => r.id === id);
-        if (foundCustom) return foundCustom;
-      }
-    } catch {}
-
+    const res = await fetch(`${API_BASE}/races/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.race) return data.race;
+    }
     throw new Error(`Race with ID "${id}" not found`);
   },
 

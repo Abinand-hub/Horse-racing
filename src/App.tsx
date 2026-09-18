@@ -171,11 +171,17 @@ export default function App() {
   const loadRacesAndBanners = async () => {
     try {
       setIsLoadingRaces(true);
+      // Clean up any legacy mock races cached in browser storage
+      try {
+        localStorage.removeItem('derby_custom_races');
+        localStorage.removeItem('derby_races');
+      } catch {}
+
       const [racesData, bannersData] = await Promise.all([
         api.getRaces('all'),
         api.getBanners(),
       ]);
-      setRaces(racesData);
+      setRaces(racesData || []);
       setBanners(bannersData);
     } catch (err: any) {
       console.error('Error fetching races:', err);

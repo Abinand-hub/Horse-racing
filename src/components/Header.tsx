@@ -158,9 +158,11 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Trophy className={`w-3.5 h-3.5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
                 <span>My Selections</span>
-                <span className="w-4 h-4 rounded-full bg-[#10b981] text-black font-black text-[10px] flex items-center justify-center shadow-xs">
-                  {pendingBetsCount > 0 ? pendingBetsCount : 2}
-                </span>
+                {pendingBetsCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#10b981] text-black font-black text-[10px] flex items-center justify-center shadow-xs">
+                    {pendingBetsCount}
+                  </span>
+                )}
               </button>
 
               {/* 3. Personal Details */}
@@ -495,9 +497,11 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <div className="relative">
               <Trophy className={`w-5 h-5 ${activeTab === 'mybets' ? 'text-[#e5b869]' : 'text-amber-400'}`} />
-              <span className="absolute -top-1.5 -right-2.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-black font-black text-[8px] flex items-center justify-center">
-                {pendingBetsCount > 0 ? pendingBetsCount : 2}
-              </span>
+              {pendingBetsCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-black font-black text-[8px] flex items-center justify-center">
+                  {pendingBetsCount}
+                </span>
+              )}
             </div>
             <span className="text-[10px] mt-0.5 tracking-tight font-bold">Selections</span>
           </button>
