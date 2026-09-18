@@ -2219,6 +2219,120 @@ export const api = {
     return [];
   },
 
+  async abandonRace(raceId: string, reason?: string): Promise<{ success: boolean; message: string; refundedCount: number; totalRefunded: number }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/abandon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {}
+    return { success: false, message: 'Failed to abandon race', refundedCount: 0, totalRefunded: 0 };
+  },
+
+  async cancelBet(betId: string, reason?: string): Promise<{ success: boolean; message: string; bet?: Bet }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/bets/${betId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, message: errData.error || 'Failed to cancel bet' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error cancelling bet' };
+    }
+  },
+
+  async createAdminUser(data: { full_name?: string; username: string; phone: string; email?: string; password: string; initial_balance?: number }): Promise<{ success: boolean; message?: string; error?: string; user?: User }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (res.ok) return result;
+      return { success: false, error: result.error || 'Failed to create user' };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error creating user' };
+    }
+  },
+
+  async toggleBlockUser(userId: string): Promise<{ success: boolean; message: string; is_blocked?: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${userId}/toggle-block`, {
+        method: 'POST',
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { success: false, message: 'Failed to toggle user block status' };
+  },
+
+  async impersonateUser(userId: string): Promise<{ success: boolean; user?: User; token?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${userId}/impersonate`, {
+        method: 'POST',
+      });
+      if (res.ok) return await res.json();
+      const err = await res.json();
+      return { success: false, error: err.error };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async getSystemSettings(): Promise<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; sub_admins?: any[] }> {
+    try {
+      const res = await fetch(`${API_BASE}/system/settings`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.settings || { betting_enabled: true, sub_admins: [] };
+      }
+    } catch {}
+    return { betting_enabled: true, sub_admins: [] };
+  },
+
+  async updateSystemSettings(settings: { betting_enabled?: boolean; emergency_message?: string; announcement?: string }): Promise<{ success: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/system/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { success: false };
+  },
+
+  async addSubAdmin(data: { username: string; name: string; role?: string; permissions?: string[] }): Promise<{ success: boolean; message?: string; sub_admin?: any }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/sub-admins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { success: false };
+  },
+
+  async deleteSubAdmin(id: string): Promise<{ success: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/sub-admins/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { success: false };
+  },
+
   async resetDemo(): Promise<void> {
     try {
       await fetch(`${API_BASE}/admin/reset-demo`, { method: 'POST' });

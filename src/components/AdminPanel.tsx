@@ -53,6 +53,7 @@ interface AdminPanelProps {
   races: Race[];
   banners: Banner[];
   onRefreshData: () => Promise<void>;
+  onImpersonateUser?: (user: User) => void;
 }
 
 // Preset matching the user's handwritten race sheet
@@ -86,6 +87,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   races: initialRaces,
   banners,
   onRefreshData,
+  onImpersonateUser,
 }) => {
   const [races, setRaces] = useState<Race[]>(initialRaces || []);
 
@@ -95,13 +97,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [initialRaces]);
 
-  const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'finished' | 'lifecycle' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'races'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'finished' | 'lifecycle' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'system' | 'races'>('live');
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
   const [auditRace, setAuditRace] = useState<Race | null>(null);
   const [auditBetSearch, setAuditBetSearch] = useState<string>('');
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+
+  // New Checklist State additions
+  const [systemSettings, setSystemSettings] = useState<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; sub_admins?: any[] }>({ betting_enabled: true, sub_admins: [] });
+  const [announcementText, setAnnouncementText] = useState<string>('');
+  const [addUserModalOpen, setAddUserModalOpen] = useState<boolean>(false);
+  const [newUserData, setNewUserData] = useState({ full_name: '', username: '', phone: '', email: '', password: '', initial_balance: '0' });
+  const [viewBetsUser, setViewBetsUser] = useState<User | null>(null);
+  const [oddsHistoryModalHorse, setOddsHistoryModalHorse] = useState<{ horse: Horse; race: Race } | null>(null);
+  const [subAdminModalOpen, setSubAdminModalOpen] = useState<boolean>(false);
+  const [newSubAdminData, setNewSubAdminData] = useState({ username: '', name: '', role: 'ODDS_MANAGER' });
+  const [betsSearchQuery, setBetsSearchQuery] = useState<string>('');
 
   // Helper: 24h (HH:mm) <-> 12h (h:mm A) for native clock picker
   const format24To12 = (time24: string): string => {
@@ -417,7 +430,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const loadAdminData = async (isBackground = false) => {
     try {
       if (!isBackground) setIsLoading(true);
-      const [statsData, usersData, betsData, depositsData, withdrawalsData, centersData, daysData] = await Promise.all([
+      const [statsData, usersData, betsData, depositsData, withdrawalsData, centersData, daysData, sysSettings] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
         api.getAdminAllBets(),
@@ -425,6 +438,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         api.getWithdrawalRequests('ALL'),
         api.getRaceCenters(true),
         api.getRaceDays(),
+        api.getSystemSettings(),
       ]);
       setStats((prev: any) => (JSON.stringify(prev) === JSON.stringify(statsData) ? prev : statsData));
       setUsers((prev) => (JSON.stringify(prev) === JSON.stringify(usersData) ? prev : usersData));
@@ -433,6 +447,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setWithdrawalRequests((prev) => (JSON.stringify(prev) === JSON.stringify(withdrawalsData) ? prev : withdrawalsData));
       setRaceCenters((prev) => (JSON.stringify(prev) === JSON.stringify(centersData) ? prev : centersData));
       setRaceDays((prev) => (JSON.stringify(prev) === JSON.stringify(daysData) ? prev : daysData));
+      if (sysSettings) setSystemSettings(sysSettings);
       if (!newDayCenterId && centersData.length > 0) {
         setNewDayCenterId(centersData[0].id);
       }
@@ -572,6 +587,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleStatusChange = async (raceId: string, status: RaceStatus) => {
     try {
+      // Enforce 1-Race-per-center OPEN invariant: When opening a race, auto-close previous open races in the same center
+      if (status === 'OPEN_FOR_BETTING' || status === 'LIVE') {
+        const targetRace = races.find(r => r.id === raceId);
+        if (targetRace) {
+          const centerId = targetRace.center_id;
+          const otherOpenRaces = races.filter(r => 
+            r.id !== targetRace.id && 
+            (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') &&
+            (r.center_id === centerId || (r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase()))
+          );
+          for (const other of otherOpenRaces) {
+            await api.updateRaceStatus(other.id, 'CLOSED');
+          }
+        }
+      }
+
       await api.updateRaceStatus(raceId, status);
       soundManager.playClick();
       setActionMessage(`⚡ Race status updated to ${status}`);
@@ -581,6 +612,196 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to update status');
       setTimeout(() => setActionMessage(null), 3500);
+    }
+  };
+
+  const handleAbandonRace = async (race: Race) => {
+    const reason = window.prompt(`Declare "${race.name}" as ABANDONED / VOID?\nAll punter bets will be 100% refunded to user wallets instantly.\n\nEnter reason:`, 'Weather / Track Unfit / False Start');
+    if (reason === null) return;
+    try {
+      setIsLoading(true);
+      const res = await api.abandonRace(race.id, reason);
+      soundManager.playClick();
+      setActionMessage(`↩️ ${res.message}`);
+      setSettlingRace(null);
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to abandon race');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelSingleBet = async (bet: Bet) => {
+    const reason = window.prompt(`Cancel Bet #${bet.id} on #${bet.horse_no} ${bet.horse_name} (Stake: ₹${bet.stake})?\nStake will be 100% refunded to @${bet.username || 'user'}.\n\nEnter reason:`, 'Suspicious Activity / Punter Request');
+    if (reason === null) return;
+    try {
+      setIsLoading(true);
+      const res = await api.cancelBet(bet.id, reason);
+      soundManager.playClick();
+      setActionMessage(`↩️ ${res.message}`);
+      await onRefreshData();
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to cancel bet');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      const res = await api.createAdminUser({
+        full_name: newUserData.full_name,
+        username: newUserData.username,
+        phone: newUserData.phone,
+        email: newUserData.email,
+        password: newUserData.password,
+        initial_balance: Number(newUserData.initial_balance) || 0,
+      });
+      if (res.success) {
+        soundManager.playClick();
+        setActionMessage(res.message || `User @${newUserData.username} created successfully!`);
+        setAddUserModalOpen(false);
+        setNewUserData({ full_name: '', username: '', phone: '', email: '', password: '', initial_balance: '0' });
+        await loadAdminData();
+        setTimeout(() => setActionMessage(null), 4000);
+      } else {
+        setActionMessage(res.error || 'Failed to create user');
+      }
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to create user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleBlockUser = async (user: User) => {
+    const confirm = window.confirm(`Are you sure you want to ${user.is_blocked ? 'UNBLOCK' : 'BLOCK'} @${user.username}?`);
+    if (!confirm) return;
+    try {
+      setIsLoading(true);
+      const res = await api.toggleBlockUser(user.id);
+      soundManager.playClick();
+      setActionMessage(res.message);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3500);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to update user block status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginAsUser = async (user: User) => {
+    const confirm = window.confirm(`Login as @${user.username} to view the platform from their perspective?`);
+    if (!confirm) return;
+    try {
+      setIsLoading(true);
+      const res = await api.impersonateUser(user.id);
+      if (res.success && res.user) {
+        soundManager.playClick();
+        if (onImpersonateUser) {
+          onImpersonateUser(res.user);
+        } else {
+          localStorage.setItem('derby_user', JSON.stringify(res.user));
+          window.location.hash = '#/lobby';
+        }
+      } else {
+        setActionMessage(res.error || 'Failed to login as user');
+      }
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to login as user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleGlobalBetting = async () => {
+    const nextState = !(systemSettings.betting_enabled ?? true);
+    const confirm = window.confirm(
+      nextState 
+        ? 'Resume all live betting platform-wide?' 
+        : '🚨 EMERGENCY: Freeze all betting across the entire app immediately?'
+    );
+    if (!confirm) return;
+    try {
+      setIsLoading(true);
+      const res = await api.updateSystemSettings({
+        betting_enabled: nextState,
+        emergency_message: nextState ? '' : 'Betting is temporarily suspended by Administrator.',
+      });
+      if (res.success) {
+        soundManager.playClick();
+        setSystemSettings(prev => ({ ...prev, betting_enabled: nextState }));
+        setActionMessage(nextState ? '🟢 Global Betting RESUMED platform-wide.' : '🚨 EMERGENCY: Global Betting FROZEN platform-wide.');
+        setTimeout(() => setActionMessage(null), 4000);
+      }
+    } catch (err: any) {
+      setActionMessage('Failed to update emergency switch');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePostAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementText.trim()) return;
+    try {
+      setIsLoading(true);
+      const res = await api.updateSystemSettings({ announcement: announcementText.trim() });
+      if (res.success) {
+        soundManager.playClick();
+        setSystemSettings(prev => ({ ...prev, announcement: announcementText.trim() }));
+        setActionMessage('📢 Announcement broadcasted to all users!');
+        setAnnouncementText('');
+        setTimeout(() => setActionMessage(null), 4000);
+      }
+    } catch (err: any) {
+      setActionMessage('Failed to post announcement');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddSubAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubAdminData.username.trim() || !newSubAdminData.name.trim()) return;
+    try {
+      setIsLoading(true);
+      const res = await api.addSubAdmin(newSubAdminData);
+      if (res.success) {
+        soundManager.playClick();
+        setActionMessage(res.message || 'Sub-Admin added successfully');
+        setSubAdminModalOpen(false);
+        setNewSubAdminData({ username: '', name: '', role: 'ODDS_MANAGER' });
+        await loadAdminData();
+      }
+    } catch (err: any) {
+      setActionMessage('Failed to add sub-admin');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSubAdmin = async (id: string) => {
+    const confirm = window.confirm('Are you sure you want to remove this Sub-Admin?');
+    if (!confirm) return;
+    try {
+      setIsLoading(true);
+      await api.deleteSubAdmin(id);
+      soundManager.playClick();
+      setActionMessage('Sub-Admin removed successfully');
+      await loadAdminData();
+    } catch (err: any) {
+      setActionMessage('Failed to remove sub-admin');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1372,6 +1593,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {/* 🚨 MASTER EMERGENCY BETTING KILL-SWITCH BANNER */}
+      <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl ${
+        (systemSettings.betting_enabled ?? true)
+          ? 'bg-[#08150d] border-emerald-500/40 text-emerald-200'
+          : 'bg-[#20080c] border-red-500/60 text-red-200 shadow-red-950/50'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+            (systemSettings.betting_enabled ?? true)
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+              : 'bg-red-500/30 text-red-400 border border-red-500/60'
+          }`}>
+            <Shield className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-black text-white text-xs sm:text-sm tracking-wide">
+                GLOBAL BETTING ENGINE:
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider border ${
+                (systemSettings.betting_enabled ?? true)
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                  : 'bg-red-600 text-white border-red-400'
+              }`}>
+                {(systemSettings.betting_enabled ?? true) ? '🟢 BETTING ACTIVE (OPEN)' : '🚨 BETTING FROZEN (STOPPED)'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {(systemSettings.betting_enabled ?? true)
+                ? 'Platform is accepting live bets normally across all published races.'
+                : 'Emergency kill-switch is ACTIVE. No bets can be placed across the platform.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleToggleGlobalBetting}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-lg active:scale-95 border flex items-center gap-1.5 ${
+              (systemSettings.betting_enabled ?? true)
+                ? 'bg-red-600 hover:bg-red-500 text-white border-red-400/60 shadow-red-950/40'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/60 shadow-emerald-950/40'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>{(systemSettings.betting_enabled ?? true) ? '🛑 FREEZE ALL BETTING' : '▶️ RESUME BETTING'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Metrics Banner */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
@@ -1527,7 +1799,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Banknote className="w-3.5 h-3.5" />
-          <span>Financial Requests</span>
+          <span>Financials & Reports</span>
           {(depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length) > 0 && (
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
               activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
@@ -1548,6 +1820,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         >
           <Coins className="w-3.5 h-3.5" />
           Global Bets Book ({allBets.length})
+        </button>
+
+        <button
+          id="admin-tab-system"
+          onClick={() => setActiveTab('system')}
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+            activeTab === 'system'
+              ? 'bg-rose-700 text-white shadow-sm font-black'
+              : 'text-rose-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Shield className="w-3.5 h-3.5" />
+          <span>System Control & Staff</span>
         </button>
       </div>
 
@@ -1713,6 +1998,85 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </div>
 
+                        {/* 📊 MASTER RISK & LIABILITY METER FOR THIS LIVE RACE */}
+                        <div className="bg-[#050907] rounded-2xl border-2 border-emerald-900/60 p-4 space-y-3">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="w-4 h-4 text-amber-400" />
+                              <h4 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">
+                                Live Liability & Bookmaker Risk Meter
+                              </h4>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              Total Race Pool: <strong className="text-emerald-400 font-black">₹{liveTurnover.toLocaleString('en-IN')}</strong>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {liveRace.horses.map((horse) => {
+                              const runnerWinBets = liveBets.filter((b) => b.horse_id === horse.id && b.bet_type === 'WIN');
+                              const runnerPlaceBets = liveBets.filter((b) => b.horse_id === horse.id && b.bet_type === 'PLACE');
+                              const winStake = runnerWinBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+                              const placeStake = runnerPlaceBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+                              const totalRunnerStake = winStake + placeStake;
+                              
+                              const winPayoutLiability = runnerWinBets.reduce((s, b) => s + ((b.stake || b.amount || 0) * b.odds), 0);
+                              const netWinExposure = winPayoutLiability - liveTurnover;
+                              const isHighRisk = netWinExposure > 0;
+                              
+                              return (
+                                <div
+                                  key={horse.id}
+                                  className={`p-3 rounded-xl border transition ${
+                                    isHighRisk && totalRunnerStake > 0
+                                      ? 'bg-[#1a080d] border-red-500/50 shadow-sm'
+                                      : totalRunnerStake > 0
+                                      ? 'bg-[#0a150d] border-emerald-500/40'
+                                      : 'bg-slate-900/80 border-slate-800'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <span className="w-5 h-5 rounded font-black text-[10px] bg-slate-800 text-white flex items-center justify-center shrink-0">
+                                        {horse.serial_no || horse.horse_no}
+                                      </span>
+                                      <span className="text-xs font-black text-white truncate">{horse.name}</span>
+                                    </div>
+                                    <span className="font-mono text-[11px] font-bold text-amber-400">
+                                      {horse.win_odds.toFixed(2)}x
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1 text-[11px] font-mono">
+                                    <div className="flex items-center justify-between text-slate-400">
+                                      <span>Total Bet Volume:</span>
+                                      <strong className="text-white">₹{totalRunnerStake.toLocaleString('en-IN')}</strong>
+                                    </div>
+                                    <div className="flex items-center justify-between text-slate-400">
+                                      <span>Win Payout Liability:</span>
+                                      <strong className={isHighRisk ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                                        ₹{Math.round(winPayoutLiability).toLocaleString('en-IN')}
+                                      </strong>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                                      <span className="text-[10px] text-slate-400 font-sans font-bold">Admin Net Exposure:</span>
+                                      <span className={`px-2 py-0.2 rounded font-bold text-[10px] ${
+                                        netWinExposure > 0
+                                          ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                      }`}>
+                                        {netWinExposure > 0
+                                          ? `-₹${Math.round(netWinExposure).toLocaleString('en-IN')} (RISK)`
+                                          : `+₹${Math.round(Math.abs(netWinExposure)).toLocaleString('en-IN')} (SAFE)`}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         {/* Real-time Match Bets Breakdown */}
                         <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-rose-500/30 space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -1748,6 +2112,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         {u?.username || u?.name || b.username || 'Bettor'}
                                       </span>
                                       <strong className="text-emerald-400 font-black">₹{b.stake?.toLocaleString() || b.amount?.toLocaleString()}</strong>
+                                      {b.status === 'PENDING' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelSingleBet(b)}
+                                          className="p-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white text-[10px] font-bold border border-red-500/30 transition cursor-pointer"
+                                          title="Cancel single bet & refund"
+                                        >
+                                          Cancel
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -1760,9 +2134,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           )}
                         </div>
 
-                        {/* Cockpit Actions: Declare Settlement & Suspend All */}
+                        {/* Cockpit Actions: Declare Settlement, Abandon & Suspend All */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <button
                               type="button"
                               onClick={() => handleToggleRaceSuspendAll(liveRace.id)}
@@ -1774,6 +2148,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             >
                               <AlertCircle className="w-3.5 h-3.5" />
                               <span>{liveRace.horses.every((h) => h.is_suspended) ? 'RESUME ALL RUNNERS' : 'SUSPEND ALL BETTING'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAbandonRace(liveRace)}
+                              className="px-3 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-white border border-red-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                              title="Declare Abandoned / Void and refund all bets 100%"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Declare Abandoned / Void (Refund All)</span>
                             </button>
 
                             <button
@@ -3600,10 +3984,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Registered Bettors & User Accounts</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Live database records of all registered bettors with full name, verified Gmail, phone, wallet balance, and exposure.
+                Live database records of all registered bettors with full name, verified Gmail, phone, wallet balance, exposure, and account control.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setAddUserModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-md transition cursor-pointer active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Bettor Manually</span>
+              </button>
               <button
                 onClick={loadAdminData}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer"
@@ -3611,7 +4003,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Refresh Users</span>
               </button>
-              <span className="px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold">
+              <span className="px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold font-mono">
                 {users.length} Total Users
               </span>
             </div>
@@ -3630,15 +4022,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </strong>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block font-medium">Total User Balances</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Total Outstanding User Balances</span>
               <strong className="text-base sm:text-lg font-black text-emerald-400 font-mono">
                 ₹{users.reduce((sum, u) => sum + (u.balance || 0), 0).toLocaleString('en-IN')}
               </strong>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block font-medium">Total Active Exposure</span>
+              <span className="text-[11px] text-slate-400 block font-medium">Blocked Accounts</span>
               <strong className="text-base sm:text-lg font-black text-rose-400 font-mono">
-                ₹{users.reduce((sum, u) => sum + (u.exposure || 0), 0).toLocaleString('en-IN')}
+                {users.filter(u => u.is_blocked).length} Blocked
               </strong>
             </div>
           </div>
@@ -3666,17 +4058,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80 bg-slate-950">
-            <table className="w-full min-w-[750px] text-left text-xs border-collapse">
+            <table className="w-full min-w-[850px] text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[11px]">
                   <th className="py-3 px-3.5">User Profile & Unique ID</th>
-                  <th className="py-3 px-3">Gmail / Email</th>
-                  <th className="py-3 px-3">Phone</th>
-                  <th className="py-3 px-3 text-center">Role</th>
+                  <th className="py-3 px-3">Contact Details</th>
+                  <th className="py-3 px-3 text-center">Status</th>
                   <th className="py-3 px-3 text-right">Balance</th>
                   <th className="py-3 px-3 text-right">Exposure</th>
-                  <th className="py-3 px-3 text-right">Joined</th>
-                  <th className="py-3 px-3.5 text-right">Balance Operations</th>
+                  <th className="py-3 px-3 text-center">History</th>
+                  <th className="py-3 px-3.5 text-right">Admin Controls</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -3695,6 +4086,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   })
                   .map((u) => {
                     const displayUniqueId = u.ref_id || u.id;
+                    const userBetCount = (allBets || []).filter(b => b.user_id === u.id).length;
                     return (
                       <tr key={u.id} className="hover:bg-slate-900/60 transition">
                         {/* Profile & Unique ID */}
@@ -3733,83 +4125,325 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </td>
 
-                    {/* Email */}
-                    <td className="py-3 px-3 text-slate-300 font-mono text-[11px]">
-                      {u.email ? (
-                        <span className="text-emerald-300 flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-emerald-400 shrink-0" />
-                          <span>{u.email}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 italic">No email</span>
-                      )}
-                    </td>
+                        {/* Contact Details */}
+                        <td className="py-3 px-3 text-slate-300 font-mono text-[11px] space-y-0.5">
+                          {u.email && (
+                            <span className="text-emerald-300 flex items-center gap-1 truncate max-w-[150px]">
+                              <Mail className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span>{u.email}</span>
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>{u.phone}</span>
+                          </span>
+                        </td>
 
-                    {/* Phone */}
-                    <td className="py-3 px-3 text-slate-300 font-mono text-[11px]">
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3 text-slate-500 shrink-0" />
-                        <span>{u.phone}</span>
-                      </span>
-                    </td>
+                        {/* Status / Role */}
+                        <td className="py-3 px-3 text-center">
+                          {u.is_blocked ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              🛑 BLOCKED
+                            </span>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              u.role === 'admin' 
+                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            }`}>
+                              {u.role === 'admin' ? 'ADMIN' : 'ACTIVE'}
+                            </span>
+                          )}
+                        </td>
 
-                    {/* Role */}
-                    <td className="py-3 px-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        u.role === 'admin' 
-                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
-                          : 'bg-slate-800 text-slate-300 border border-slate-700'
-                      }`}>
-                        {u.role}
-                      </span>
-                    </td>
+                        {/* Balance */}
+                        <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400 text-sm">
+                          ₹{u.balance.toLocaleString('en-IN')}
+                        </td>
 
-                    {/* Balance */}
-                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400 text-sm">
-                      ₹{u.balance.toLocaleString('en-IN')}
-                    </td>
+                        {/* Exposure */}
+                        <td className="py-3 px-3 text-right font-mono font-bold text-rose-400 text-xs">
+                          ₹{u.exposure.toLocaleString('en-IN')}
+                        </td>
 
-                    {/* Exposure */}
-                    <td className="py-3 px-3 text-right font-mono font-bold text-rose-400 text-xs">
-                      ₹{u.exposure.toLocaleString('en-IN')}
-                    </td>
+                        {/* Bet History Trigger */}
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setViewBetsUser(u)}
+                            className="px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold font-mono transition cursor-pointer flex items-center gap-1 mx-auto"
+                            title="View all bets placed by this user"
+                          >
+                            <Coins className="w-3 h-3" />
+                            <span>{userBetCount} Bets</span>
+                          </button>
+                        </td>
 
-                    {/* Joined */}
-                    <td className="py-3 px-3 text-right text-slate-400 text-[11px]">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
+                        {/* Actions */}
+                        <td className="py-3 px-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {/* Impersonate / Login as User */}
+                            <button
+                              type="button"
+                              onClick={() => handleLoginAsUser(u)}
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                              title="Login as this user to view their screen"
+                            >
+                              <Eye className="w-3 h-3 text-indigo-400" />
+                              <span>Login As</span>
+                            </button>
 
-                    {/* Actions */}
-                    <td className="py-3 px-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => {
-                            setBalanceModalUser(u);
-                            setBalanceModalType('CREDIT');
-                            setBalanceModalAmount('1000');
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-black text-[11px] transition cursor-pointer border border-emerald-500/30 flex items-center gap-1"
-                        >
-                          <span>+ Credit</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setBalanceModalUser(u);
-                            setBalanceModalType('DEBIT');
-                            setBalanceModalAmount('500');
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-black text-[11px] transition cursor-pointer border border-rose-500/30 flex items-center gap-1"
-                        >
-                          <span>- Debit</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                            {/* Block / Unblock Toggle */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleBlockUser(u)}
+                              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border flex items-center gap-1 ${
+                                u.is_blocked
+                                  ? 'bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border-rose-500/40'
+                              }`}
+                              title={u.is_blocked ? 'Unblock user' : 'Block user from betting & login'}
+                            >
+                              <Lock className="w-3 h-3" />
+                              <span>{u.is_blocked ? 'Unblock' : 'Block'}</span>
+                            </button>
+
+                            {/* Credit Balance */}
+                            <button
+                              onClick={() => {
+                                setBalanceModalUser(u);
+                                setBalanceModalType('CREDIT');
+                                setBalanceModalAmount('1000');
+                              }}
+                              className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-black text-[11px] transition cursor-pointer border border-emerald-500/30 flex items-center gap-0.5"
+                            >
+                              <span>+ Cr</span>
+                            </button>
+
+                            {/* Debit Balance */}
+                            <button
+                              onClick={() => {
+                                setBalanceModalUser(u);
+                                setBalanceModalType('DEBIT');
+                                setBalanceModalAmount('500');
+                              }}
+                              className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-black text-[11px] transition cursor-pointer border border-rose-500/30 flex items-center gap-0.5"
+                            >
+                              <span>- Dr</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
+
+          {/* ADD USER MODAL */}
+          {addUserModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Users className="w-5 h-5 text-indigo-400" />
+                    <span>Create User / Bettor Account</span>
+                  </h3>
+                  <button
+                    onClick={() => setAddUserModalOpen(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newUserData.full_name}
+                      onChange={(e) => setNewUserData({ ...newUserData, full_name: e.target.value })}
+                      placeholder="e.g. Ramesh Kumar"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Username <span className="text-rose-400">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={newUserData.username}
+                        onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
+                        placeholder="e.g. ramesh77"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Phone Number <span className="text-rose-400">*</span></label>
+                      <input
+                        type="tel"
+                        required
+                        value={newUserData.phone}
+                        onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
+                        placeholder="e.g. 9876543210"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Email / Gmail (Optional)</label>
+                    <input
+                      type="email"
+                      value={newUserData.email}
+                      onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                      placeholder="e.g. ramesh@gmail.com"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Password <span className="text-rose-400">*</span></label>
+                      <input
+                        type="password"
+                        required
+                        value={newUserData.password}
+                        onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                        placeholder="Min 6 characters"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Initial Balance (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newUserData.initial_balance}
+                        onChange={(e) => setNewUserData({ ...newUserData, initial_balance: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-emerald-400 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddUserModalOpen(false)}
+                      className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black shadow-lg"
+                    >
+                      Create Account
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* USER BET HISTORY MODAL */}
+          {viewBetsUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-amber-400" />
+                    <div>
+                      <h3 className="text-base font-bold text-white">
+                        Bet History: @{viewBetsUser.username} ({viewBetsUser.full_name || 'Bettor'})
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Current Balance: <strong className="text-emerald-400 font-mono">₹{viewBetsUser.balance.toLocaleString()}</strong> • Exposure: <strong className="text-rose-400 font-mono">₹{viewBetsUser.exposure.toLocaleString()}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setViewBetsUser(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 text-slate-400 uppercase font-semibold text-[10px]">
+                        <th className="p-2.5">Time</th>
+                        <th className="p-2.5">Race</th>
+                        <th className="p-2.5">Runner</th>
+                        <th className="p-2.5">Market</th>
+                        <th className="p-2.5">Odds</th>
+                        <th className="p-2.5">Stake</th>
+                        <th className="p-2.5">Status</th>
+                        <th className="p-2.5">Payout</th>
+                        <th className="p-2.5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 font-mono">
+                      {(allBets || [])
+                        .filter(b => b.user_id === viewBetsUser.id)
+                        .map(b => (
+                          <tr key={b.id} className="hover:bg-slate-900/40">
+                            <td className="p-2.5 text-slate-400 text-[10px]">
+                              {new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="p-2.5 text-slate-200 font-sans">{b.race_name}</td>
+                            <td className="p-2.5 text-white font-bold font-sans">#{b.horse_no} {b.horse_name}</td>
+                            <td className="p-2.5">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
+                                {b.bet_type}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-amber-400 font-bold">{b.odds.toFixed(2)}x</td>
+                            <td className="p-2.5 text-white">₹{b.stake.toLocaleString()}</td>
+                            <td className="p-2.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                b.status === 'WON' ? 'bg-emerald-500/20 text-emerald-400' :
+                                b.status === 'LOST' ? 'bg-rose-500/20 text-rose-400' :
+                                b.status === 'CANCELLED' || b.status === 'REFUNDED' ? 'bg-slate-700 text-slate-300' :
+                                'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {b.status}
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-bold text-emerald-400">
+                              {b.payout_amount ? `+₹${b.payout_amount.toLocaleString()}` : '-'}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              {b.status === 'PENDING' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelSingleBet(b)}
+                                  className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer font-sans"
+                                >
+                                  Cancel & Refund
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  {(allBets || []).filter(b => b.user_id === viewBetsUser.id).length === 0 && (
+                    <div className="p-6 text-center text-slate-500 text-xs">
+                      No bets placed yet by this user.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Balance Adjustment Modal */}
           {balanceModalUser && (
@@ -3884,18 +4518,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 6: Global Bets Book */}
+      {/* TAB 6: Global Bets Book & Single Bet Cancellation */}
       {activeTab === 'bets' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-white">Platform Bets Ledger (Audit Trail)</h2>
-            <span className="text-xs text-slate-400">{allBets.length} Bets Placed</span>
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Coins className="w-5 h-5 text-amber-400" />
+                <span>Global Platform Bets Ledger (Audit Trail)</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Live audit trail of all wagers placed across the platform. Single bets can be cancelled and 100% refunded.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold">
+                {allBets.length} Bets Recorded
+              </span>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={betsSearchQuery}
+                onChange={(e) => setBetsSearchQuery(e.target.value)}
+                placeholder="Filter by Bettor username, race name, or horse name..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+              />
+            </div>
+            {betsSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setBetsSearchQuery('')}
+                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
-            <table className="w-full min-w-[700px] text-left text-xs border-collapse">
+            <table className="w-full min-w-[850px] text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
                   <th className="py-2.5 px-3">Time</th>
                   <th className="py-2.5 px-3">Bettor</th>
                   <th className="py-2.5 px-3">Race</th>
@@ -3905,42 +4574,70 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="py-2.5 px-3">Stake</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3">Payout</th>
+                  <th className="py-2.5 px-3 text-right">Emergency Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {allBets.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-850/50">
-                    <td className="py-2.5 px-3 text-slate-400">
-                      {new Date(b.placed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="py-2.5 px-3 font-semibold text-white">@{b.username || b.user_id}</td>
-                    <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate">{b.race_name}</td>
-                    <td className="py-2.5 px-3 font-bold text-white">#{b.horse_no} {b.horse_name}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
-                        {b.bet_type}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}</td>
-                    <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
-                    <td className="py-2.5 px-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          b.status === 'WON'
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : b.status === 'LOST'
-                            ? 'bg-rose-500/20 text-rose-400'
-                            : 'bg-amber-500/20 text-amber-400'
-                        }`}
-                      >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                      {b.payout ? `+₹${b.payout.toLocaleString()}` : '-'}
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {allBets
+                  .filter((b) => {
+                    if (!betsSearchQuery) return true;
+                    const q = betsSearchQuery.toLowerCase();
+                    return (
+                      (b.username && b.username.toLowerCase().includes(q)) ||
+                      (b.race_name && b.race_name.toLowerCase().includes(q)) ||
+                      (b.horse_name && b.horse_name.toLowerCase().includes(q)) ||
+                      (b.user_id && b.user_id.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((b) => (
+                    <tr key={b.id} className="hover:bg-slate-850/50">
+                      <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                        {new Date(b.placed_at || b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-white font-sans">@{b.username || b.user_id}</td>
+                      <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate font-sans">{b.race_name}</td>
+                      <td className="py-2.5 px-3 font-bold text-white font-sans">#{b.horse_no} {b.horse_name}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
+                          {b.bet_type}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}x</td>
+                      <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            b.status === 'WON'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : b.status === 'LOST'
+                              ? 'bg-rose-500/20 text-rose-400'
+                              : b.status === 'CANCELLED' || b.status === 'REFUNDED'
+                              ? 'bg-slate-700 text-slate-300'
+                              : 'bg-amber-500/20 text-amber-400'
+                          }`}
+                        >
+                          {b.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                        {b.payout_amount ? `+₹${b.payout_amount.toLocaleString()}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {b.status === 'PENDING' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelSingleBet(b)}
+                            className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer font-sans"
+                            title="Cancel bet & refund user wallet"
+                          >
+                            Cancel & Refund
+                          </button>
+                        ) : (
+                          <span className="text-slate-600 text-[10px] font-sans">Settled</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -4387,6 +5084,359 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     No withdrawal requests found under "{withdrawalStatusFilter}".
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* SUB-PANEL 3: DAY-WISE CENTER PROFIT & LOSS REPORT */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <span>Day-Wise Center Profit & Loss (P/L) Summary</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Daily financial performance breakdown aggregated by Race Center venue and race day turnover vs payout liabilities.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold">
+                Platform-Wide Margin
+              </span>
+            </div>
+
+            {(() => {
+              // Group bets by race center / venue
+              const centerMap: Record<string, { venue: string; centerCode: string; turnover: number; payouts: number; betCount: number }> = {};
+
+              (races || []).forEach(r => {
+                const centerKey = r.venue || 'Unknown Center';
+                if (!centerMap[centerKey]) {
+                  centerMap[centerKey] = {
+                    venue: centerKey,
+                    centerCode: r.venue.split(' ')[0].toUpperCase(),
+                    turnover: 0,
+                    payouts: 0,
+                    betCount: 0
+                  };
+                }
+              });
+
+              (allBets || []).forEach(b => {
+                const race = (races || []).find(r => r.id === b.race_id);
+                const centerKey = race?.venue || 'General Book';
+                if (!centerMap[centerKey]) {
+                  centerMap[centerKey] = {
+                    venue: centerKey,
+                    centerCode: centerKey.split(' ')[0].toUpperCase(),
+                    turnover: 0,
+                    payouts: 0,
+                    betCount: 0
+                  };
+                }
+                centerMap[centerKey].turnover += (b.amount || 0);
+                centerMap[centerKey].payouts += (b.payout_amount || 0);
+                centerMap[centerKey].betCount += 1;
+              });
+
+              const centerRows = Object.values(centerMap);
+
+              return (
+                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
+                        <th className="py-2.5 px-3.5">Center / Venue</th>
+                        <th className="py-2.5 px-3 text-center">Total Bets</th>
+                        <th className="py-2.5 px-3 text-right">Turnover Pool</th>
+                        <th className="py-2.5 px-3 text-right">Payouts Paid</th>
+                        <th className="py-2.5 px-3 text-right">Net Bookmaker P/L</th>
+                        <th className="py-2.5 px-3.5 text-right">Hold Margin %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {centerRows.map((c, i) => {
+                        const netPl = c.turnover - c.payouts;
+                        const margin = c.turnover > 0 ? ((netPl / c.turnover) * 100).toFixed(1) : '0.0';
+                        return (
+                          <tr key={i} className="hover:bg-slate-900/40">
+                            <td className="py-2.5 px-3.5 font-bold text-white font-sans flex items-center gap-2">
+                              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>{c.venue}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-slate-300 font-bold">{c.betCount}</td>
+                            <td className="py-2.5 px-3 text-right text-emerald-400 font-bold">₹{c.turnover.toLocaleString('en-IN')}</td>
+                            <td className="py-2.5 px-3 text-right text-amber-400 font-bold">₹{c.payouts.toLocaleString('en-IN')}</td>
+                            <td className={`py-2.5 px-3 text-right font-black ${netPl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {netPl >= 0 ? `+₹${netPl.toLocaleString('en-IN')}` : `-₹${Math.abs(netPl).toLocaleString('en-IN')}`}
+                            </td>
+                            <td className="py-2.5 px-3.5 text-right font-bold text-indigo-300">{margin}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {centerRows.length === 0 && (
+                    <div className="p-6 text-center text-slate-500 text-xs">
+                      No center betting data recorded yet.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: System Control & Staff Management (Master Privileges Item #5) */}
+      {activeTab === 'system' && (
+        <div className="space-y-6">
+          {/* Section 1: Emergency Kill-Switch Master Control */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 font-bold">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Master Global Emergency Betting Kill-Switch</h2>
+                <p className="text-xs text-slate-400">
+                  Instantly freeze or unfreeze bet placement across every single race and center with 1 click.
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+              (systemSettings.betting_enabled ?? true)
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+                : 'bg-red-950/50 border-red-500/50 text-red-200'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">Status:</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
+                    (systemSettings.betting_enabled ?? true)
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-red-600 text-white border border-red-400'
+                  }`}>
+                    {(systemSettings.betting_enabled ?? true) ? '🟢 Betting Engine ACTIVE' : '🛑 Emergency FREEZE Active'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  {(systemSettings.betting_enabled ?? true)
+                    ? 'Punters can place bets normally on open races.'
+                    : 'All bet submission endpoints are locked. Error banner is shown to users.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleGlobalBetting}
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 ${
+                  (systemSettings.betting_enabled ?? true)
+                    ? 'bg-red-600 hover:bg-red-500 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
+              >
+                {(systemSettings.betting_enabled ?? true) ? '🛑 Activate Emergency Freeze' : '▶️ Resume Platform Betting'}
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Platform Announcement Broadcaster */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Platform Live Announcement Banner</h2>
+                <p className="text-xs text-slate-400">
+                  Broadcast important race delays, track condition changes, or promotions to all active user lobbies in real-time.
+                </p>
+              </div>
+            </div>
+
+            {systemSettings.announcement && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">📢 Current Live Broadcast:</span>
+                  <span className="font-mono text-white">"{systemSettings.announcement}"</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await api.updateSystemSettings({ announcement: '' });
+                    setSystemSettings(prev => ({ ...prev, announcement: '' }));
+                    notify('Announcement cleared', 'info');
+                  }}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold cursor-pointer"
+                >
+                  Clear Broadcast
+                </button>
+              </div>
+            )}
+
+            <form onSubmit={handlePostAnnouncement} className="space-y-3">
+              <textarea
+                rows={2}
+                value={announcementText}
+                onChange={(e) => setAnnouncementText(e.target.value)}
+                placeholder="e.g. 📢 Mysore Race 4 delayed by 10 minutes due to rain. Track condition changed to Heavy."
+                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 leading-relaxed"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isLoading || !announcementText.trim()}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg disabled:opacity-40"
+                >
+                  Broadcast Announcement
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Section 3: Sub-Admin & Staff Delegated Management */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Sub-Admin & Operating Staff Access</h2>
+                  <p className="text-xs text-slate-400">
+                    Grant designated operators specific permissions (e.g., Live Odds Updates, Result Declaration, Deposit Verification).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubAdminModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold shadow transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Sub-Admin</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
+                    <th className="py-2.5 px-3.5">Staff Name</th>
+                    <th className="py-2.5 px-3">Username</th>
+                    <th className="py-2.5 px-3">Assigned Role</th>
+                    <th className="py-2.5 px-3">Created</th>
+                    <th className="py-2.5 px-3.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {(systemSettings.sub_admins || []).map((sa: any) => (
+                    <tr key={sa.id} className="hover:bg-slate-900/40">
+                      <td className="py-2.5 px-3.5 font-bold text-white font-sans">{sa.name}</td>
+                      <td className="py-2.5 px-3 text-indigo-300">@{sa.username}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold">
+                          {sa.role}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                        {new Date(sa.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSubAdmin(sa.id)}
+                          className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer font-sans"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!systemSettings.sub_admins || systemSettings.sub_admins.length === 0) && (
+                <div className="p-6 text-center text-slate-500 text-xs">
+                  No sub-admins configured. Master administrator has full control.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ADD SUB-ADMIN MODAL */}
+          {subAdminModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-indigo-400" />
+                    <span>Add Sub-Admin Staff</span>
+                  </h3>
+                  <button
+                    onClick={() => setSubAdminModalOpen(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddSubAdmin} className="space-y-3 text-xs">
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Staff Member Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newSubAdminData.name}
+                      onChange={(e) => setNewSubAdminData({ ...newSubAdminData, name: e.target.value })}
+                      placeholder="e.g. Suresh Operator"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Username</label>
+                    <input
+                      type="text"
+                      required
+                      value={newSubAdminData.username}
+                      onChange={(e) => setNewSubAdminData({ ...newSubAdminData, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
+                      placeholder="e.g. suresh_odds"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Operating Role</label>
+                    <select
+                      value={newSubAdminData.role}
+                      onChange={(e) => setNewSubAdminData({ ...newSubAdminData, role: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="ODDS_MANAGER">ODDS_MANAGER (Live Odds & Suspensions Only)</option>
+                      <option value="RESULT_OFFICER">RESULT_OFFICER (Declare Winners & Settle Races)</option>
+                      <option value="FINANCIAL_AUDITOR">FINANCIAL_AUDITOR (Verify Deposits & Withdrawals)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSubAdminModalOpen(false)}
+                      className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg"
+                    >
+                      Add Staff Member
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -5623,6 +6673,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Apply & Populate Race Card ({parseBulkRunnersText(bulkPasteText).length} Horses)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ODDS CHANGE HISTORY MODAL */}
+      {oddsHistoryModalHorse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Odds Audit Log: #{oddsHistoryModalHorse.horse.serial_no || oddsHistoryModalHorse.horse.horse_no} {oddsHistoryModalHorse.horse.name}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {oddsHistoryModalHorse.race.venue} • Current Win: <strong className="text-amber-400 font-mono">{oddsHistoryModalHorse.horse.win_odds.toFixed(2)}x</strong> • Place: <strong className="text-emerald-400 font-mono">{oddsHistoryModalHorse.horse.place_odds.toFixed(2)}x</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOddsHistoryModalHorse(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-slate-400 uppercase font-semibold text-[10px]">
+                    <th className="p-2.5">Time</th>
+                    <th className="p-2.5">Win Odds Change</th>
+                    <th className="p-2.5">Place Odds Change</th>
+                    <th className="p-2.5 text-right">Modified By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 font-mono">
+                  {(oddsHistoryModalHorse.horse.odds_history || []).map((log, idx) => (
+                    <tr key={idx} className="hover:bg-slate-900/40">
+                      <td className="p-2.5 text-slate-400 text-[10px]">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td className="p-2.5">
+                        <span className="text-slate-400">{log.old_win?.toFixed(2) || '-'}</span>
+                        <span className="mx-1 text-slate-500">→</span>
+                        <span className="text-amber-400 font-bold">{log.win_odds.toFixed(2)}x</span>
+                      </td>
+                      <td className="p-2.5">
+                        <span className="text-slate-400">{log.old_place?.toFixed(2) || '-'}</span>
+                        <span className="mx-1 text-slate-500">→</span>
+                        <span className="text-emerald-400 font-bold">{log.place_odds.toFixed(2)}x</span>
+                      </td>
+                      <td className="p-2.5 text-right text-slate-300 font-sans text-[11px]">
+                        {log.changed_by || 'Admin'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!oddsHistoryModalHorse.horse.odds_history || oddsHistoryModalHorse.horse.odds_history.length === 0) && (
+                <div className="p-6 text-center text-slate-500 text-xs">
+                  No previous odds updates recorded yet for this runner. Initial odds: {oddsHistoryModalHorse.horse.win_odds.toFixed(2)}x Win / {oddsHistoryModalHorse.horse.place_odds.toFixed(2)}x Place.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setOddsHistoryModalHorse(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+              >
+                Close Log
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 export type BetType = 'WIN' | 'PLACE';
-export type BetStatus = 'PENDING' | 'WON' | 'LOST';
-export type RaceStatus = 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED' | 'OPEN_FOR_BETTING' | 'SUSPENDED';
+export type BetStatus = 'PENDING' | 'WON' | 'LOST' | 'CANCELLED' | 'REFUNDED';
+export type RaceStatus = 'DRAFT' | 'UPCOMING' | 'OPEN' | 'LIVE' | 'CLOSED' | 'RESULTED' | 'OPEN_FOR_BETTING' | 'SUSPENDED' | 'ABANDONED';
 export type TransactionType = 'DEPOSIT' | 'WITHDRAW' | 'BET' | 'WIN' | 'REFUND';
 
 // Level 1: Race Center Master
@@ -37,9 +37,16 @@ export interface User {
   role: 'user' | 'admin';
   balance: number;
   exposure: number;
+  is_blocked?: boolean;
   profile_photo?: string;
   password_hash?: string;
   created_at: string;
+}
+
+export interface OddsLog {
+  win_odds: number;
+  place_odds: number;
+  updated_at: string;
 }
 
 export interface Horse {
@@ -53,6 +60,7 @@ export interface Horse {
   trainer: string; // Name of the trainer
   win_odds: number;
   place_odds: number;
+  odds_history?: OddsLog[];
   silk_color?: string;
   form?: string;
   weight?: string;
@@ -198,5 +206,21 @@ export interface UserNotification {
   reference_id?: string;
   is_read: boolean;
   created_at: string;
+}
+
+export interface SubAdmin {
+  id: string;
+  username: string;
+  name: string;
+  role: 'ODDS_MANAGER' | 'FINANCE_MANAGER' | 'FULL_ADMIN';
+  permissions: string[];
+  created_at: string;
+}
+
+export interface SystemSettings {
+  betting_enabled: boolean;
+  emergency_message?: string;
+  announcement?: string;
+  sub_admins?: SubAdmin[];
 }
 

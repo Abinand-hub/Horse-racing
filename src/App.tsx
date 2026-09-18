@@ -463,6 +463,12 @@ export default function App() {
               await loadRacesAndBanners();
               await loadUserFinancials();
             }}
+            onImpersonateUser={(targetUser) => {
+              setUser(targetUser);
+              localStorage.setItem('derby_user', JSON.stringify(targetUser));
+              window.location.hash = '#/lobby';
+              showToast(`Logged in as @${targetUser.username}`, 'success');
+            }}
           />
         </main>
       </div>

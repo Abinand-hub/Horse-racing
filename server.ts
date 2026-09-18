@@ -93,8 +93,15 @@ interface User {
   balance: number;
   exposure: number;
   role: 'user' | 'admin';
+  is_blocked?: boolean;
   profile_photo: string;
   created_at: string;
+}
+
+interface OddsLog {
+  win_odds: number;
+  place_odds: number;
+  updated_at: string;
 }
 
 interface Horse {
@@ -108,6 +115,7 @@ interface Horse {
   trainer: string; // Name of the trainer
   win_odds: number;
   place_odds: number;
+  odds_history?: OddsLog[];
   silk_color: string;
   form?: string;
   weight?: string;
@@ -245,6 +253,22 @@ interface Banner {
   is_active: boolean;
 }
 
+interface SubAdmin {
+  id: string;
+  username: string;
+  name: string;
+  role: 'ODDS_MANAGER' | 'FINANCE_MANAGER' | 'FULL_ADMIN';
+  permissions: string[];
+  created_at: string;
+}
+
+interface SystemSettings {
+  betting_enabled: boolean;
+  emergency_message?: string;
+  announcement?: string;
+  sub_admins?: SubAdmin[];
+}
+
 interface DBData {
   users: User[];
   race_centers: RaceCenter[];
@@ -255,6 +279,7 @@ interface DBData {
   deposit_requests: DepositRequest[];
   withdrawal_requests: WithdrawalRequest[];
   banners: Banner[];
+  system_settings?: SystemSettings;
   otps: Record<string, { code: string; expires_at: number }>;
 }
 
@@ -277,6 +302,12 @@ const defaultData: DBData = {
   races: [],
   bets: [],
   transactions: [],
+  system_settings: {
+    betting_enabled: true,
+    emergency_message: '',
+    announcement: '',
+    sub_admins: [],
+  },
   banners: [
     {
       id: 'bnr_01',
@@ -323,6 +354,7 @@ function loadDatabase() {
       if (!db.deposit_requests) db.deposit_requests = [];
       if (!db.withdrawal_requests) db.withdrawal_requests = [];
       if (!db.banners) db.banners = defaultData.banners;
+      if (!db.system_settings) db.system_settings = defaultData.system_settings;
       if (!db.race_centers || db.race_centers.length === 0) {
         db.race_centers = defaultData.race_centers;
       }
@@ -897,6 +929,13 @@ app.post('/api/auth/login', async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({
       error: 'Incorrect password. Click the eye icon to verify or click "Forgot Password?" to reset.',
+    });
+  }
+
+  if (user.is_blocked) {
+    return res.status(403).json({
+      error: 'This account has been BLOCKED by Administrator. Please contact support.',
+      is_blocked: true,
     });
   }
 
@@ -1483,9 +1522,22 @@ app.post('/api/bets/place', async (req, res) => {
     return res.status(400).json({ error: 'Stake must be a positive number' });
   }
 
+  // 🚨 Master Global Betting Emergency Kill-Switch
+  if (db.system_settings && db.system_settings.betting_enabled === false) {
+    return res.status(403).json({
+      error: db.system_settings.emergency_message || 'Betting is temporarily suspended platform-wide by Administrator.',
+    });
+  }
+
   const user = db.users.find((u) => u.id === user_id);
   if (!user) {
     return res.status(404).json({ error: 'User not found. Please log in.' });
+  }
+
+  if (user.is_blocked) {
+    return res.status(403).json({
+      error: 'Your account has been BLOCKED by Administrator. You cannot place bets.',
+    });
   }
 
   const race = db.races.find((r) => r.id === race_id);
@@ -1876,6 +1928,16 @@ app.put('/api/admin/horses/:id/odds', (req, res) => {
     if (horse) {
       if (win_odds !== undefined) horse.win_odds = Number(win_odds);
       if (place_odds !== undefined) horse.place_odds = Number(place_odds);
+
+      // Record Odds History log (last 10 updates)
+      horse.odds_history = horse.odds_history || [];
+      horse.odds_history.unshift({
+        win_odds: horse.win_odds,
+        place_odds: horse.place_odds,
+        updated_at: new Date().toISOString(),
+      });
+      if (horse.odds_history.length > 10) horse.odds_history = horse.odds_history.slice(0, 10);
+
       foundHorse = horse;
       break;
     }
@@ -2164,7 +2226,209 @@ app.post('/api/admin/users/:id/adjust-balance', (req, res) => {
   });
 });
 
-// 9. Admin Reset Demo Data
+// 9. Admin Declare Race ABANDONED / VOID (100% Full Bet Refund)
+app.post('/api/admin/races/:id/abandon', (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: 'Race not found' });
+  const { reason } = req.body;
+  race.status = 'ABANDONED';
+  race.is_suspended = true;
+
+  const pendingBets = db.bets.filter((b) => (b.race_id === race.id || b.race_name === race.name) && b.status === 'PENDING');
+  let refundedCount = 0;
+  let totalRefunded = 0;
+
+  for (const bet of pendingBets) {
+    bet.status = 'REFUNDED';
+    bet.settled_at = new Date().toISOString();
+    totalRefunded += bet.stake;
+    refundedCount++;
+
+    const betUser = db.users.find((u) => u.id === bet.user_id);
+    if (betUser) {
+      betUser.balance += bet.stake;
+      betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
+
+      const refTx: Transaction = {
+        id: generateId('tx'),
+        user_id: betUser.id,
+        username: betUser.username,
+        type: 'REFUND',
+        amount: bet.stake,
+        balance_after: betUser.balance,
+        description: `100% Refund for Cancelled/Abandoned Race: ${race.name} (#${bet.horse_no} ${bet.horse_name})`,
+        created_at: new Date().toISOString(),
+        reference_id: bet.id,
+      };
+      db.transactions.unshift(refTx);
+    }
+  }
+
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Race "${race.name}" declared ABANDONED / VOID. ${refundedCount} bets refunded (₹${totalRefunded.toLocaleString('en-IN')})!`,
+    race,
+    refundedCount,
+    totalRefunded,
+  });
+});
+
+// 10. Admin Cancel Single Bet (Suspicious / Incorrect Bet 1-Click Refund)
+app.post('/api/admin/bets/:id/cancel', (req, res) => {
+  const bet = db.bets.find((b) => b.id === req.params.id);
+  if (!bet) return res.status(404).json({ error: 'Bet not found' });
+  if (bet.status !== 'PENDING') {
+    return res.status(400).json({ error: `Cannot cancel bet with status: ${bet.status}` });
+  }
+  const { reason } = req.body;
+  bet.status = 'CANCELLED';
+  bet.settled_at = new Date().toISOString();
+
+  const betUser = db.users.find((u) => u.id === bet.user_id);
+  if (betUser) {
+    betUser.balance += bet.stake;
+    betUser.exposure = Math.max(0, betUser.exposure - bet.stake);
+
+    const cancelTx: Transaction = {
+      id: generateId('tx'),
+      user_id: betUser.id,
+      username: betUser.username,
+      type: 'REFUND',
+      amount: bet.stake,
+      balance_after: betUser.balance,
+      description: `Single Bet Cancelled by Admin: #${bet.horse_no} ${bet.horse_name} in ${bet.race_name} (${reason || 'Admin Void'})`,
+      created_at: new Date().toISOString(),
+      reference_id: bet.id,
+    };
+    db.transactions.unshift(cancelTx);
+  }
+
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: `Bet #${bet.id} cancelled and ₹${bet.stake.toLocaleString('en-IN')} refunded to @${bet.username || 'user'}`,
+    bet,
+  });
+});
+
+// 11. Admin Create User Manually (Offline / Direct Registration)
+app.post('/api/admin/users/create', (req, res) => {
+  const { full_name, username, phone, email, password, initial_balance } = req.body;
+  if (!username || !phone || !password) {
+    return res.status(400).json({ error: 'Username, Phone, and Password are required' });
+  }
+  const cleanUsername = String(username).trim().toLowerCase();
+  const existing = db.users.find(u => u.username.toLowerCase() === cleanUsername || u.phone === String(phone).trim());
+  if (existing) {
+    return res.status(400).json({ error: 'A user with this username or phone number already exists' });
+  }
+  const initBal = Math.max(0, Number(initial_balance) || 0);
+  const newUser: User = {
+    id: generateId('usr'),
+    ref_id: `TURF-${10001 + db.users.length}`,
+    full_name: full_name ? String(full_name).trim() : cleanUsername,
+    phone: String(phone).trim(),
+    email: email ? String(email).trim().toLowerCase() : undefined,
+    username: cleanUsername,
+    password_hash: String(password).trim(),
+    balance: initBal,
+    exposure: 0,
+    role: 'user',
+    is_blocked: false,
+    profile_photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    created_at: new Date().toISOString(),
+  };
+  db.users.push(newUser);
+  if (initBal > 0) {
+    db.transactions.unshift({
+      id: generateId('tx'),
+      user_id: newUser.id,
+      username: newUser.username,
+      type: 'DEPOSIT',
+      amount: initBal,
+      balance_after: initBal,
+      description: 'Initial balance credited by Admin on account creation',
+      created_at: new Date().toISOString(),
+    });
+  }
+  saveDatabase();
+  const { password_hash, ...profile } = newUser;
+  return res.json({ success: true, message: `User @${newUser.username} created successfully!`, user: profile });
+});
+
+// 12. Admin Toggle User Block/Unblock
+app.post('/api/admin/users/:id/toggle-block', (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  user.is_blocked = !user.is_blocked;
+  saveDatabase();
+  return res.json({
+    success: true,
+    message: user.is_blocked ? `User @${user.username} has been BLOCKED.` : `User @${user.username} has been UNBLOCKED.`,
+    is_blocked: user.is_blocked,
+    user,
+  });
+});
+
+// 13. Admin "Login as User" / Impersonation
+app.post('/api/admin/users/:id/impersonate', (req, res) => {
+  const user = db.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const { password_hash, ...userProfile } = user;
+  return res.json({
+    success: true,
+    message: `Logged in as @${user.username}`,
+    user: userProfile,
+    token: `token_${user.id}`,
+  });
+});
+
+// 14. System Control: Get Settings
+app.get('/api/system/settings', (req, res) => {
+  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
+  return res.json({ success: true, settings: db.system_settings });
+});
+
+// 15. System Control: Update Global Settings & Emergency Switch
+app.post('/api/admin/system/settings', (req, res) => {
+  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
+  const { betting_enabled, emergency_message, announcement } = req.body;
+  if (betting_enabled !== undefined) db.system_settings.betting_enabled = Boolean(betting_enabled);
+  if (emergency_message !== undefined) db.system_settings.emergency_message = String(emergency_message);
+  if (announcement !== undefined) db.system_settings.announcement = String(announcement);
+  saveDatabase();
+  return res.json({ success: true, message: 'System settings updated successfully', settings: db.system_settings });
+});
+
+// 16. System Control: Add Sub-Admin
+app.post('/api/admin/sub-admins', (req, res) => {
+  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
+  db.system_settings.sub_admins = db.system_settings.sub_admins || [];
+  const { username, name, role, permissions } = req.body;
+  if (!username || !name) return res.status(400).json({ error: 'Username and Name are required' });
+  const newSubAdmin: SubAdmin = {
+    id: generateId('subadm'),
+    username: String(username).trim().toLowerCase(),
+    name: String(name).trim(),
+    role: role || 'ODDS_MANAGER',
+    permissions: Array.isArray(permissions) ? permissions : ['ODDS_MANAGEMENT'],
+    created_at: new Date().toISOString(),
+  };
+  db.system_settings.sub_admins.push(newSubAdmin);
+  saveDatabase();
+  return res.json({ success: true, message: `Sub-Admin @${newSubAdmin.username} added!`, sub_admin: newSubAdmin });
+});
+
+// 17. System Control: Delete Sub-Admin
+app.delete('/api/admin/sub-admins/:id', (req, res) => {
+  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
+  db.system_settings.sub_admins = (db.system_settings.sub_admins || []).filter(s => s.id !== req.params.id);
+  saveDatabase();
+  return res.json({ success: true, message: 'Sub-Admin removed successfully' });
+});
+
+// 18. Admin Reset Demo Data
 app.post('/api/admin/reset-demo', (req, res) => {
   db = JSON.parse(JSON.stringify(defaultData));
   saveDatabase();

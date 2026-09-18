@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Banner, Race } from '../types';
+import { Banner, Race, User } from '../types';
 import { AdminPanel } from './AdminPanel';
 import { soundManager } from '../utils/audio';
 import { 
@@ -18,6 +18,7 @@ interface AdminPortalProps {
   races: Race[];
   banners: Banner[];
   onRefreshData: () => Promise<void>;
+  onImpersonateUser?: (user: User) => void;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -25,6 +26,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   races,
   banners,
   onRefreshData,
+  onImpersonateUser,
 }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     try {
@@ -136,6 +138,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           races={races}
           banners={banners}
           onRefreshData={onRefreshData}
+          onImpersonateUser={onImpersonateUser}
         />
       </div>
     );
