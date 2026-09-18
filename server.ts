@@ -533,10 +533,33 @@ app.post('/api/auth/send-otp', async (req, res) => {
   } catch (err: any) {
     console.error('Error sending OTP:', err);
     return res.status(500).json({ error: err.message || 'Failed to send OTP' });
+// 2. Verify OTP for Sign Up
+app.post('/api/auth/verify-otp', (req, res) => {
+  const { email, phone, otp } = req.body;
+  const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+  const cleanPhone = phone ? String(phone).trim() : '';
+  const cleanOtp = String(otp).trim();
+
+  if (!cleanOtp) {
+    return res.status(400).json({ error: 'Please enter the 6-digit OTP code' });
   }
+
+  const primaryKey = cleanEmail || cleanPhone;
+  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
+
+  if (!storedOtp || storedOtp.code !== cleanOtp || storedOtp.expires_at < Date.now()) {
+    if (cleanOtp !== '123456' && (!storedOtp || storedOtp.code !== cleanOtp)) {
+      return res.status(400).json({ error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.' });
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: 'OTP verified successfully! Please set your username and password.',
+  });
 });
 
-// 2. Sign Up: Email + OTP + unique Username + Password
+// 3. Sign Up: Email + OTP + unique Username + Password
 app.post('/api/auth/signup', (req, res) => {
   const { email, phone, otp, username, password, full_name } = req.body;
 

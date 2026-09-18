@@ -37,6 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot_password'>(defaultMode);
 
   // Sign Up fields
+  const [signupStep, setSignupStep] = useState<1 | 2>(1);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -46,6 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpHint, setOtpHint] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmSignupPassword, setConfirmSignupPassword] = useState('');
 
   // Forgot Password fields
   const [forgotEmail, setForgotEmail] = useState('');
@@ -77,6 +79,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Reset state on modal open or mode change
   const switchMode = (newMode: 'login' | 'signup' | 'forgot_password') => {
     setMode(newMode);
+    setSignupStep(1);
+    setOtpSent(false);
+    setOtpVerified(false);
     setError(null);
     setSuccessMsg(null);
     setCountdown(0);
@@ -123,26 +128,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // 2. Submit Complete Sign Up
-  const handleSignup = async (e: React.FormEvent) => {
+  // 2. Step 1 Action: Verify OTP and advance to Step 2 (Username + Password)
+  const handleVerifySignupOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanOtp = otp.trim();
 
     if (!fullName.trim() || !cleanEmail || !phone.trim()) {
       setError('Please fill out your Name, Gmail, and Phone Number');
       return;
     }
-    if (!otp.trim()) {
-      setError('Please enter the 6-digit OTP code sent to your Gmail');
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setError('Please enter the 6-digit OTP sent to your Gmail inbox');
       return;
     }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      await api.verifyOtp({
+        email: cleanEmail,
+        phone: phone.trim(),
+        otp: cleanOtp,
+      });
+
+      setOtpVerified(true);
+      setSignupStep(2);
+      setSuccessMsg('✓ Gmail Verified! Now choose your unique username and password.');
+    } catch (err: any) {
+      setError(err.message || 'Invalid or expired OTP. (Check Gmail inbox or use test code 123456)');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 3. Step 2 Action: Submit Complete Sign Up (Save Username & Password)
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase();
+
     if (!cleanUsername || cleanUsername.length < 3) {
       setError('Please choose a username (at least 3 characters)');
       return;
     }
     if (!password || password.length < 4) {
-      setError('Password must be at least 4 characters');
+      setError('Password must be at least 4 characters long');
+      return;
+    }
+    if (password !== confirmSignupPassword) {
+      setError('Passwords do not match. Please re-enter.');
       return;
     }
 
@@ -344,176 +380,293 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* ---------------- SCREEN 1: SIGN UP (OTP) ---------------- */}
+          {/* ---------------- SCREEN 1: SIGN UP (2-STEP WORKFLOW) ---------------- */}
           {mode === 'signup' && (
-            <form onSubmit={handleSignup} className="space-y-3.5">
-              {/* 1. Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="signup-name-input"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter your full name (e.g. Rahul Sharma)"
-                    required
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                  />
+            <div className="space-y-3.5">
+              {/* Step indicator */}
+              <div className="flex items-center justify-between px-1 pb-1 text-xs border-b border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] ${
+                    signupStep === 1
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-emerald-500 text-slate-950'
+                  }`}>
+                    {signupStep === 2 ? '✓' : '1'}
+                  </span>
+                  <span className={signupStep === 1 ? 'text-amber-300 font-bold' : 'text-emerald-400 font-medium'}>
+                    {signupStep === 1 ? 'Step 1: Gmail OTP Verification' : 'Step 1: Gmail Verified'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] ${
+                    signupStep === 2
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}>
+                    2
+                  </span>
+                  <span className={signupStep === 2 ? 'text-amber-300 font-bold' : 'text-slate-500 font-medium'}>
+                    Step 2: Username & Password
+                  </span>
                 </div>
               </div>
 
-              {/* 2. Gmail / Email */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Gmail / Email Address</span>
-                  <span className="text-[10px] text-amber-400 font-mono">OTP will be sent here</span>
-                </label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="signup-email-input"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="yourname@gmail.com"
-                      required
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition font-sans"
-                    />
+              {/* STEP 1 FORM: NAME, GMAIL, PHONE + OTP */}
+              {signupStep === 1 && (
+                <form onSubmit={handleVerifySignupOtp} className="space-y-3.5 animate-in fade-in duration-200">
+                  {/* 1. Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="signup-name-input"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Enter your full name (e.g. Rahul Sharma)"
+                        required
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
                   </div>
+
+                  {/* 2. Gmail / Email */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Gmail / Email Address</span>
+                      <span className="text-[10px] text-amber-400 font-mono">OTP will be sent here</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="signup-email-input"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="yourname@gmail.com"
+                          required
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition font-sans"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        id="signup-send-otp-btn"
+                        disabled={isLoading || !email || countdown > 0}
+                        onClick={handleSendSignupOtp}
+                        className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 font-bold text-xs border border-amber-500/30 transition cursor-pointer shrink-0 flex items-center gap-1"
+                      >
+                        {isLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : countdown > 0 ? (
+                          <span>Resend ({countdown}s)</span>
+                        ) : (
+                          <span>{otpSent ? 'Resend OTP' : 'Send Gmail OTP'}</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Phone Number */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Phone Number
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="signup-phone-input"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. 9876543210"
+                        required
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* OTP Notice & Input */}
+                  {otpSent && (
+                    <div className="space-y-2 p-3 rounded-xl bg-slate-950 border border-amber-500/40 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                          <Inbox className="w-3.5 h-3.5 text-amber-400" />
+                          Enter 6-Digit OTP Code
+                        </span>
+                        {otpHint && (
+                          <span className="text-emerald-400 text-[10px] font-mono">
+                            Preview: {otpHint}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="signup-otp-input"
+                          type="text"
+                          maxLength={6}
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          placeholder="Enter 6-digit code"
+                          required
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-amber-500/60 text-amber-300 font-mono tracking-widest text-sm focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {!otpSent ? (
+                    <button
+                      type="button"
+                      onClick={handleSendSignupOtp}
+                      disabled={isLoading || !email || !phone || !fullName}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? (
+                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span>Send Gmail OTP</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      id="submit-verify-otp-btn"
+                      disabled={isLoading || !otp}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? (
+                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span>Verify OTP & Continue</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  )}
+                </form>
+              )}
+
+              {/* STEP 2 FORM: CREATE USERNAME & PASSWORD */}
+              {signupStep === 2 && (
+                <form onSubmit={handleSignup} className="space-y-3.5 animate-in fade-in duration-200">
+                  {/* Verified Contact Card */}
+                  <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-emerald-300">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="font-bold text-white block">{fullName}</span>
+                        <span className="text-[11px] text-emerald-300 font-mono">{email} • {phone}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSignupStep(1)}
+                      className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                    >
+                      Edit Contact
+                    </button>
+                  </div>
+
+                  {/* 1. Username (Unique) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Create Unique Username</span>
+                      <span className="text-[10px] text-amber-400">For Login</span>
+                    </label>
+                    <div className="relative">
+                      <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="signup-username-input"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="e.g. derby_king"
+                        required
+                        autoFocus
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Password */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Create Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="signup-password-input"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Choose a secure password (min 4 chars)"
+                        required
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Confirm Password */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="signup-confirm-password-input"
+                        type="password"
+                        value={confirmSignupPassword}
+                        onChange={(e) => setConfirmSignupPassword(e.target.value)}
+                        placeholder="Re-enter password to confirm"
+                        required
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
                   <button
-                    type="button"
-                    id="signup-send-otp-btn"
-                    disabled={isLoading || !email || countdown > 0}
-                    onClick={handleSendSignupOtp}
-                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 font-bold text-xs border border-amber-500/30 transition cursor-pointer shrink-0 flex items-center gap-1"
+                    type="submit"
+                    id="submit-signup-btn"
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : countdown > 0 ? (
-                      <span>Resend ({countdown}s)</span>
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <span>{otpSent ? 'Resend OTP' : 'Send Gmail OTP'}</span>
+                      <>
+                        <span>Save & Create Account</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
                     )}
                   </button>
-                </div>
-              </div>
-
-              {/* 3. Phone Number */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Phone Number
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="signup-phone-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    required
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                  />
-                </div>
-              </div>
-
-              {/* OTP Notice & Input */}
-              {otpSent && (
-                <div className="space-y-2 p-3 rounded-xl bg-slate-950 border border-amber-500/40 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-amber-300 flex items-center gap-1.5">
-                      <Inbox className="w-3.5 h-3.5 text-amber-400" />
-                      Enter 6-Digit OTP Code
-                    </span>
-                    {otpHint && (
-                      <span className="text-emerald-400 text-[10px] font-mono">
-                        Preview: {otpHint}
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="signup-otp-input"
-                      type="text"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      placeholder="Enter 6-digit code"
-                      required
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-amber-500/60 text-amber-300 font-mono tracking-widest text-sm focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
+                </form>
               )}
-
-              {/* 4. Username (Unique) */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Create Unique Username</span>
-                  <span className="text-[10px] text-slate-500">For Login</span>
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="signup-username-input"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. derby_king"
-                    required
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                  />
-                </div>
-              </div>
-
-              {/* 5. Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Create Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="signup-password-input"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Choose a secure password"
-                    required
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                id="submit-signup-btn"
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>Verify OTP & Create Account</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+            </div>
           )}
 
           {/* ---------------- SCREEN 2: LOG IN (Username + Password) ---------------- */}

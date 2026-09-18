@@ -210,6 +210,17 @@ export const api = {
     }
   },
 
+  async verifyOtp(params: { email?: string; phone?: string; otp: string }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid OTP code');
+    return data;
+  },
+
   async signup(params: { email?: string; phone?: string; otp: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
