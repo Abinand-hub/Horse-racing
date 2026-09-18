@@ -129,6 +129,41 @@ interface Transaction {
   reference_id?: string;
 }
 
+export type DepositStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+interface DepositRequest {
+  id: string;
+  user_id: string;
+  username: string;
+  amount: number;
+  payment_method: string;
+  utr_number: string;
+  screenshot_url?: string;
+  status: DepositStatus;
+  admin_notes?: string;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export type WithdrawalStatus = 'PENDING' | 'IN_PROGRESS' | 'SUCCESSFUL' | 'REJECTED';
+
+interface WithdrawalRequest {
+  id: string;
+  user_id: string;
+  username: string;
+  amount: number;
+  upi_id?: string;
+  bank_account?: string;
+  ifsc?: string;
+  account_holder?: string;
+  status: WithdrawalStatus;
+  admin_notes?: string;
+  created_at: string;
+  approved_at: string | null;
+  completed_at: string | null;
+  estimated_minutes?: number;
+}
+
 interface Banner {
   id: string;
   title: string;
@@ -146,6 +181,8 @@ interface DBData {
   races: Race[];
   bets: Bet[];
   transactions: Transaction[];
+  deposit_requests: DepositRequest[];
+  withdrawal_requests: WithdrawalRequest[];
   banners: Banner[];
   otps: Record<string, { code: string; expires_at: number }>;
 }
@@ -180,6 +217,34 @@ const defaultData: DBData = {
       profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
       created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     },
+  ],
+  deposit_requests: [
+    {
+      id: 'dep_01',
+      user_id: 'usr_arjun',
+      username: 'arjun_punters',
+      amount: 5000,
+      payment_method: 'UPI (PhonePe)',
+      utr_number: '329845729104',
+      screenshot_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
+      status: 'APPROVED',
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      reviewed_at: new Date(Date.now() - 86400000 + 120000).toISOString(),
+    }
+  ],
+  withdrawal_requests: [
+    {
+      id: 'wth_01',
+      user_id: 'usr_arjun',
+      username: 'arjun_punters',
+      amount: 2000,
+      upi_id: 'arjun@okaxis',
+      status: 'PENDING',
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      approved_at: null,
+      completed_at: null,
+      estimated_minutes: 120,
+    }
   ],
   race_centers: [
     { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS', city: 'Mysore', is_active: true, order: 1, created_at: new Date().toISOString() },
@@ -2016,6 +2081,317 @@ app.post('/api/admin/reset-demo', (req, res) => {
   db = JSON.parse(JSON.stringify(defaultData));
   saveDatabase();
   return res.json({ success: true, message: 'Platform demo data successfully reseeded!' });
+});
+
+// ----------------------------------------------------
+// 10. DEPOSIT REQUESTS API
+// ----------------------------------------------------
+app.post('/api/deposits', (req, res) => {
+  const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;
+  const numAmount = Number(amount);
+  if (!userId || isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: 'Valid user ID and minimum deposit amount of ₹100 is required' });
+  }
+
+  const user = db.users.find((u) => u.id === userId);
+  const username = user?.username || 'arjun_punters';
+
+  if (!db.deposit_requests) db.deposit_requests = [];
+
+  const newRequest: DepositRequest = {
+    id: `dep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    user_id: userId,
+    username,
+    amount: numAmount,
+    payment_method: paymentMethod || 'UPI',
+    utr_number: utrNumber || `UTR${Date.now().toString().slice(-6)}`,
+    screenshot_url: screenshotUrl,
+    status: 'PENDING',
+    created_at: new Date().toISOString(),
+    reviewed_at: null,
+  };
+
+  db.deposit_requests.unshift(newRequest);
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    depositRequest: newRequest,
+    message: `Deposit request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin verification.`,
+  });
+});
+
+app.get('/api/deposits', (req, res) => {
+  const { user_id, status } = req.query;
+  if (!db.deposit_requests) db.deposit_requests = [];
+
+  let list = db.deposit_requests;
+  if (user_id) {
+    list = list.filter((d) => d.user_id === user_id);
+  }
+  if (status && status !== 'ALL') {
+    list = list.filter((d) => d.status === status);
+  }
+  return res.json({ success: true, deposits: list });
+});
+
+app.post('/api/admin/deposits/:id/approve', (req, res) => {
+  if (!db.deposit_requests) db.deposit_requests = [];
+  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
+
+  if (reqItem.status === 'APPROVED') {
+    return res.json({ success: true, message: 'Deposit request is already approved' });
+  }
+
+  const { adminNotes } = req.body;
+  reqItem.status = 'APPROVED';
+  reqItem.reviewed_at = new Date().toISOString();
+  if (adminNotes) reqItem.admin_notes = adminNotes;
+
+  const user = db.users.find((u) => u.id === reqItem.user_id);
+  if (user) {
+    user.balance += reqItem.amount;
+  }
+
+  const newTx: Transaction = {
+    id: `tx_${Date.now()}_dep`,
+    user_id: reqItem.user_id,
+    username: reqItem.username,
+    type: 'DEPOSIT',
+    amount: reqItem.amount,
+    balance_after: user ? user.balance : reqItem.amount,
+    description: `Deposit Approved via ${reqItem.payment_method} (UTR: ${reqItem.utr_number})`,
+    created_at: new Date().toISOString(),
+    reference_id: reqItem.id,
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Deposit of ₹${reqItem.amount.toLocaleString('en-IN')} approved! Balance credited automatically.`,
+    user,
+    depositRequest: reqItem,
+  });
+});
+
+app.post('/api/admin/deposits/:id/reject', (req, res) => {
+  if (!db.deposit_requests) db.deposit_requests = [];
+  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
+
+  const { reason } = req.body;
+  reqItem.status = 'REJECTED';
+  reqItem.reviewed_at = new Date().toISOString();
+  reqItem.admin_notes = reason || 'UTR or proof could not be verified by Admin.';
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: 'Deposit request rejected.',
+    depositRequest: reqItem,
+  });
+});
+
+// ----------------------------------------------------
+// 11. WITHDRAWAL REQUESTS API
+// ----------------------------------------------------
+app.post('/api/withdrawals', (req, res) => {
+  const { userId, amount, details } = req.body;
+  const numAmount = Number(amount);
+  if (!userId || isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: 'Valid user ID and minimum withdrawal amount of ₹100 is required' });
+  }
+
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const withdrawable = (user.balance ?? 0) - (user.exposure ?? 0);
+  if (withdrawable < numAmount) {
+    return res.status(400).json({ error: `Insufficient withdrawable balance. Available: ₹${Math.max(0, withdrawable)}` });
+  }
+
+  user.balance -= numAmount;
+
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+
+  const newRequest: WithdrawalRequest = {
+    id: `wth_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    user_id: userId,
+    username: user.username,
+    amount: numAmount,
+    upi_id: details?.upi_id,
+    bank_account: details?.bank_account,
+    ifsc: details?.ifsc,
+    account_holder: details?.account_holder,
+    status: 'PENDING',
+    created_at: new Date().toISOString(),
+    approved_at: null,
+    completed_at: null,
+    estimated_minutes: 120,
+  };
+
+  db.withdrawal_requests.unshift(newRequest);
+
+  const newTx: Transaction = {
+    id: `tx_${Date.now()}_wth`,
+    user_id: userId,
+    username: user.username,
+    type: 'WITHDRAW',
+    amount: -numAmount,
+    balance_after: user.balance,
+    description: `Withdrawal Request (Pending Verification) to ${details?.upi_id || details?.bank_account || 'Registered Bank'}`,
+    created_at: new Date().toISOString(),
+    reference_id: newRequest.id,
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    withdrawalRequest: newRequest,
+    user,
+    message: `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin review.`,
+  });
+});
+
+app.get('/api/withdrawals', (req, res) => {
+  const { user_id, status } = req.query;
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+
+  let list = db.withdrawal_requests;
+  if (user_id) {
+    list = list.filter((w) => w.user_id === user_id);
+  }
+  if (status && status !== 'ALL') {
+    list = list.filter((w) => w.status === status);
+  }
+  return res.json({ success: true, withdrawals: list });
+});
+
+app.post('/api/admin/withdrawals/:id/approve', (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
+
+  reqItem.status = 'IN_PROGRESS';
+  reqItem.approved_at = new Date().toISOString();
+  reqItem.estimated_minutes = 120;
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as IN PROGRESS. 120-minute timer started.`,
+    withdrawalRequest: reqItem,
+  });
+});
+
+app.post('/api/admin/withdrawals/:id/complete', (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
+
+  reqItem.status = 'SUCCESSFUL';
+  reqItem.completed_at = new Date().toISOString();
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as SUCCESSFUL / DISBURSED!`,
+    withdrawalRequest: reqItem,
+  });
+});
+
+app.post('/api/admin/withdrawals/:id/reject', (req, res) => {
+  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
+
+  const { reason } = req.body;
+  reqItem.status = 'REJECTED';
+  reqItem.admin_notes = reason || 'Rejected by Admin. Amount refunded back to wallet.';
+
+  const user = db.users.find((u) => u.id === reqItem.user_id);
+  if (user) {
+    user.balance += reqItem.amount;
+  }
+
+  const newTx: Transaction = {
+    id: `tx_${Date.now()}_ref`,
+    user_id: reqItem.user_id,
+    username: reqItem.username,
+    type: 'REFUND',
+    amount: reqItem.amount,
+    balance_after: user ? user.balance : reqItem.amount,
+    description: `Refund for Rejected Withdrawal: ${reqItem.admin_notes}`,
+    created_at: new Date().toISOString(),
+    reference_id: reqItem.id,
+  };
+  db.transactions.unshift(newTx);
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: `Withdrawal rejected and ₹${reqItem.amount.toLocaleString('en-IN')} refunded to user wallet.`,
+    user,
+    withdrawalRequest: reqItem,
+  });
+});
+
+// ----------------------------------------------------
+// 12. SUSPEND / RESUME RACE & RUNNERS API
+// ----------------------------------------------------
+app.post('/api/admin/races/:id/suspend', (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: 'Race not found' });
+
+  race.is_suspended = true;
+  if (race.horses) {
+    race.horses.forEach((h) => { h.is_suspended = true; });
+  }
+  saveDatabase();
+  return res.json({ success: true, message: `All runners in ${race.name} suspended`, race });
+});
+
+app.post('/api/admin/races/:id/resume', (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: 'Race not found' });
+
+  race.is_suspended = false;
+  if (race.horses) {
+    race.horses.forEach((h) => { h.is_suspended = false; });
+  }
+  saveDatabase();
+  return res.json({ success: true, message: `All runners in ${race.name} resumed`, race });
+});
+
+app.post('/api/admin/races/:raceId/horses/:horseId/suspend', (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.raceId);
+  if (!race) return res.status(404).json({ error: 'Race not found' });
+
+  const horse = race.horses.find((h) => h.id === req.params.horseId);
+  if (!horse) return res.status(404).json({ error: 'Horse not found' });
+
+  horse.is_suspended = true;
+  saveDatabase();
+  return res.json({ success: true, message: `Runner ${horse.name} suspended`, race, horse });
+});
+
+app.post('/api/admin/races/:raceId/horses/:horseId/resume', (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.raceId);
+  if (!race) return res.status(404).json({ error: 'Race not found' });
+
+  const horse = race.horses.find((h) => h.id === req.params.horseId);
+  if (!horse) return res.status(404).json({ error: 'Horse not found' });
+
+  const { win_odds, place_odds } = req.body;
+  horse.is_suspended = false;
+  if (win_odds && !isNaN(Number(win_odds))) horse.win_odds = Number(win_odds);
+  if (place_odds && !isNaN(Number(place_odds))) horse.place_odds = Number(place_odds);
+
+  saveDatabase();
+  return res.json({ success: true, message: `Runner ${horse.name} resumed`, race, horse });
 });
 
 // ----------------------------------------------------

@@ -115,7 +115,7 @@ export const RaceList: React.FC<RaceListProps> = ({
 
   // 1st: Live In-Play Races (Open for live betting)
   const liveRaces = filteredRaces.filter(
-    (r) => (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') && !r.is_suspended
+    (r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING'
   );
 
   // 2nd: Upcoming Races (Scheduled for today, opened sequentially by admin)
@@ -454,11 +454,18 @@ export const RaceList: React.FC<RaceListProps> = ({
 
                           {/* Top Row: Live Pill Badge + Favorite Heart Button */}
                           <div className="relative z-10 flex items-center justify-between gap-2">
-                            <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-rose-600/90 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
-                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
-                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white" />
-                              <span>LIVE IN-PLAY</span>
-                            </span>
+                            {race.is_suspended || race.horses.every((h) => h.is_suspended) ? (
+                              <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500 text-black font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-amber-300 animate-pulse">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>🚫 ODDS CHANGING / SUSPENDED</span>
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-rose-600/90 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
+                                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
+                                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white" />
+                                <span>LIVE IN-PLAY</span>
+                              </span>
+                            )}
 
                             <button
                               type="button"
@@ -518,24 +525,37 @@ export const RaceList: React.FC<RaceListProps> = ({
                                 <span className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-400 whitespace-nowrap">
                                   Live Odds:
                                 </span>
-                                {race.horses.slice(0, 5).map((h) => (
-                                  <div
-                                    key={h.id}
-                                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl border border-white/15 bg-black/60 backdrop-blur-md whitespace-nowrap shadow-inner"
-                                  >
-                                    <SilkIcon
-                                      color={h.silk_color}
-                                      number={h.horse_no || h.serial_no}
-                                      size="sm"
-                                    />
-                                    <span className="font-bold text-slate-200 truncate max-w-[85px] sm:max-w-[110px] text-[11px] sm:text-xs">
-                                      {h.name}
-                                    </span>
-                                    <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[10px] sm:text-[11px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
-                                      {formatOdds(h.win_odds, oddsFormat)}
-                                    </span>
-                                  </div>
-                                ))}
+                                {race.horses.slice(0, 5).map((h) => {
+                                  const isHorseSusp = !!(h.is_suspended || race.is_suspended);
+                                  return (
+                                    <div
+                                      key={h.id}
+                                      className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl border backdrop-blur-md whitespace-nowrap shadow-inner ${
+                                        isHorseSusp
+                                          ? 'border-amber-500/40 bg-amber-950/40 text-amber-300'
+                                          : 'border-white/15 bg-black/60 text-slate-200'
+                                      }`}
+                                    >
+                                      <SilkIcon
+                                        color={h.silk_color}
+                                        number={h.horse_no || h.serial_no}
+                                        size="sm"
+                                      />
+                                      <span className="font-bold truncate max-w-[85px] sm:max-w-[110px] text-[11px] sm:text-xs">
+                                        {h.name}
+                                      </span>
+                                      {isHorseSusp ? (
+                                        <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[9px] sm:text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40">
+                                          SUSP
+                                        </span>
+                                      ) : (
+                                        <span className="px-1.5 py-0.5 rounded-md font-black font-mono text-[10px] sm:text-[11px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                                          {formatOdds(h.win_odds, oddsFormat)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                                 {race.horses.length > 5 && (
                                   <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 whitespace-nowrap pl-1">
                                     +{race.horses.length - 5} more

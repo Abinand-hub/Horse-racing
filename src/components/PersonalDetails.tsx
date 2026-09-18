@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bet, Transaction, User } from '../types';
+import { Bet, Transaction, User, DepositRequest, WithdrawalRequest } from '../types';
 import { soundManager } from '../utils/audio';
 import { 
   User as UserIcon, 
@@ -25,13 +25,20 @@ import {
   Plus,
   Trophy,
   Sparkles,
-  LogOut
+  LogOut,
+  AlertCircle,
+  Copy,
+  Check,
+  ExternalLink,
+  Layers
 } from 'lucide-react';
 
 interface PersonalDetailsProps {
   user: User | null;
   bets: Bet[];
   transactions: Transaction[];
+  depositRequests?: DepositRequest[];
+  withdrawalRequests?: WithdrawalRequest[];
   onOpenDeposit: () => void;
   onOpenWithdraw: () => void;
   onOpenChangePassword: () => void;
@@ -44,6 +51,8 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
   user,
   bets,
   transactions,
+  depositRequests = [],
+  withdrawalRequests = [],
   onOpenDeposit,
   onOpenWithdraw,
   onOpenChangePassword,
@@ -52,6 +61,16 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
   onGoToLobby,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [financialTab, setFinancialTab] = useState<'deposits' | 'withdrawals' | 'transactions'>('deposits');
+  const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedUtr(id);
+    soundManager.playClick();
+    setTimeout(() => setCopiedUtr(null), 2000);
+  };
 
   if (!user) {
     return (
@@ -363,16 +382,16 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
         </div>
       </div>
 
-      {/* ---------------- 4. SECTION: WALLET LIQUIDITY & STATEMENT LEDGER ---------------- */}
+      {/* ---------------- 4. SECTION: WALLET LIQUIDITY, PAYMENT STATUS & STATEMENT ---------------- */}
       <div className="bg-[#091510] rounded-2xl border border-emerald-900/60 p-4 sm:p-6 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-900/40 pb-3">
           <div>
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#e5b869]" />
-              <span>Wallet Ledger & Account Statement</span>
+              <span>Payments & Financial Ledger</span>
             </h3>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-              Instant audit trail of UPI deposits, winnings, stakes, and withdrawals
+              Live status tracking of deposit requests, withdrawal queues, and transaction statement
             </p>
           </div>
 
@@ -389,51 +408,429 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
           </div>
         </div>
 
-        {/* Transaction History Ledger */}
-        {transactions.length === 0 ? (
-          <p className="text-xs text-slate-500 py-6 text-center">No transactions recorded yet.</p>
-        ) : (
-          <div className="divide-y divide-emerald-950/60 overflow-hidden">
-            {transactions.map((tx) => (
-              <div key={tx.id} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5 text-xs min-w-0">
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
-                    tx.type === 'DEPOSIT' || tx.type === 'WIN'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  }`}>
-                    {tx.type === 'DEPOSIT' || tx.type === 'WIN' ? (
-                      <ArrowDownLeft className="w-3.5 h-3.5" />
-                    ) : (
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-white text-xs sm:text-sm truncate">{tx.description}</p>
-                    <p className="text-[10px] text-slate-500">
-                      {new Date(tx.created_at).toLocaleString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </div>
+        {/* Tab Controls for Deposits, Withdrawals, Statement */}
+        <div className="flex items-center gap-1.5 p-1 bg-[#040805] rounded-xl border border-emerald-900/50 overflow-x-auto scrollbar-none">
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setFinancialTab('deposits');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs transition cursor-pointer shrink-0 ${
+              financialTab === 'deposits'
+                ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <span>Deposit Requests</span>
+            {depositRequests.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                financialTab === 'deposits' ? 'bg-black/30 text-black' : 'bg-emerald-900 text-emerald-300'
+              }`}>
+                {depositRequests.length}
+              </span>
+            )}
+          </button>
 
-                <div className="text-right font-mono shrink-0">
-                  <p className={`font-black text-xs sm:text-sm ${
-                    tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'
-                  }`}>
-                    {tx.amount > 0 ? `+₹${tx.amount.toLocaleString('en-IN')}` : `-₹${Math.abs(tx.amount).toLocaleString('en-IN')}`}
-                  </p>
-                  <p className="text-[9px] text-slate-500">Bal: ₹{tx.balance_after.toLocaleString('en-IN')}</p>
-                </div>
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setFinancialTab('withdrawals');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs transition cursor-pointer shrink-0 ${
+              financialTab === 'withdrawals'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>Withdrawals</span>
+            {withdrawalRequests.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                financialTab === 'withdrawals' ? 'bg-black/30 text-slate-950' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {withdrawalRequests.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setFinancialTab('transactions');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs transition cursor-pointer shrink-0 ${
+              financialTab === 'transactions'
+                ? 'bg-slate-800 text-white border border-slate-700 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Statement Ledger</span>
+            {transactions.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
+                {transactions.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* ---------------- SUB-TAB 1: DEPOSIT REQUESTS & VERIFICATION STATUS ---------------- */}
+        {financialTab === 'deposits' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="text-slate-400">
+                Track status of your UPI deposits submitted to the Admin
+              </span>
+              <button
+                type="button"
+                onClick={onOpenDeposit}
+                className="text-xs text-[#e5b869] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ New Deposit</span>
+              </button>
+            </div>
+
+            {depositRequests.length === 0 ? (
+              <div className="bg-[#040805] rounded-xl p-8 text-center border border-emerald-950 text-xs text-slate-500 space-y-2">
+                <ArrowDownLeft className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="font-semibold text-slate-400">No deposit requests submitted yet.</p>
+                <button
+                  onClick={onOpenDeposit}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black text-xs transition cursor-pointer mt-2"
+                >
+                  Deposit Funds Now
+                </button>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-2.5">
+                {depositRequests.map((dep) => {
+                  const isApproved = dep.status === 'APPROVED';
+                  const isPending = dep.status === 'PENDING';
+                  const isRejected = dep.status === 'REJECTED';
+
+                  return (
+                    <div
+                      key={dep.id}
+                      className={`p-3.5 rounded-2xl border transition-all ${
+                        isApproved
+                          ? 'bg-[#041009] border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                          : isPending
+                          ? 'bg-[#120e04] border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-[#140607] border-rose-500/40'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                              isApproved
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                : isPending
+                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                            }`}
+                          >
+                            <ArrowDownLeft className="w-5 h-5" />
+                          </div>
+
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-black text-white text-base">
+                                ₹{dep.amount.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-xs text-slate-400 font-semibold">
+                                via {dep.payment_method}
+                              </span>
+
+                              {/* Status Badge */}
+                              {isApproved && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>APPROVED & CREDITED</span>
+                                </span>
+                              )}
+                              {isPending && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse shadow">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  <span>PENDING ADMIN APPROVAL</span>
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                                  <span>REJECTED</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* UTR & Timestamp */}
+                            <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                              <span className="font-mono bg-[#030604] px-2 py-0.5 rounded border border-emerald-950 text-slate-300 font-bold flex items-center gap-1">
+                                <span>UTR:</span>
+                                <span className="text-[#e5b869]">{dep.utr_number}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(dep.utr_number, dep.id)}
+                                  className="ml-1 text-slate-400 hover:text-white cursor-pointer"
+                                  title="Copy UTR"
+                                >
+                                  {copiedUtr === dep.id ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </span>
+
+                              <span className="text-[11px] text-slate-500">
+                                {new Date(dep.created_at).toLocaleString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+
+                            {dep.admin_notes && (
+                              <p className="text-[11px] text-amber-300/90 pt-0.5">
+                                Note: {dep.admin_notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Screenshot proof thumbnail if available */}
+                        {dep.screenshot_url && (
+                          <div className="sm:text-right shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImage(dep.screenshot_url || null)}
+                              className="px-2.5 py-1 rounded-xl bg-[#030604] border border-emerald-900/60 hover:border-[#e5b869] text-slate-300 hover:text-white text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            >
+                              <Eye className="w-3 h-3 text-[#e5b869]" />
+                              <span>View Proof</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ---------------- SUB-TAB 2: WITHDRAWAL REQUESTS & 120M SLA ---------------- */}
+        {financialTab === 'withdrawals' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="text-slate-400">
+                Track withdrawal status, 120-minute timer, and bank disbursements
+              </span>
+              <button
+                type="button"
+                onClick={onOpenWithdraw}
+                className="text-xs text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Request Withdrawal</span>
+              </button>
+            </div>
+
+            {withdrawalRequests.length === 0 ? (
+              <div className="bg-[#040805] rounded-xl p-8 text-center border border-emerald-950 text-xs text-slate-500 space-y-2">
+                <ArrowUpRight className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="font-semibold text-slate-400">No withdrawal requests found.</p>
+                <button
+                  onClick={onOpenWithdraw}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs transition cursor-pointer mt-2"
+                >
+                  Withdraw Funds
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {withdrawalRequests.map((wth) => {
+                  const isSuccess = wth.status === 'SUCCESSFUL';
+                  const isInProgress = wth.status === 'IN_PROGRESS';
+                  const isPending = wth.status === 'PENDING';
+                  const isRejected = wth.status === 'REJECTED';
+
+                  return (
+                    <div
+                      key={wth.id}
+                      className={`p-3.5 rounded-2xl border transition-all ${
+                        isSuccess
+                          ? 'bg-[#041009] border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                          : isInProgress
+                          ? 'bg-[#061218] border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                          : isPending
+                          ? 'bg-[#120e04] border-amber-500/50'
+                          : 'bg-[#140607] border-rose-500/40'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                              isSuccess
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                : isInProgress
+                                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                                : isPending
+                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                            }`}
+                          >
+                            <ArrowUpRight className="w-5 h-5" />
+                          </div>
+
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-black text-white text-base">
+                                ₹{wth.amount.toLocaleString('en-IN')}
+                              </span>
+
+                              {/* Status Badge */}
+                              {isSuccess && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>DISBURSED / SUCCESSFUL</span>
+                                </span>
+                              )}
+                              {isInProgress && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse shadow">
+                                  <Clock className="w-3 h-3 text-cyan-400" />
+                                  <span>IN PROGRESS (120m SLA)</span>
+                                </span>
+                              )}
+                              {isPending && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  <span>PENDING REVIEW</span>
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
+                                  <AlertCircle className="w-3 h-3 text-rose-400" />
+                                  <span>REJECTED & REFUNDED</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Destination & Timestamp */}
+                            <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                              <span className="font-mono bg-[#030604] px-2 py-0.5 rounded border border-emerald-950 text-slate-300 font-semibold">
+                                {wth.upi_id ? `UPI: ${wth.upi_id}` : `A/C: ${wth.bank_account || 'Bank'} (${wth.ifsc || 'IFSC'})`}
+                              </span>
+
+                              <span className="text-[11px] text-slate-500">
+                                {new Date(wth.created_at).toLocaleString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+
+                            {wth.admin_notes && (
+                              <p className="text-[11px] text-rose-400/90 pt-0.5">
+                                Reason: {wth.admin_notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ---------------- SUB-TAB 3: WALLET STATEMENT LEDGER ---------------- */}
+        {financialTab === 'transactions' && (
+          <div>
+            {transactions.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No transactions recorded yet.</p>
+            ) : (
+              <div className="divide-y divide-emerald-950/60 overflow-hidden">
+                {transactions.map((tx) => (
+                  <div key={tx.id} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5 text-xs min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                        tx.type === 'DEPOSIT' || tx.type === 'WIN'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      }`}>
+                        {tx.type === 'DEPOSIT' || tx.type === 'WIN' ? (
+                          <ArrowDownLeft className="w-3.5 h-3.5" />
+                        ) : (
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-white text-xs sm:text-sm truncate">{tx.description}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {new Date(tx.created_at).toLocaleString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right font-mono shrink-0">
+                      <p className={`font-black text-xs sm:text-sm ${
+                        tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'
+                      }`}>
+                        {tx.amount > 0 ? `+₹${tx.amount.toLocaleString('en-IN')}` : `-₹${Math.abs(tx.amount).toLocaleString('en-IN')}`}
+                      </p>
+                      <p className="text-[9px] text-slate-500">Bal: ₹{tx.balance_after.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Proof Image Preview Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-lg w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-4 shadow-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-sm">Payment Screenshot Proof</span>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={previewImage}
+              alt="Payment Proof"
+              className="w-full max-h-[70vh] object-contain rounded-2xl border border-emerald-950"
+            />
+          </div>
+        </div>
+      )}
 
       {/* ---------------- 5. SECTION: SECURITY & LOGOUT ---------------- */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#091510] rounded-2xl border border-emerald-900/60 p-4 sm:p-5 shadow-xl">

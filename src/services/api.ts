@@ -789,16 +789,48 @@ export const api = {
     };
 
     try {
-      const raw = localStorage.getItem('derby_deposit_requests');
-      const list: DepositRequest[] = raw ? JSON.parse(raw) : [];
-      list.unshift(newRequest);
-      localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
-    } catch {}
+      const res = await fetch(`${API_BASE}/deposits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: params.userId,
+          amount: params.amount,
+          paymentMethod: method,
+          utrNumber: utr,
+          screenshotUrl: proofUrl,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.depositRequest) {
+          this.saveLocalDepositRequest(data.depositRequest);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend deposit request fallback to local:', e);
+    }
+
+    this.saveLocalDepositRequest(newRequest);
 
     return {
       depositRequest: newRequest,
       message: `Deposit request of ₹${params.amount.toLocaleString('en-IN')} submitted! Status is PENDING verification by Admin.`,
     };
+  },
+
+  saveLocalDepositRequest(dep: DepositRequest) {
+    try {
+      const raw = localStorage.getItem('derby_deposit_requests');
+      const list: DepositRequest[] = raw ? JSON.parse(raw) : [];
+      const idx = list.findIndex((d) => d.id === dep.id);
+      if (idx >= 0) {
+        list[idx] = dep;
+      } else {
+        list.unshift(dep);
+      }
+      localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
+    } catch {}
   },
 
   logout(): void {
@@ -830,12 +862,35 @@ export const api = {
     };
   },
 
-  async getDepositRequests(status?: DepositStatus | 'ALL'): Promise<DepositRequest[]> {
+  async getDepositRequests(status?: DepositStatus | 'ALL', userId?: string): Promise<DepositRequest[]> {
     let list: DepositRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_deposit_requests');
       if (raw) list = JSON.parse(raw);
     } catch {}
+
+    try {
+      const query = new URLSearchParams();
+      if (status && status !== 'ALL') query.set('status', status);
+      if (userId) query.set('user_id', userId);
+      const res = await fetch(`${API_BASE}/deposits?${query.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.deposits)) {
+          // Merge with local deposits
+          const remoteMap = new Map(data.deposits.map((d: DepositRequest) => [d.id, d]));
+          for (const ld of list) {
+            if (!remoteMap.has(ld.id)) {
+              data.deposits.unshift(ld);
+            }
+          }
+          localStorage.setItem('derby_deposit_requests', JSON.stringify(data.deposits));
+          list = data.deposits;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend getDepositRequests fallback:', e);
+    }
 
     if (list.length === 0) {
       // Default seed demo requests
@@ -848,9 +903,9 @@ export const api = {
           payment_method: 'UPI (PhonePe)',
           utr_number: '329845729104',
           screenshot_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
-          status: 'PENDING',
+          status: 'APPROVED',
           created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-          reviewed_at: null,
+          reviewed_at: new Date(Date.now() - 3600000 * 2 + 120000).toISOString(),
         },
         {
           id: 'dep_02',
@@ -858,11 +913,10 @@ export const api = {
           username: 'rahul_derby',
           amount: 10000,
           payment_method: 'Google Pay',
-          utr_number: '482910394821',
-          screenshot_url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80',
-          status: 'APPROVED',
-          created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-          reviewed_at: new Date(Date.now() - 3600000 * 23).toISOString(),
+          utr_number: '329845729105',
+          status: 'PENDING',
+          created_at: new Date(Date.now() - 1800000).toISOString(),
+          reviewed_at: null,
         }
       ];
       try {
@@ -870,13 +924,37 @@ export const api = {
       } catch {}
     }
 
-    if (status && status !== 'ALL') {
-      return list.filter((r) => r.status === status);
+    let filtered = list;
+    if (userId) {
+      filtered = filtered.filter((r) => r.user_id === userId);
     }
-    return list;
+    if (status && status !== 'ALL') {
+      filtered = filtered.filter((r) => r.status === status);
+    }
+    return filtered;
   },
 
   async approveDepositRequest(depositId: string, adminNotes?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits/${depositId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNotes }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.depositRequest) {
+          this.saveLocalDepositRequest(data.depositRequest);
+        }
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend approveDepositRequest fallback:', e);
+    }
+
     let list: DepositRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_deposit_requests');
@@ -944,6 +1022,23 @@ export const api = {
   },
 
   async rejectDepositRequest(depositId: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits/${depositId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.depositRequest) {
+          this.saveLocalDepositRequest(data.depositRequest);
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend rejectDepositRequest fallback:', e);
+    }
+
     let list: DepositRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_deposit_requests');
@@ -1002,6 +1097,26 @@ export const api = {
       throw new Error(`Insufficient withdrawable balance. Available to withdraw: ₹${Math.max(0, withdrawable).toLocaleString('en-IN')}`);
     }
 
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.withdrawalRequest) {
+          this.saveLocalWithdrawalRequest(data.withdrawalRequest);
+        }
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend submitWithdrawalRequest fallback:', e);
+    }
+
     // Deduct from balance immediately to lock amount
     currentUser.balance = Math.max(0, (currentUser.balance ?? 0) - params.amount);
     localStorage.setItem('derby_user', JSON.stringify(currentUser));
@@ -1022,12 +1137,7 @@ export const api = {
       estimated_minutes: 120,
     };
 
-    try {
-      const raw = localStorage.getItem('derby_withdrawal_requests');
-      const list: WithdrawalRequest[] = raw ? JSON.parse(raw) : [];
-      list.unshift(newRequest);
-      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
-    } catch {}
+    this.saveLocalWithdrawalRequest(newRequest);
 
     // Log pending transaction in statement
     try {
@@ -1053,6 +1163,20 @@ export const api = {
     };
   },
 
+  saveLocalWithdrawalRequest(wth: WithdrawalRequest) {
+    try {
+      const raw = localStorage.getItem('derby_withdrawal_requests');
+      const list: WithdrawalRequest[] = raw ? JSON.parse(raw) : [];
+      const idx = list.findIndex((w) => w.id === wth.id);
+      if (idx >= 0) {
+        list[idx] = wth;
+      } else {
+        list.unshift(wth);
+      }
+      localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
+    } catch {}
+  },
+
   // Backward compatibility alias
   async withdraw(userId: string, amount: number, details: { upi_id?: string; bank_account?: string; ifsc?: string; account_holder?: string }): Promise<{ user: User; message: string }> {
     const res = await this.submitWithdrawalRequest({
@@ -1066,12 +1190,34 @@ export const api = {
     };
   },
 
-  async getWithdrawalRequests(status?: WithdrawalStatus | 'ALL'): Promise<WithdrawalRequest[]> {
+  async getWithdrawalRequests(status?: WithdrawalStatus | 'ALL', userId?: string): Promise<WithdrawalRequest[]> {
     let list: WithdrawalRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_withdrawal_requests');
       if (raw) list = JSON.parse(raw);
     } catch {}
+
+    try {
+      const query = new URLSearchParams();
+      if (status && status !== 'ALL') query.set('status', status);
+      if (userId) query.set('user_id', userId);
+      const res = await fetch(`${API_BASE}/withdrawals?${query.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.withdrawals)) {
+          const remoteMap = new Map(data.withdrawals.map((w: WithdrawalRequest) => [w.id, w]));
+          for (const lw of list) {
+            if (!remoteMap.has(lw.id)) {
+              data.withdrawals.unshift(lw);
+            }
+          }
+          localStorage.setItem('derby_withdrawal_requests', JSON.stringify(data.withdrawals));
+          list = data.withdrawals;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend getWithdrawalRequests fallback:', e);
+    }
 
     if (list.length === 0) {
       // Default seed demo requests
@@ -1120,13 +1266,30 @@ export const api = {
       } catch {}
     }
 
-    if (status && status !== 'ALL') {
-      return list.filter((w) => w.status === status);
+    let filtered = list;
+    if (userId) {
+      filtered = filtered.filter((w) => w.user_id === userId);
     }
-    return list;
+    if (status && status !== 'ALL') {
+      filtered = filtered.filter((w) => w.status === status);
+    }
+    return filtered;
   },
 
   async approveWithdrawalToInProgress(withdrawalId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals/${withdrawalId}/approve`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.withdrawalRequest) {
+          this.saveLocalWithdrawalRequest(data.withdrawalRequest);
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend approveWithdrawal fallback:', e);
+    }
+
     let list: WithdrawalRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_withdrawal_requests');
@@ -1161,6 +1324,19 @@ export const api = {
   },
 
   async completeWithdrawalToSuccessful(withdrawalId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals/${withdrawalId}/complete`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.withdrawalRequest) {
+          this.saveLocalWithdrawalRequest(data.withdrawalRequest);
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend completeWithdrawal fallback:', e);
+    }
+
     let list: WithdrawalRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_withdrawal_requests');
@@ -1194,6 +1370,26 @@ export const api = {
   },
 
   async rejectWithdrawalRequest(withdrawalId: string, reason?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals/${withdrawalId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.withdrawalRequest) {
+          this.saveLocalWithdrawalRequest(data.withdrawalRequest);
+        }
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Backend rejectWithdrawal fallback:', e);
+    }
+
     let list: WithdrawalRequest[] = [];
     try {
       const raw = localStorage.getItem('derby_withdrawal_requests');
@@ -1568,6 +1764,10 @@ export const api = {
   },
 
   async suspendHorse(raceId: string, horseId: string): Promise<Race | null> {
+    try {
+      await fetch(`${API_BASE}/admin/races/${raceId}/horses/${horseId}/suspend`, { method: 'POST' });
+    } catch {}
+
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
     if (!race) return null;
@@ -1590,6 +1790,14 @@ export const api = {
   },
 
   async resumeHorse(raceId: string, horseId: string, new_win_odds?: number, new_place_odds?: number): Promise<Race | null> {
+    try {
+      await fetch(`${API_BASE}/admin/races/${raceId}/horses/${horseId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_odds: new_win_odds, place_odds: new_place_odds }),
+      });
+    } catch {}
+
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
     if (!race) return null;
@@ -1620,6 +1828,10 @@ export const api = {
   },
 
   async suspendAll(raceId: string): Promise<Race | null> {
+    try {
+      await fetch(`${API_BASE}/admin/races/${raceId}/suspend`, { method: 'POST' });
+    } catch {}
+
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
     if (!race) return null;
@@ -1641,6 +1853,10 @@ export const api = {
   },
 
   async resumeAll(raceId: string, oddsMap?: Record<string, { win_odds?: number; place_odds?: number }>): Promise<Race | null> {
+    try {
+      await fetch(`${API_BASE}/admin/races/${raceId}/resume`, { method: 'POST' });
+    } catch {}
+
     const allRaces = await this.getRaces('all');
     const race = allRaces.find((r) => r.id === raceId);
     if (!race) return null;

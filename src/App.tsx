@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, realtimeOdds } from './services/api';
-import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User, UserNotification } from './types';
+import { Banner, Bet, BetSlipState, BetType, Horse, Race, Transaction, User, UserNotification, DepositRequest, WithdrawalRequest } from './types';
 import { Header } from './components/Header';
 import { BannerSlider } from './components/BannerSlider';
 import { RaceList } from './components/RaceList';
@@ -287,6 +287,9 @@ export default function App() {
     return () => clearInterval(oddsInterval);
   }, []);
 
+  const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+
   // Fetch user notifications
   const loadNotifications = async () => {
     if (!user?.id) return;
@@ -296,27 +299,33 @@ export default function App() {
     } catch {}
   };
 
-  // Fetch user bets and statement
+  // Fetch user bets, statement, deposits and withdrawals
   const loadUserFinancials = async () => {
     if (!user) {
       setMyBets([]);
       setTransactions([]);
       setNotifications([]);
+      setDepositRequests([]);
+      setWithdrawalRequests([]);
       return;
     }
     try {
       setIsLoadingBets(true);
       setIsLoadingTxs(true);
-      const [betsData, txsData, freshUser, notifsData] = await Promise.all([
+      const [betsData, txsData, freshUser, notifsData, depData, wthData] = await Promise.all([
         api.getMyBets(user.id),
         api.getTransactions(user.id),
         api.getMe(user.id),
         api.getNotifications(user.id),
+        api.getDepositRequests('ALL', user.id),
+        api.getWithdrawalRequests('ALL', user.id),
       ]);
       setMyBets(betsData);
       setTransactions(txsData);
       setUser(freshUser);
       setNotifications(notifsData);
+      setDepositRequests(depData);
+      setWithdrawalRequests(wthData);
     } catch (err: any) {
       console.error('Error loading financials:', err);
     } finally {
@@ -413,11 +422,31 @@ export default function App() {
     loadNotifications();
   };
 
+  const handleOpenDeposit = () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      showToast('Please sign in to deposit funds into your wallet', 'info');
+      return;
+    }
+    setIsDepositOpen(true);
+  };
+
+  const handleOpenWithdraw = () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      showToast('Please sign in to request withdrawals', 'info');
+      return;
+    }
+    setIsWithdrawOpen(true);
+  };
+
   const handleLogout = () => {
     api.logout();
     setUser(null);
     setMyBets([]);
     setTransactions([]);
+    setDepositRequests([]);
+    setWithdrawalRequests([]);
     window.location.hash = '#/rules';
     showToast('Signed out successfully', 'info');
   };
@@ -455,8 +484,8 @@ export default function App() {
       {/* ---------------- 1. HEADER (Top bar layout common on all public pages) ---------------- */}
       <Header
         user={user}
-        onOpenDeposit={() => setIsDepositOpen(true)}
-        onOpenWithdraw={() => setIsWithdrawOpen(true)}
+        onOpenDeposit={handleOpenDeposit}
+        onOpenWithdraw={handleOpenWithdraw}
         onOpenStatement={() => {
           loadUserFinancials();
           setIsStatementOpen(true);
@@ -479,6 +508,7 @@ export default function App() {
           window.location.hash = '#/rules';
         }}
         onOpenPersonalDetails={() => {
+          loadUserFinancials();
           window.location.hash = '#/personal_details';
         }}
         onOpenNotifications={() => {
@@ -490,19 +520,25 @@ export default function App() {
         unreadNotificationsCount={notifications.filter(n => !n.is_read).length}
       />
 
-      {/* Toast Notification Banner */}
+      {/* ---------------- TOAST NOTIFICATION ---------------- */}
       {toast && (
-        <div className="fixed top-20 sm:top-24 right-4 z-50 animate-in slide-in-from-top-4 duration-200">
+        <div className="fixed top-20 right-4 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
           <div
-            className={`px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs sm:text-sm font-bold backdrop-blur-xl ${
+            className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border backdrop-blur-md ${
               toast.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-300'
+                ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
                 : toast.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/40 text-rose-300'
+                ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
                 : 'bg-slate-900/90 border-slate-700 text-slate-200'
             }`}
           >
-            <Sparkles className="w-4 h-4 shrink-0 text-rose-400" />
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            ) : (
+              <Sparkles className="w-5 h-5 text-[#e5b869] shrink-0" />
+            )}
             <span>{toast.message}</span>
           </div>
         </div>
@@ -516,8 +552,10 @@ export default function App() {
             user={user}
             bets={myBets}
             transactions={transactions}
-            onOpenDeposit={() => setIsDepositOpen(true)}
-            onOpenWithdraw={() => setIsWithdrawOpen(true)}
+            depositRequests={depositRequests}
+            withdrawalRequests={withdrawalRequests}
+            onOpenDeposit={handleOpenDeposit}
+            onOpenWithdraw={handleOpenWithdraw}
             onOpenChangePassword={() => setIsChangePasswordOpen(true)}
             onOpenAuth={() => setIsAuthOpen(true)}
             onLogout={handleLogout}
@@ -566,14 +604,14 @@ export default function App() {
               onSelectRace={(raceId) => {
                 window.location.hash = `#/race/${raceId}`;
               }}
-              onOpenDeposit={() => setIsDepositOpen(true)}
+              onOpenDeposit={handleOpenDeposit}
             />
             <HowToPlayRules
               onGoToLobby={() => {
                 soundManager.playClick();
                 window.location.hash = '#/lobby';
               }}
-              onOpenDeposit={() => setIsDepositOpen(true)}
+              onOpenDeposit={handleOpenDeposit}
             />
           </div>
         ) : (
@@ -584,7 +622,7 @@ export default function App() {
             onSelectRace={(raceId) => {
               window.location.hash = `#/race/${raceId}`;
             }}
-            onOpenDeposit={() => setIsDepositOpen(true)}
+            onOpenDeposit={handleOpenDeposit}
             filterStatus={raceFilter}
             onChangeFilter={setRaceFilter}
             isLoading={isLoadingRaces}
@@ -711,6 +749,8 @@ export default function App() {
       {/* Account Statement Modal */}
       <AccountStatementModal
         transactions={transactions}
+        depositRequests={depositRequests}
+        withdrawalRequests={withdrawalRequests}
         isOpen={isStatementOpen}
         onClose={() => setIsStatementOpen(false)}
         isLoading={isLoadingTxs}

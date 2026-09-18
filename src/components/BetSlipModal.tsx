@@ -73,7 +73,13 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
 
   const quickStakes = [100, 250, 500, 1000, 2500, 5000];
 
+  const isSuspended = !!(betSlip.horse.is_suspended || betSlip.race.is_suspended || betSlip.race.status === 'SUSPENDED');
+
   const handlePlaceBet = async () => {
+    if (isSuspended) {
+      setError('Betting is temporarily suspended / Odds are currently changing for this runner.');
+      return;
+    }
     if (stake <= 0) {
       setError('Please enter a valid stake amount (min ₹10)');
       return;
@@ -418,6 +424,13 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
             </div>
           </div>
 
+          {isSuspended && (
+            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2 animate-pulse">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>🚫 Odds are currently changing. Betting is temporarily suspended for this runner.</span>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -431,10 +444,10 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
           <button
             id="confirm-place-bet-btn"
             type="button"
-            disabled={isSubmitting || isInsufficientBalance || stake <= 0}
+            disabled={isSubmitting || isInsufficientBalance || stake <= 0 || isSuspended}
             onClick={handlePlaceBet}
             className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm transition-all shadow-xl flex items-center justify-center gap-2 ${
-              isSubmitting || isInsufficientBalance || stake <= 0
+              isSubmitting || isInsufficientBalance || stake <= 0 || isSuspended
                 ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                 : 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 shadow-amber-500/25 active:scale-95 cursor-pointer'
             }`}
@@ -443,6 +456,11 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
               <>
                 <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Confirming Order...</span>
+              </>
+            ) : isSuspended ? (
+              <>
+                <AlertCircle className="w-4 h-4 text-amber-400" />
+                <span>Betting Suspended</span>
               </>
             ) : (
               <>

@@ -348,7 +348,7 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                   const isP2 = p2Horses.some((h) => h.id === horse.id);
                   const isP3 = p3Horses.some((h) => h.id === horse.id);
                   const isWinner = isP1;
-                  const isSuspended = !!(horse.is_suspended || (race.is_suspended && race.status === 'SUSPENDED'));
+                  const isSuspended = !!(horse.is_suspended || race.is_suspended || race.status === 'SUSPENDED');
 
                   return (
                     <tr
