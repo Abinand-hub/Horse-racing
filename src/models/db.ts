@@ -9,9 +9,11 @@ import {
   RaceDayModel,
   DepositRequestModel,
   WithdrawalRequestModel,
+  OtpModel,
 } from './index';
 
 let isConnected = false;
+let connectPromise: Promise<boolean> | null = null;
 
 export async function connectMongoDB(uri?: string): Promise<boolean> {
   const fallbackUri = Buffer.from('bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl', 'base64').toString('utf-8');
@@ -25,28 +27,88 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
     return false;
   }
 
-  try {
-    if (mongoose.connection.readyState === 1) {
-      isConnected = true;
-      return true;
-    }
-
-    await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 5000,
-    });
-
+  if (mongoose.connection.readyState === 1) {
     isConnected = true;
-    console.log('✅ Connected to MongoDB successfully! Collections active: users, races, horses, bets, transactions, banners');
     return true;
-  } catch (err: any) {
-    console.error('⚠️ MongoDB connection error:', err.message);
-    isConnected = false;
-    return false;
   }
+
+  if (connectPromise) {
+    return connectPromise;
+  }
+
+  connectPromise = (async () => {
+    try {
+      if (mongoose.connection.readyState === 1) {
+        isConnected = true;
+        return true;
+      }
+
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 5000,
+        bufferCommands: false,
+      });
+
+      isConnected = true;
+      console.log('✅ Connected to MongoDB Atlas successfully! Collections active: users, otps, races, bets, etc.');
+      return true;
+    } catch (err: any) {
+      console.error('⚠️ MongoDB connection error:', err.message);
+      isConnected = false;
+      return false;
+    } finally {
+      connectPromise = null;
+    }
+  })();
+
+  return connectPromise;
 }
 
 export function isMongoDBConnected(): boolean {
-  return isConnected && mongoose.connection.readyState === 1;
+  return mongoose.connection.readyState === 1;
+}
+
+export async function ensureMongoConnected(): Promise<boolean> {
+  if (mongoose.connection.readyState === 1) {
+    return true;
+  }
+  return connectMongoDB();
+}
+
+// Helpers for OTP Persistence across serverless functions
+export async function savePersistentOtp(target: string, code: string, expires_at: number) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.findOneAndUpdate(
+      { target: cleanTarget },
+      { target: cleanTarget, code: String(code).trim(), expires_at },
+      { upsert: true, new: true }
+    );
+  } catch (err: any) {
+    console.error('⚠️ Error saving OTP to MongoDB:', err.message);
+  }
+}
+
+export async function getPersistentOtp(target: string) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    const record = await OtpModel.findOne({ target: cleanTarget }).lean();
+    return record;
+  } catch (err: any) {
+    console.error('⚠️ Error getting OTP from MongoDB:', err.message);
+    return null;
+  }
+}
+
+export async function deletePersistentOtp(target: string) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.deleteOne({ target: cleanTarget });
+  } catch (err: any) {
+    console.error('⚠️ Error deleting OTP from MongoDB:', err.message);
+  }
 }
 
 // Helpers to sync memory DB to MongoDB
@@ -148,3 +210,4 @@ export async function loadDataFromMongoDB() {
     return null;
   }
 }
+

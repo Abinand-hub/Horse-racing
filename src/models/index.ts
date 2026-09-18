@@ -404,3 +404,25 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
 
 export const WithdrawalRequestModel: Model<IWithdrawalRequest> =
   mongoose.models.WithdrawalRequest || mongoose.model<IWithdrawalRequest>('WithdrawalRequest', WithdrawalRequestSchema, 'withdrawal_requests');
+
+// ==========================================
+// 12. OTP SCHEMA & MODEL
+// ==========================================
+export interface IOtp extends Document {
+  target: string;
+  code: string;
+  expires_at: number;
+}
+
+export const OtpSchema = new Schema<IOtp>(
+  {
+    target: { type: String, required: true, unique: true, index: true },
+    code: { type: String, required: true },
+    expires_at: { type: Number, required: true },
+  },
+  { timestamps: true }
+);
+
+export const OtpModel: Model<IOtp> =
+  mongoose.models.Otp || mongoose.model<IOtp>('Otp', OtpSchema, 'otps');
+

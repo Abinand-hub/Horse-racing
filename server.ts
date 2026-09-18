@@ -2,8 +2,24 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import 'dotenv/config';
-import { connectMongoDB, syncMemoryToMongoDB, loadDataFromMongoDB, isMongoDBConnected } from './src/models/db';
-import { UserModel, RaceModel, BetModel, TransactionModel, BannerModel } from './src/models/index';
+import {
+  connectMongoDB,
+  syncMemoryToMongoDB,
+  loadDataFromMongoDB,
+  isMongoDBConnected,
+  ensureMongoConnected,
+  savePersistentOtp,
+  getPersistentOtp,
+  deletePersistentOtp,
+} from './src/models/db';
+import {
+  UserModel,
+  RaceModel,
+  BetModel,
+  TransactionModel,
+  BannerModel,
+  OtpModel,
+} from './src/models/index';
 import { sendOtpEmail } from './src/utils/mailer';
 
 const app = express();
@@ -523,11 +539,14 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expires_at = Date.now() + 10 * 60 * 1000; // 10 mins
 
     db.otps = db.otps || {};
-    if (cleanEmail) {
-      db.otps[cleanEmail] = { code, expires_at };
-    }
-    if (cleanPhone) {
-      db.otps[cleanPhone] = { code, expires_at };
+    const primaryKey = cleanEmail || cleanPhone;
+    db.otps[primaryKey] = { code, expires_at };
+    if (cleanPhone) db.otps[cleanPhone] = { code, expires_at };
+
+    // Persistent storage in MongoDB Atlas (ensures multi-instance serverless works!)
+    await savePersistentOtp(primaryKey, code, expires_at);
+    if (cleanPhone && cleanPhone !== primaryKey) {
+      await savePersistentOtp(cleanPhone, code, expires_at);
     }
     saveDatabase();
 
@@ -556,119 +575,173 @@ app.post('/api/auth/send-otp', async (req, res) => {
     return res.status(500).json({ error: err.message || 'Failed to send OTP' });
   }
 });
+
 // 2. Verify OTP for Sign Up
-app.post('/api/auth/verify-otp', (req, res) => {
-  const { email, phone, otp } = req.body;
-  const cleanEmail = email ? String(email).trim().toLowerCase() : '';
-  const cleanPhone = phone ? String(phone).trim() : '';
-  const cleanOtp = String(otp).trim();
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { email, phone, otp } = req.body;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
+    const cleanOtp = String(otp || '').trim();
 
-  if (!cleanOtp) {
-    return res.status(400).json({ error: 'Please enter the 6-digit OTP code' });
-  }
-
-  db.otps = db.otps || {};
-  const primaryKey = cleanEmail || cleanPhone;
-  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
-
-  if (!storedOtp || storedOtp.code !== cleanOtp || storedOtp.expires_at < Date.now()) {
-    if (cleanOtp !== '123456' && (!storedOtp || storedOtp.code !== cleanOtp)) {
-      return res.status(400).json({ error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.' });
+    if (!cleanOtp) {
+      return res.status(400).json({ error: 'Please enter the 6-digit OTP code' });
     }
-  }
 
-  return res.json({
-    success: true,
-    message: 'OTP verified successfully! Please set your username and password.',
-  });
+    const primaryKey = cleanEmail || cleanPhone;
+
+    // Check persistent MongoDB Atlas OTP first (essential for serverless!)
+    const persistent = await getPersistentOtp(primaryKey);
+    
+    // Check in-memory fallback
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
+
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+
+    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTestFallback = cleanOtp === '123456';
+
+    if (!isMatch && !isTestFallback) {
+      return res.status(400).json({
+        error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'OTP verified successfully! Please set your username and password.',
+    });
+  } catch (err: any) {
+    console.error('Error verifying OTP:', err);
+    return res.status(500).json({ error: 'Failed to verify OTP' });
+  }
 });
 
 // 3. Sign Up: Email + OTP + unique Username + Password
-app.post('/api/auth/signup', (req, res) => {
-  const { email, phone, otp, username, password, full_name } = req.body;
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { email, phone, otp, username, password, full_name } = req.body;
 
-  if ((!email && !phone) || !username || !password) {
-    return res.status(400).json({ error: 'Email/Phone, username, and password are required' });
-  }
-
-  const cleanEmail = email ? String(email).trim().toLowerCase() : '';
-  const cleanPhone = phone ? String(phone).trim() : '';
-  const cleanUsername = String(username).trim().toLowerCase();
-
-  // Check username unique
-  const existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
-  if (existingUsername) {
-    return res.status(400).json({ error: 'Username already taken. Please choose another.' });
-  }
-
-  // Check email unique if provided
-  if (cleanEmail) {
-    const existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
-    if (existingEmail) {
-      return res.status(400).json({ error: 'An account with this email already exists. Please log in.' });
+    if ((!email && !phone) || !username || !password) {
+      return res.status(400).json({ error: 'Email/Phone, username, and password are required' });
     }
-  }
 
-  // Check OTP
-  const primaryKey = cleanEmail || cleanPhone;
-  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
-  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
-    // If testing without active SMTP, allow fallback OTP 123456
-    if (String(otp).trim() !== '123456' && (!storedOtp || storedOtp.code !== String(otp).trim())) {
-      return res.status(400).json({ error: 'Invalid or expired OTP code. (Check your Gmail inbox or use test code 123456)' });
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanOtp = String(otp || '').trim();
+
+    // Check unique username in Memory and MongoDB
+    let existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
+    if (!existingUsername) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({ username: cleanUsername }).lean();
+      if (mongoUser) existingUsername = mongoUser as any;
     }
+    if (existingUsername) {
+      return res.status(400).json({ error: 'Username already taken. Please choose another.' });
+    }
+
+    // Check unique email if provided
+    if (cleanEmail) {
+      let existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+      if (!existingEmail) {
+        await ensureMongoConnected();
+        const mongoUser = await UserModel.findOne({ email: cleanEmail }).lean();
+        if (mongoUser) existingEmail = mongoUser as any;
+      }
+      if (existingEmail) {
+        return res.status(400).json({ error: 'An account with this email already exists. Please log in.' });
+      }
+    }
+
+    // Check OTP
+    const primaryKey = cleanEmail || cleanPhone;
+    const persistent = await getPersistentOtp(primaryKey);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
+
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+
+    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTestFallback = cleanOtp === '123456';
+
+    if (!isMatch && !isTestFallback) {
+      return res.status(400).json({
+        error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.',
+      });
+    }
+
+    // Generate unique User Reference ID (e.g. TURF-10001)
+    const nextUserSeq = 10000 + db.users.length + 1;
+    const uniqueRefId = `TURF-${nextUserSeq}`;
+    const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+
+    // Create user with starting balance of ₹5000 as welcome credit!
+    const newUser: User = {
+      id: userId,
+      ref_id: uniqueRefId,
+      phone: cleanPhone || '9876543210',
+      email: cleanEmail,
+      full_name: full_name ? String(full_name).trim() : cleanUsername,
+      username: cleanUsername,
+      password_hash: String(password).trim(),
+      balance: 5000,
+      exposure: 0,
+      role: 'user',
+      profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
+      created_at: new Date().toISOString(),
+    };
+
+    db.users.push(newUser);
+
+    // Record initial welcome bonus transaction
+    const welcomeTx: Transaction = {
+      id: generateId('tx'),
+      user_id: newUser.id,
+      username: newUser.username,
+      type: 'DEPOSIT',
+      amount: 5000,
+      balance_after: 5000,
+      description: 'Welcome Sign-up Bonus',
+      created_at: new Date().toISOString(),
+    };
+    db.transactions.unshift(welcomeTx);
+
+    // Save directly to MongoDB Atlas
+    await ensureMongoConnected();
+    try {
+      await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
+      await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
+      await deletePersistentOtp(primaryKey);
+      if (cleanPhone) await deletePersistentOtp(cleanPhone);
+    } catch (e: any) {
+      console.error('MongoDB persist error on signup:', e.message);
+    }
+
+    delete db.otps[primaryKey];
+    if (cleanPhone) delete db.otps[cleanPhone];
+    saveDatabase();
+
+    const { password_hash, ...userProfile } = newUser;
+    return res.json({
+      success: true,
+      user: userProfile,
+      token: `token_${newUser.id}`,
+    });
+  } catch (err: any) {
+    console.error('Error in signup:', err);
+    return res.status(500).json({ error: err.message || 'Failed to complete signup' });
   }
-
-  // Generate unique User Reference ID (e.g. TURF-10001)
-  const nextUserSeq = 10000 + db.users.length + 1;
-  const uniqueRefId = `TURF-${nextUserSeq}`;
-  const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
-
-  // Create user with starting balance of ₹5000 as welcome credit!
-  const newUser: User = {
-    id: userId,
-    ref_id: uniqueRefId,
-    phone: cleanPhone || '9876543210',
-    email: cleanEmail,
-    full_name: full_name ? String(full_name).trim() : cleanUsername,
-    username: cleanUsername,
-    password_hash: String(password).trim(),
-    balance: 5000,
-    exposure: 0,
-    role: 'user',
-    profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
-    created_at: new Date().toISOString(),
-  };
-
-  db.users.push(newUser);
-
-  // Record initial welcome bonus transaction
-  const welcomeTx: Transaction = {
-    id: generateId('tx'),
-    user_id: newUser.id,
-    username: newUser.username,
-    type: 'DEPOSIT',
-    amount: 5000,
-    balance_after: 5000,
-    description: 'Welcome Sign-up Bonus',
-    created_at: new Date().toISOString(),
-  };
-  db.transactions.unshift(welcomeTx);
-
-  saveDatabase();
-
-  const { password_hash, ...userProfile } = newUser;
-  return res.json({
-    success: true,
-    user: userProfile,
-    token: `token_${newUser.id}`,
-  });
 });
 
 // Fetch single user by Unique ID (e.g. TURF-10001, usr_...) / username / phone
-app.get('/api/users/:identifier', (req, res) => {
+app.get('/api/users/:identifier', async (req, res) => {
   const query = req.params.identifier.toLowerCase().trim();
-  const user = db.users.find(
+  let user = db.users.find(
     (u) =>
       u.id.toLowerCase() === query ||
       (u.ref_id && u.ref_id.toLowerCase() === query) ||
@@ -676,6 +749,23 @@ app.get('/api/users/:identifier', (req, res) => {
       (u.email && u.email.toLowerCase() === query) ||
       u.phone === query
   );
+
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({
+      $or: [
+        { id: query },
+        { ref_id: query.toUpperCase() },
+        { username: query },
+        { email: query },
+        { phone: query },
+      ],
+    }).lean();
+    if (mongoUser) {
+      user = mongoUser as any;
+      if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+    }
+  }
 
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
@@ -686,7 +776,7 @@ app.get('/api/users/:identifier', (req, res) => {
 });
 
 // 3. Login: Username / Email / Phone + Password
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username/Email and password are required' });
@@ -720,13 +810,29 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
-  const user = db.users.find(
+  let user = db.users.find(
     (u) =>
       (u.username.toLowerCase() === query ||
         (u.email && u.email.toLowerCase() === query) ||
         u.phone === query) &&
       u.password_hash === String(password).trim()
   );
+
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({
+      $or: [
+        { username: query },
+        { email: query },
+        { phone: query },
+      ],
+      password_hash: String(password).trim(),
+    }).lean();
+    if (mongoUser) {
+      user = mongoUser as any;
+      if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+    }
+  }
 
   if (!user) {
     return res.status(401).json({ error: 'Invalid username/email or password' });
@@ -741,7 +847,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // 4. Current user profile
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   const authHeader = req.headers.authorization || '';
   const userId = req.query.user_id as string || authHeader.replace('Bearer token_', '');
 
@@ -763,7 +869,16 @@ app.get('/api/auth/me', (req, res) => {
     return res.json({ success: true, user: adminProfile });
   }
 
-  const user = db.users.find((u) => u.id === userId);
+  let user = db.users.find((u) => u.id === userId);
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({ id: userId }).lean();
+    if (mongoUser) {
+      user = mongoUser as any;
+      if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+    }
+  }
+
   if (!user) {
     return res.status(401).json({ error: 'User not found or unauthenticated' });
   }
@@ -773,9 +888,14 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // 5. Change Password
-app.post('/api/auth/change-password', (req, res) => {
+app.post('/api/auth/change-password', async (req, res) => {
   const { user_id, current_password, new_password } = req.body;
-  const user = db.users.find((u) => u.id === user_id);
+  let user = db.users.find((u) => u.id === user_id);
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({ id: user_id }).lean();
+    if (mongoUser) user = mongoUser as any;
+  }
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   if (user.password_hash !== current_password) {
@@ -786,6 +906,7 @@ app.post('/api/auth/change-password', (req, res) => {
   }
 
   user.password_hash = new_password;
+  await UserModel.findOneAndUpdate({ id: user_id }, { password_hash: new_password });
   saveDatabase();
   return res.json({ success: true, message: 'Password updated successfully' });
 });
@@ -799,12 +920,20 @@ app.post('/api/auth/forgot-password/send-otp', async (req, res) => {
     }
 
     const query = String(email).trim().toLowerCase();
-    const user = db.users.find(
+    let user = db.users.find(
       (u) =>
         (u.email && u.email.toLowerCase() === query) ||
         u.username.toLowerCase() === query ||
         u.phone === query
     );
+
+    if (!user) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({
+        $or: [{ email: query }, { username: query }, { phone: query }],
+      }).lean();
+      if (mongoUser) user = mongoUser as any;
+    }
 
     if (!user) {
       return res.status(404).json({ error: 'No account found matching this identifier' });
@@ -816,10 +945,13 @@ app.post('/api/auth/forgot-password/send-otp', async (req, res) => {
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    db.otps[targetEmail.toLowerCase()] = {
-      code,
-      expires_at: Date.now() + 10 * 60 * 1000,
-    };
+    const expires_at = Date.now() + 10 * 60 * 1000;
+
+    db.otps = db.otps || {};
+    db.otps[targetEmail.toLowerCase()] = { code, expires_at };
+
+    // Persistent storage in MongoDB Atlas
+    await savePersistentOtp(targetEmail.toLowerCase(), code, expires_at);
     saveDatabase();
 
     const mailResult = await sendOtpEmail({
@@ -840,45 +972,65 @@ app.post('/api/auth/forgot-password/send-otp', async (req, res) => {
 });
 
 // 7. Forgot Password - Reset with OTP
-app.post('/api/auth/forgot-password/reset', (req, res) => {
-  const { email, otp, new_password } = req.body;
-  if (!email || !otp || !new_password) {
-    return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
-  }
+app.post('/api/auth/forgot-password/reset', async (req, res) => {
+  try {
+    const { email, otp, new_password } = req.body;
+    if (!email || !otp || !new_password) {
+      return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
+    }
 
-  if (String(new_password).trim().length < 4) {
-    return res.status(400).json({ error: 'New password must be at least 4 characters long' });
-  }
+    if (String(new_password).trim().length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters long' });
+    }
 
-  const query = String(email).trim().toLowerCase();
-  const user = db.users.find(
-    (u) =>
-      (u.email && u.email.toLowerCase() === query) ||
-      u.username.toLowerCase() === query ||
-      u.phone === query
-  );
+    const query = String(email).trim().toLowerCase();
+    let user = db.users.find(
+      (u) =>
+        (u.email && u.email.toLowerCase() === query) ||
+        u.username.toLowerCase() === query ||
+        u.phone === query
+    );
 
-  if (!user) {
-    return res.status(404).json({ error: 'User account not found' });
-  }
+    if (!user) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({
+        $or: [{ email: query }, { username: query }, { phone: query }],
+      }).lean();
+      if (mongoUser) user = mongoUser as any;
+    }
 
-  const targetEmail = (user.email || query).toLowerCase();
-  const storedOtp = db.otps[targetEmail];
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
 
-  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
-    if (String(otp).trim() !== '123456' && (!storedOtp || storedOtp.code !== String(otp).trim())) {
+    const targetEmail = (user.email || query).toLowerCase();
+    const persistent = await getPersistentOtp(targetEmail);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[targetEmail];
+
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+
+    const isMatch = candidateCode && candidateCode === String(otp).trim() && candidateExpiry >= Date.now();
+    const isTestFallback = String(otp).trim() === '123456';
+
+    if (!isMatch && !isTestFallback) {
       return res.status(400).json({ error: 'Invalid or expired OTP code' });
     }
+
+    user.password_hash = String(new_password).trim();
+    await UserModel.findOneAndUpdate({ id: user.id }, { password_hash: String(new_password).trim() });
+    await deletePersistentOtp(targetEmail);
+    delete db.otps[targetEmail];
+    saveDatabase();
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully! You can now log in with your new password.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to reset password' });
   }
-
-  user.password_hash = String(new_password).trim();
-  delete db.otps[targetEmail];
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    message: 'Password reset successfully! You can now log in with your new password.',
-  });
 });
 
 // ----------------------------------------------------

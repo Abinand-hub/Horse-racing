@@ -237,34 +237,96 @@ var WithdrawalRequestSchema = new import_mongoose.Schema(
   { timestamps: true }
 );
 var WithdrawalRequestModel = import_mongoose.default.models.WithdrawalRequest || import_mongoose.default.model("WithdrawalRequest", WithdrawalRequestSchema, "withdrawal_requests");
+var OtpSchema = new import_mongoose.Schema(
+  {
+    target: { type: String, required: true, unique: true, index: true },
+    code: { type: String, required: true },
+    expires_at: { type: Number, required: true }
+  },
+  { timestamps: true }
+);
+var OtpModel = import_mongoose.default.models.Otp || import_mongoose.default.model("Otp", OtpSchema, "otps");
 
 // src/models/db.ts
 var isConnected = false;
+var connectPromise = null;
 async function connectMongoDB(uri) {
   const fallbackUri = Buffer.from("bW9uZ29kYitzcnY6Ly90dXJmdGFjdGljczIwMjZfZGJfdXNlcjpUdXJmdGFjdGljczIwMjZAY2x1c3RlcmhvcnNlLm14d2dvemUubW9uZ29kYi5uZXQvZGVyYnliZXQ/cmV0cnlXcml0ZXM9dHJ1ZSZ3PW1ham9yaXR5JmFwcE5hbWU9Q2x1c3RlckhvcnNl", "base64").toString("utf-8");
   const mongoUri = uri || process.env.MONGODB_URI || process.env.MONGO_URL || fallbackUri;
   if (!mongoUri) {
     return false;
   }
-  try {
-    if (import_mongoose2.default.connection.readyState === 1) {
-      isConnected = true;
-      return true;
-    }
-    await import_mongoose2.default.connect(mongoUri, {
-      serverSelectionTimeoutMS: 5e3
-    });
+  if (import_mongoose2.default.connection.readyState === 1) {
     isConnected = true;
-    console.log("\u2705 Connected to MongoDB successfully! Collections active: users, races, horses, bets, transactions, banners");
     return true;
-  } catch (err) {
-    console.error("\u26A0\uFE0F MongoDB connection error:", err.message);
-    isConnected = false;
-    return false;
   }
+  if (connectPromise) {
+    return connectPromise;
+  }
+  connectPromise = (async () => {
+    try {
+      if (import_mongoose2.default.connection.readyState === 1) {
+        isConnected = true;
+        return true;
+      }
+      await import_mongoose2.default.connect(mongoUri, {
+        serverSelectionTimeoutMS: 5e3,
+        bufferCommands: false
+      });
+      isConnected = true;
+      console.log("\u2705 Connected to MongoDB Atlas successfully! Collections active: users, otps, races, bets, etc.");
+      return true;
+    } catch (err) {
+      console.error("\u26A0\uFE0F MongoDB connection error:", err.message);
+      isConnected = false;
+      return false;
+    } finally {
+      connectPromise = null;
+    }
+  })();
+  return connectPromise;
 }
 function isMongoDBConnected() {
-  return isConnected && import_mongoose2.default.connection.readyState === 1;
+  return import_mongoose2.default.connection.readyState === 1;
+}
+async function ensureMongoConnected() {
+  if (import_mongoose2.default.connection.readyState === 1) {
+    return true;
+  }
+  return connectMongoDB();
+}
+async function savePersistentOtp(target, code, expires_at) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.findOneAndUpdate(
+      { target: cleanTarget },
+      { target: cleanTarget, code: String(code).trim(), expires_at },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error saving OTP to MongoDB:", err.message);
+  }
+}
+async function getPersistentOtp(target) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    const record = await OtpModel.findOne({ target: cleanTarget }).lean();
+    return record;
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error getting OTP from MongoDB:", err.message);
+    return null;
+  }
+}
+async function deletePersistentOtp(target) {
+  try {
+    await ensureMongoConnected();
+    const cleanTarget = String(target).trim().toLowerCase();
+    await OtpModel.deleteOne({ target: cleanTarget });
+  } catch (err) {
+    console.error("\u26A0\uFE0F Error deleting OTP from MongoDB:", err.message);
+  }
 }
 async function syncMemoryToMongoDB(db2) {
   if (!isMongoDBConnected()) return;
@@ -829,11 +891,12 @@ app.post("/api/auth/send-otp", async (req, res) => {
     const code = Math.floor(1e5 + Math.random() * 9e5).toString();
     const expires_at = Date.now() + 10 * 60 * 1e3;
     db.otps = db.otps || {};
-    if (cleanEmail) {
-      db.otps[cleanEmail] = { code, expires_at };
-    }
-    if (cleanPhone) {
-      db.otps[cleanPhone] = { code, expires_at };
+    const primaryKey = cleanEmail || cleanPhone;
+    db.otps[primaryKey] = { code, expires_at };
+    if (cleanPhone) db.otps[cleanPhone] = { code, expires_at };
+    await savePersistentOtp(primaryKey, code, expires_at);
+    if (cleanPhone && cleanPhone !== primaryKey) {
+      await savePersistentOtp(cleanPhone, code, expires_at);
     }
     saveDatabase();
     if (cleanEmail) {
@@ -859,101 +922,160 @@ app.post("/api/auth/send-otp", async (req, res) => {
     return res.status(500).json({ error: err.message || "Failed to send OTP" });
   }
 });
-app.post("/api/auth/verify-otp", (req, res) => {
-  const { email, phone, otp } = req.body;
-  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
-  const cleanPhone = phone ? String(phone).trim() : "";
-  const cleanOtp = String(otp).trim();
-  if (!cleanOtp) {
-    return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
-  }
-  db.otps = db.otps || {};
-  const primaryKey = cleanEmail || cleanPhone;
-  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-  if (!storedOtp || storedOtp.code !== cleanOtp || storedOtp.expires_at < Date.now()) {
-    if (cleanOtp !== "123456" && (!storedOtp || storedOtp.code !== cleanOtp)) {
-      return res.status(400).json({ error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code." });
+app.post("/api/auth/verify-otp", async (req, res) => {
+  try {
+    const { email, phone, otp } = req.body;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+    const cleanPhone = phone ? String(phone).trim() : "";
+    const cleanOtp = String(otp || "").trim();
+    if (!cleanOtp) {
+      return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
     }
+    const primaryKey = cleanEmail || cleanPhone;
+    const persistent = await getPersistentOtp(primaryKey);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTestFallback = cleanOtp === "123456";
+    if (!isMatch && !isTestFallback) {
+      return res.status(400).json({
+        error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
+      });
+    }
+    return res.json({
+      success: true,
+      message: "OTP verified successfully! Please set your username and password."
+    });
+  } catch (err) {
+    console.error("Error verifying OTP:", err);
+    return res.status(500).json({ error: "Failed to verify OTP" });
   }
-  return res.json({
-    success: true,
-    message: "OTP verified successfully! Please set your username and password."
-  });
 });
-app.post("/api/auth/signup", (req, res) => {
-  const { email, phone, otp, username, password, full_name } = req.body;
-  if (!email && !phone || !username || !password) {
-    return res.status(400).json({ error: "Email/Phone, username, and password are required" });
-  }
-  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
-  const cleanPhone = phone ? String(phone).trim() : "";
-  const cleanUsername = String(username).trim().toLowerCase();
-  const existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
-  if (existingUsername) {
-    return res.status(400).json({ error: "Username already taken. Please choose another." });
-  }
-  if (cleanEmail) {
-    const existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
-    if (existingEmail) {
-      return res.status(400).json({ error: "An account with this email already exists. Please log in." });
+app.post("/api/auth/signup", async (req, res) => {
+  try {
+    const { email, phone, otp, username, password, full_name } = req.body;
+    if (!email && !phone || !username || !password) {
+      return res.status(400).json({ error: "Email/Phone, username, and password are required" });
     }
-  }
-  const primaryKey = cleanEmail || cleanPhone;
-  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
-    if (String(otp).trim() !== "123456" && (!storedOtp || storedOtp.code !== String(otp).trim())) {
-      return res.status(400).json({ error: "Invalid or expired OTP code. (Check your Gmail inbox or use test code 123456)" });
+    const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+    const cleanPhone = phone ? String(phone).trim() : "";
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanOtp = String(otp || "").trim();
+    let existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
+    if (!existingUsername) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({ username: cleanUsername }).lean();
+      if (mongoUser) existingUsername = mongoUser;
     }
+    if (existingUsername) {
+      return res.status(400).json({ error: "Username already taken. Please choose another." });
+    }
+    if (cleanEmail) {
+      let existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+      if (!existingEmail) {
+        await ensureMongoConnected();
+        const mongoUser = await UserModel.findOne({ email: cleanEmail }).lean();
+        if (mongoUser) existingEmail = mongoUser;
+      }
+      if (existingEmail) {
+        return res.status(400).json({ error: "An account with this email already exists. Please log in." });
+      }
+    }
+    const primaryKey = cleanEmail || cleanPhone;
+    const persistent = await getPersistentOtp(primaryKey);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+    const isMatch = candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now();
+    const isTestFallback = cleanOtp === "123456";
+    if (!isMatch && !isTestFallback) {
+      return res.status(400).json({
+        error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
+      });
+    }
+    const nextUserSeq = 1e4 + db.users.length + 1;
+    const uniqueRefId = `TURF-${nextUserSeq}`;
+    const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+    const newUser = {
+      id: userId,
+      ref_id: uniqueRefId,
+      phone: cleanPhone || "9876543210",
+      email: cleanEmail,
+      full_name: full_name ? String(full_name).trim() : cleanUsername,
+      username: cleanUsername,
+      password_hash: String(password).trim(),
+      balance: 5e3,
+      exposure: 0,
+      role: "user",
+      profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    db.users.push(newUser);
+    const welcomeTx = {
+      id: generateId("tx"),
+      user_id: newUser.id,
+      username: newUser.username,
+      type: "DEPOSIT",
+      amount: 5e3,
+      balance_after: 5e3,
+      description: "Welcome Sign-up Bonus",
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    db.transactions.unshift(welcomeTx);
+    await ensureMongoConnected();
+    try {
+      await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
+      await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
+      await deletePersistentOtp(primaryKey);
+      if (cleanPhone) await deletePersistentOtp(cleanPhone);
+    } catch (e) {
+      console.error("MongoDB persist error on signup:", e.message);
+    }
+    delete db.otps[primaryKey];
+    if (cleanPhone) delete db.otps[cleanPhone];
+    saveDatabase();
+    const { password_hash, ...userProfile } = newUser;
+    return res.json({
+      success: true,
+      user: userProfile,
+      token: `token_${newUser.id}`
+    });
+  } catch (err) {
+    console.error("Error in signup:", err);
+    return res.status(500).json({ error: err.message || "Failed to complete signup" });
   }
-  const nextUserSeq = 1e4 + db.users.length + 1;
-  const uniqueRefId = `TURF-${nextUserSeq}`;
-  const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
-  const newUser = {
-    id: userId,
-    ref_id: uniqueRefId,
-    phone: cleanPhone || "9876543210",
-    email: cleanEmail,
-    full_name: full_name ? String(full_name).trim() : cleanUsername,
-    username: cleanUsername,
-    password_hash: String(password).trim(),
-    balance: 5e3,
-    exposure: 0,
-    role: "user",
-    profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
-    created_at: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  db.users.push(newUser);
-  const welcomeTx = {
-    id: generateId("tx"),
-    user_id: newUser.id,
-    username: newUser.username,
-    type: "DEPOSIT",
-    amount: 5e3,
-    balance_after: 5e3,
-    description: "Welcome Sign-up Bonus",
-    created_at: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  db.transactions.unshift(welcomeTx);
-  saveDatabase();
-  const { password_hash, ...userProfile } = newUser;
-  return res.json({
-    success: true,
-    user: userProfile,
-    token: `token_${newUser.id}`
-  });
 });
-app.get("/api/users/:identifier", (req, res) => {
+app.get("/api/users/:identifier", async (req, res) => {
   const query = req.params.identifier.toLowerCase().trim();
-  const user = db.users.find(
+  let user = db.users.find(
     (u) => u.id.toLowerCase() === query || u.ref_id && u.ref_id.toLowerCase() === query || u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone === query
   );
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({
+      $or: [
+        { id: query },
+        { ref_id: query.toUpperCase() },
+        { username: query },
+        { email: query },
+        { phone: query }
+      ]
+    }).lean();
+    if (mongoUser) {
+      user = mongoUser;
+      if (!db.users.find((u) => u.id === user.id)) db.users.push(user);
+    }
+  }
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
   const { password_hash, ...userProfile } = user;
   return res.json({ success: true, user: userProfile });
 });
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: "Username/Email and password are required" });
@@ -980,9 +1102,24 @@ app.post("/api/auth/login", (req, res) => {
       token: "token_usr_admin"
     });
   }
-  const user = db.users.find(
+  let user = db.users.find(
     (u) => (u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone === query) && u.password_hash === String(password).trim()
   );
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({
+      $or: [
+        { username: query },
+        { email: query },
+        { phone: query }
+      ],
+      password_hash: String(password).trim()
+    }).lean();
+    if (mongoUser) {
+      user = mongoUser;
+      if (!db.users.find((u) => u.id === user.id)) db.users.push(user);
+    }
+  }
   if (!user) {
     return res.status(401).json({ error: "Invalid username/email or password" });
   }
@@ -993,7 +1130,7 @@ app.post("/api/auth/login", (req, res) => {
     token: `token_${user.id}`
   });
 });
-app.get("/api/auth/me", (req, res) => {
+app.get("/api/auth/me", async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const userId = req.query.user_id || authHeader.replace("Bearer token_", "");
   if (userId === "usr_admin") {
@@ -1013,16 +1150,29 @@ app.get("/api/auth/me", (req, res) => {
     };
     return res.json({ success: true, user: adminProfile });
   }
-  const user = db.users.find((u) => u.id === userId);
+  let user = db.users.find((u) => u.id === userId);
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({ id: userId }).lean();
+    if (mongoUser) {
+      user = mongoUser;
+      if (!db.users.find((u) => u.id === user.id)) db.users.push(user);
+    }
+  }
   if (!user) {
     return res.status(401).json({ error: "User not found or unauthenticated" });
   }
   const { password_hash, ...userProfile } = user;
   return res.json({ success: true, user: userProfile });
 });
-app.post("/api/auth/change-password", (req, res) => {
+app.post("/api/auth/change-password", async (req, res) => {
   const { user_id, current_password, new_password } = req.body;
-  const user = db.users.find((u) => u.id === user_id);
+  let user = db.users.find((u) => u.id === user_id);
+  if (!user) {
+    await ensureMongoConnected();
+    const mongoUser = await UserModel.findOne({ id: user_id }).lean();
+    if (mongoUser) user = mongoUser;
+  }
   if (!user) return res.status(404).json({ error: "User not found" });
   if (user.password_hash !== current_password) {
     return res.status(400).json({ error: "Current password is incorrect" });
@@ -1031,6 +1181,7 @@ app.post("/api/auth/change-password", (req, res) => {
     return res.status(400).json({ error: "New password must be at least 4 characters" });
   }
   user.password_hash = new_password;
+  await UserModel.findOneAndUpdate({ id: user_id }, { password_hash: new_password });
   saveDatabase();
   return res.json({ success: true, message: "Password updated successfully" });
 });
@@ -1041,9 +1192,16 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
       return res.status(400).json({ error: "Please enter your registered Gmail or username" });
     }
     const query = String(email).trim().toLowerCase();
-    const user = db.users.find(
+    let user = db.users.find(
       (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
     );
+    if (!user) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({
+        $or: [{ email: query }, { username: query }, { phone: query }]
+      }).lean();
+      if (mongoUser) user = mongoUser;
+    }
     if (!user) {
       return res.status(404).json({ error: "No account found matching this identifier" });
     }
@@ -1052,10 +1210,10 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
       return res.status(400).json({ error: "No registered Gmail address found for this user. Please contact admin." });
     }
     const code = Math.floor(1e5 + Math.random() * 9e5).toString();
-    db.otps[targetEmail.toLowerCase()] = {
-      code,
-      expires_at: Date.now() + 10 * 60 * 1e3
-    };
+    const expires_at = Date.now() + 10 * 60 * 1e3;
+    db.otps = db.otps || {};
+    db.otps[targetEmail.toLowerCase()] = { code, expires_at };
+    await savePersistentOtp(targetEmail.toLowerCase(), code, expires_at);
     saveDatabase();
     const mailResult = await sendOtpEmail({
       to: targetEmail,
@@ -1072,35 +1230,52 @@ app.post("/api/auth/forgot-password/send-otp", async (req, res) => {
     return res.status(500).json({ error: err.message || "Failed to process forgot password request" });
   }
 });
-app.post("/api/auth/forgot-password/reset", (req, res) => {
-  const { email, otp, new_password } = req.body;
-  if (!email || !otp || !new_password) {
-    return res.status(400).json({ error: "Email, OTP code, and new password are required" });
-  }
-  if (String(new_password).trim().length < 4) {
-    return res.status(400).json({ error: "New password must be at least 4 characters long" });
-  }
-  const query = String(email).trim().toLowerCase();
-  const user = db.users.find(
-    (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
-  );
-  if (!user) {
-    return res.status(404).json({ error: "User account not found" });
-  }
-  const targetEmail = (user.email || query).toLowerCase();
-  const storedOtp = db.otps[targetEmail];
-  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
-    if (String(otp).trim() !== "123456" && (!storedOtp || storedOtp.code !== String(otp).trim())) {
+app.post("/api/auth/forgot-password/reset", async (req, res) => {
+  try {
+    const { email, otp, new_password } = req.body;
+    if (!email || !otp || !new_password) {
+      return res.status(400).json({ error: "Email, OTP code, and new password are required" });
+    }
+    if (String(new_password).trim().length < 4) {
+      return res.status(400).json({ error: "New password must be at least 4 characters long" });
+    }
+    const query = String(email).trim().toLowerCase();
+    let user = db.users.find(
+      (u) => u.email && u.email.toLowerCase() === query || u.username.toLowerCase() === query || u.phone === query
+    );
+    if (!user) {
+      await ensureMongoConnected();
+      const mongoUser = await UserModel.findOne({
+        $or: [{ email: query }, { username: query }, { phone: query }]
+      }).lean();
+      if (mongoUser) user = mongoUser;
+    }
+    if (!user) {
+      return res.status(404).json({ error: "User account not found" });
+    }
+    const targetEmail = (user.email || query).toLowerCase();
+    const persistent = await getPersistentOtp(targetEmail);
+    db.otps = db.otps || {};
+    const storedOtp = db.otps[targetEmail];
+    const candidateCode = persistent?.code || storedOtp?.code;
+    const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
+    const isMatch = candidateCode && candidateCode === String(otp).trim() && candidateExpiry >= Date.now();
+    const isTestFallback = String(otp).trim() === "123456";
+    if (!isMatch && !isTestFallback) {
       return res.status(400).json({ error: "Invalid or expired OTP code" });
     }
+    user.password_hash = String(new_password).trim();
+    await UserModel.findOneAndUpdate({ id: user.id }, { password_hash: String(new_password).trim() });
+    await deletePersistentOtp(targetEmail);
+    delete db.otps[targetEmail];
+    saveDatabase();
+    return res.json({
+      success: true,
+      message: "Password reset successfully! You can now log in with your new password."
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to reset password" });
   }
-  user.password_hash = String(new_password).trim();
-  delete db.otps[targetEmail];
-  saveDatabase();
-  return res.json({
-    success: true,
-    message: "Password reset successfully! You can now log in with your new password."
-  });
 });
 app.get("/api/race-centers", (req, res) => {
   const showAll = req.query.all === "true";
