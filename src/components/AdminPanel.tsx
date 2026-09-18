@@ -194,6 +194,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; message: string; type: 'success' | 'warning' | 'error' | 'info' } | null>(null);
+
+  const notify = (message: string, type: 'success' | 'warning' | 'error' | 'info' = 'success') => {
+    const id = Date.now();
+    setToast({ id, message, type });
+    if (type === 'error' || type === 'warning') {
+      soundManager.playClick();
+    }
+    setTimeout(() => {
+      setToast((curr) => (curr?.id === id ? null : curr));
+    }, 4500);
+  };
 
   // Financial requests state
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
@@ -325,7 +337,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleApplyBulkRunners = () => {
     const parsed = parseBulkRunnersText(bulkPasteText);
     if (parsed.length === 0) {
-      alert('Please paste valid runner lines in format: Horse number-Gate number-Horse name-Jockey-Trainer');
+      notify('Please paste valid runner lines in format: Horse number-Gate number-Horse name-Jockey-Trainer', 'warning');
       return;
     }
 
@@ -646,7 +658,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const targetCenterId = newDayCenterId || (raceCenters && raceCenters.length > 0 ? raceCenters[0].id : 'cntr_mysore');
     const center = (raceCenters || []).find((c) => c.id === targetCenterId) || raceCenters[0];
     if (!center) {
-      alert('Please create a Race Center first before creating a Race Day card.');
+      notify('Please create a Race Center first before creating a Race Day card.', 'warning');
       return;
     }
     try {
@@ -673,10 +685,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setNewVenue(`${center.name} Turf Club`);
       }
       setActiveTab('add_race');
+      notify(`✅ Race Day "${title}" Created & Published! You can now add races below.`, 'success');
       setActionMessage(`✅ Race Day "${title}" Created & Published! Add races below.`);
       setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to create race day');
+      notify(err.message || 'Failed to create race day', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -907,7 +920,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateRace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRaceName.trim()) {
-      alert('⚠️ Please provide a Name of the Race (e.g. The Rock of Gibraltar Plate)');
+      notify('⚠️ Please provide a Name of the Race (e.g. The Rock of Gibraltar Plate)', 'warning');
       return;
     }
     const finalStatus = newRaceStatus || 'UPCOMING';
@@ -930,7 +943,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }));
 
     if (validRunners.length === 0) {
-      alert('⚠️ Please enter at least 1 runner in the table below (or click "Bulk Paste Horses" or "Fill Demo (7 Horses)")');
+      notify('⚠️ Please enter at least 1 runner in the table below (or click "Bulk Paste Horses")', 'warning');
       return;
     }
 
@@ -954,12 +967,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       if (finalStatus === 'LIVE') {
         soundManager.playRaceBugle();
-        alert(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`);
+        notify(`⚡ Race "${newRaceName}" published directly to LIVE RACES with ${validRunners.length} runners!`, 'success');
         setAdminRaceFilter('live');
         setActiveTab('live');
       } else {
         soundManager.playBetPlaced();
-        alert(`🚀 Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`);
+        notify(`🚀 Race "${newRaceName}" published to UPCOMING RACES with ${validRunners.length} runners!`, 'success');
         setAdminRaceFilter('upcoming');
         setActiveTab('upcoming');
       }
@@ -967,7 +980,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await loadAdminData();
       handleClearForm();
     } catch (err: any) {
-      alert(err.message || 'Failed to publish race');
+      notify(err.message || 'Failed to publish race', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -1182,7 +1195,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      {actionMessage && (
+      {/* Floating Action Done / Notification Toast - Replaces annoying browser popups */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-[9999] max-w-md w-[calc(100%-2.5rem)] sm:w-auto animate-in slide-in-from-top-3 fade-in duration-300">
+          <div
+            className={`flex items-start gap-3 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-300 ${
+              toast.type === 'error'
+                ? 'bg-red-950/95 border-red-500/50 text-red-100 shadow-red-950/50'
+                : toast.type === 'warning'
+                ? 'bg-amber-950/95 border-amber-500/50 text-amber-100 shadow-amber-950/50'
+                : toast.type === 'info'
+                ? 'bg-sky-950/95 border-sky-500/50 text-sky-100 shadow-sky-950/50'
+                : 'bg-slate-900/95 border-emerald-500/50 text-emerald-100 shadow-emerald-950/50'
+            }`}
+          >
+            <div className="mt-0.5 shrink-0">
+              {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400" />}
+              {toast.type === 'warning' && <AlertCircle className="w-5 h-5 text-amber-400" />}
+              {toast.type === 'info' && <Shield className="w-5 h-5 text-sky-400" />}
+              {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+            </div>
+            <div className="flex-1 pr-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider opacity-75">
+                {toast.type === 'error' ? 'Action Failed' : toast.type === 'warning' ? 'Notice' : 'Action Done'}
+              </p>
+              <p className="text-sm font-semibold mt-0.5 leading-snug">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer shrink-0"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {actionMessage && !toast && (
         <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{actionMessage}</span>
