@@ -138,8 +138,8 @@ export const RaceList: React.FC<RaceListProps> = ({
       case 'LIVE':
       case 'OPEN_FOR_BETTING':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             🟢 LIVE / OPEN FOR BETTING
           </span>
         );
@@ -241,7 +241,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                         : 'bg-[#091510] text-slate-300 border-emerald-950 hover:text-white'
                     }`}
                   >
-                    {cntr.hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+                    {cntr.hasLive && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
                     <span>{cntr.name}</span>
                     <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                       isSelected ? 'bg-slate-950/40 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'
@@ -268,8 +268,8 @@ export const RaceList: React.FC<RaceListProps> = ({
                     <span className="text-[#e5b869]">TODAY'S RACE CARD</span>
                   </h2>
                   {activeCentersWithRaces[0]?.hasLive && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[9px] font-black uppercase animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[9px] font-black uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       Live Betting In-Play
                     </span>
                   )}
@@ -337,11 +337,11 @@ export const RaceList: React.FC<RaceListProps> = ({
             }}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               filterStatus === 'live'
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-[0_0_12px_rgba(16,185,129,0.5)]'
                 : 'text-emerald-400 hover:text-emerald-200 hover:bg-emerald-950/40'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span>🔴 Live & Open ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
           </button>
 
@@ -404,7 +404,7 @@ export const RaceList: React.FC<RaceListProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between pb-1 border-b border-emerald-500/40">
                     <div className="flex items-center gap-2">
-                      <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
+                      <Flame className="w-5 h-5 text-rose-500" />
                       <h2 className="text-base sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
                         <span>Featured Racing Fixtures</span>
                         <span className="text-xs font-bold text-rose-300 bg-rose-950/80 px-2.5 py-0.5 rounded-full border border-rose-500/40">
@@ -457,13 +457,12 @@ export const RaceList: React.FC<RaceListProps> = ({
                           {/* Top Row: Live Pill Badge + Favorite Heart Button */}
                           <div className="relative z-10 flex items-center justify-between gap-2">
                             {race.is_suspended || race.horses.every((h) => h.is_suspended) ? (
-                              <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500 text-black font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-amber-300 animate-pulse">
+                              <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500 text-black font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-amber-300">
                                 <AlertCircle className="w-3.5 h-3.5" />
                                 <span>🚫 ODDS CHANGING / SUSPENDED</span>
                               </span>
                             ) : (
                               <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-rose-600/90 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-rose-400/50">
-                                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-ping" />
                                 <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white" />
                                 <span>LIVE IN-PLAY</span>
                               </span>

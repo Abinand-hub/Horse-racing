@@ -265,62 +265,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 3-second Live Market Odds Fluctuation Engine (Only active on user screens, paused on admin)
-  useEffect(() => {
-    if (activeTab === 'admin' || window.location.hash.toLowerCase().includes('admin')) return;
-
-    const oddsInterval = setInterval(() => {
-      setRaces((prevRaces) => {
-        const activeRaces = prevRaces.filter(
-          (r) =>
-            (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING' || r.status === 'UPCOMING' || r.status === 'OPEN') &&
-            !r.is_suspended &&
-            r.horses &&
-            r.horses.length > 0
-        );
-        if (activeRaces.length === 0) return prevRaces;
-
-        // Pick one active race randomly
-        const targetRace = activeRaces[Math.floor(Math.random() * activeRaces.length)];
-        const availableHorses = targetRace.horses.filter((h) => !h.is_suspended);
-        if (availableHorses.length === 0) return prevRaces;
-
-        // Pick 1 or 2 random horses to fluctuate
-        const horseToUpdate = availableHorses[Math.floor(Math.random() * availableHorses.length)];
-        
-        // Small realistic tick delta between -0.15 and +0.15
-        const delta = (Math.floor(Math.random() * 7) - 3) * 0.05;
-        if (delta === 0) return prevRaces;
-
-        const updatedWinOdds = Math.max(1.10, Math.min(50.00, Number((horseToUpdate.win_odds + delta).toFixed(2))));
-        const updatedPlaceOdds = Math.max(1.05, Math.min(20.00, Number(((updatedWinOdds * 0.35) + 0.55).toFixed(2))));
-
-        const updatedHorses = targetRace.horses.map((h) =>
-          h.id === horseToUpdate.id
-            ? { ...h, win_odds: updatedWinOdds, place_odds: updatedPlaceOdds }
-            : h
-        );
-
-        const updatedRace = { ...targetRace, horses: updatedHorses };
-
-        // Broadcast to listeners (RaceDetail, BetSlip, etc.)
-        realtimeOdds.broadcast({
-          event: 'ODDS_UPDATED',
-          race_id: updatedRace.id,
-          race: updatedRace,
-          horse_id: horseToUpdate.id,
-          win_odds: updatedWinOdds,
-          place_odds: updatedPlaceOdds,
-          timestamp: Date.now(),
-        });
-
-        return prevRaces.map((r) => (r.id === updatedRace.id ? updatedRace : r));
-      });
-    }, 3000);
-
-    return () => clearInterval(oddsInterval);
-  }, []);
-
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
 
@@ -329,11 +273,11 @@ export default function App() {
     if (!user?.id) return;
     try {
       const data = await api.getNotifications(user.id);
-      setNotifications(data);
+      setNotifications((prev) => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
     } catch {}
   };
 
-  // Fetch user bets, statement, deposits and withdrawals
+  // Fetch user bets, statement, deposits and withdrawals (flicker-free with equality check)
   const loadUserFinancials = async (isBackground = false) => {
     if (!user) {
       setMyBets([]);
@@ -356,12 +300,14 @@ export default function App() {
         api.getDepositRequests('ALL', user.id),
         api.getWithdrawalRequests('ALL', user.id),
       ]);
-      setMyBets(betsData);
-      setTransactions(txsData);
-      if (freshUser) setUser(freshUser);
-      setNotifications(notifsData);
-      setDepositRequests(depData);
-      setWithdrawalRequests(wthData);
+      setMyBets((prev) => (JSON.stringify(prev) === JSON.stringify(betsData) ? prev : betsData));
+      setTransactions((prev) => (JSON.stringify(prev) === JSON.stringify(txsData) ? prev : txsData));
+      if (freshUser) {
+        setUser((prev) => (JSON.stringify(prev) === JSON.stringify(freshUser) ? prev : freshUser));
+      }
+      setNotifications((prev) => (JSON.stringify(prev) === JSON.stringify(notifsData) ? prev : notifsData));
+      setDepositRequests((prev) => (JSON.stringify(prev) === JSON.stringify(depData) ? prev : depData));
+      setWithdrawalRequests((prev) => (JSON.stringify(prev) === JSON.stringify(wthData) ? prev : wthData));
     } catch (err: any) {
       console.error('Error loading financials:', err);
     } finally {
@@ -375,10 +321,6 @@ export default function App() {
   useEffect(() => {
     if (user?.id) {
       loadUserFinancials(false);
-      // Background polling every 3 seconds for live balance & payment approvals
-      const interval = setInterval(() => {
-        loadUserFinancials(true);
-      }, 3000);
 
       // Realtime cross-tab & storage event subscription for instant sync
       const unsubscribe = financialSync.subscribe(() => {
@@ -386,7 +328,6 @@ export default function App() {
       });
 
       return () => {
-        clearInterval(interval);
         unsubscribe();
       };
     }

@@ -421,7 +421,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
                             </span>
                           )}
                           {req.status === 'IN_PROGRESS' && (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1 animate-pulse">
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1">
                               <Timer className="w-3 h-3" />
                               <span>IN PROGRESS</span>
                             </span>

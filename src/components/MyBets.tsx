@@ -186,8 +186,8 @@ export const MyBets: React.FC<MyBetsProps> = ({
                     : 'border-emerald-900/70 hover:border-[#e5b869]/60 shadow-lg hover:shadow-[0_0_15px_rgba(229,184,105,0.2)]'
                 }`}
               >
-                {/* Lightning Glow Animation Strip on Top Border */}
-                <div className="h-1 w-full bg-gradient-to-r from-transparent via-[#e5b869] to-transparent animate-pulse" />
+                {/* Lightning Glow Strip on Top Border */}
+                <div className="h-1 w-full bg-gradient-to-r from-transparent via-[#e5b869] to-transparent" />
 
                 {/* ---------------- 1. CLICKABLE CONTEST MASTER HEADER ---------------- */}
                 <div 
@@ -200,7 +200,7 @@ export const MyBets: React.FC<MyBetsProps> = ({
                         ? 'bg-[#18160c] border-[#e5b869] text-[#e5b869] shadow-[0_0_12px_rgba(229,184,105,0.4)]'
                         : 'bg-emerald-950/40 border-emerald-800 text-emerald-400'
                     }`}>
-                      <Zap className={`w-5 h-5 fill-current ${isOpen ? 'animate-pulse text-[#e5b869]' : 'text-emerald-400'}`} />
+                      <Zap className={`w-5 h-5 fill-current ${isOpen ? 'text-[#e5b869]' : 'text-emerald-400'}`} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -314,7 +314,7 @@ export const MyBets: React.FC<MyBetsProps> = ({
                             {/* Status Badge */}
                             <div className="flex items-center gap-1.5 self-start sm:self-auto">
                               {bet.status === 'PENDING' && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/40 text-[10px] sm:text-[11px] font-black uppercase tracking-wider animate-pulse shadow-sm">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/40 text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-sm">
                                   <Clock className="w-3 h-3" />
                                   In Play / Contesting
                                 </span>

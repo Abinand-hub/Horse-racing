@@ -127,7 +127,7 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 bg-slate-950 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
             <h3 className="font-extrabold text-white text-base tracking-tight">Interactive Bet Slip</h3>
             <span className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800 text-amber-400 font-mono font-bold border border-slate-700">
               {betSlip.race.venue}
@@ -339,7 +339,7 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
           </div>
 
           {isSuspended && (
-            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2 animate-pulse">
+            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
               <span>🚫 Odds are currently changing. Betting is temporarily suspended for this runner.</span>
             </div>

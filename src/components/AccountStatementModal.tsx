@@ -191,7 +191,7 @@ export const AccountStatementModal: React.FC<AccountStatementModalProps> = ({
                               </span>
                             )}
                             {isPending && (
-                              <span className="px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase flex items-center gap-1 animate-pulse">
+                              <span className="px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5 text-amber-400" />
                                 <span>PENDING ADMIN APPROVAL</span>
                               </span>
@@ -285,7 +285,7 @@ export const AccountStatementModal: React.FC<AccountStatementModalProps> = ({
                               </span>
                             )}
                             {isInProgress && (
-                              <span className="px-2 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[9px] font-black uppercase flex items-center gap-1 animate-pulse">
+                              <span className="px-2 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[9px] font-black uppercase flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5 text-cyan-400" />
                                 <span>IN PROGRESS (120m)</span>
                               </span>

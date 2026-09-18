@@ -81,7 +81,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           className="relative -top-4 w-12 h-12 rounded-full bg-gradient-to-r from-rose-500 to-red-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/40 hover:scale-110 active:scale-95 transition cursor-pointer border-2 border-black"
           title="Live Racing"
         >
-          <Flame className="w-6 h-6 fill-current animate-pulse" />
+          <Flame className="w-6 h-6 fill-current" />
         </button>
 
         {/* Results */}

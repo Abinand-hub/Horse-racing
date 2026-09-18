@@ -445,17 +445,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     loadAdminData(false);
-    // Realtime background polling every 5 seconds for new incoming deposit/withdrawal submissions
-    const interval = setInterval(() => {
-      loadAdminData(true);
-    }, 5000);
 
     const unsubscribe = financialSync.subscribe(() => {
       loadAdminData(true);
     });
 
     return () => {
-      clearInterval(interval);
       unsubscribe();
     };
   }, []);
@@ -1425,7 +1420,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <Flame className="w-3.5 h-3.5" />
           <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
           {races.some((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') && (
-            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-white" />
           )}
         </button>
 
@@ -1562,7 +1557,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                <Flame className="w-5 h-5 text-rose-500 animate-pulse" />
+                <Flame className="w-5 h-5 text-rose-500" />
                 <span>🔴 Live Races Lifecycle & Settle</span>
               </h2>
               <p className="text-xs text-slate-400">
@@ -1604,7 +1599,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-rose-500/30">
                           <div className="flex items-center gap-2.5">
                             <span className="relative flex h-3.5 w-3.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
                             </span>
                             <div>
@@ -1967,7 +1961,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             {race.name}
                           </h4>
                           {/* Live Countdown Timer Badge */}
-                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider font-mono shadow-sm animate-pulse">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider font-mono shadow-sm">
                             <Timer className="w-3 h-3 text-emerald-400" />
                             {getRaceCountdown(race.race_time)}
                           </span>
@@ -2302,7 +2296,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-rose-400" />
                 <span>Live Odds Management System</span>
-                <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider">
                   Handwritten Layout Live
                 </span>
               </h2>
@@ -2388,7 +2382,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             : 'text-slate-400 hover:text-white hover:bg-slate-800'
                         }`}
                       >
-                        {isLive && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
+                        {isLive && <span className="w-2 h-2 rounded-full bg-rose-500" />}
                         <span>{r.race_no ? `R#${r.race_no} - ` : ''}{r.name}</span>
                       </button>
                     );
@@ -2413,7 +2407,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             {activeRace.name}
                           </h3>
                           {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
-                            <span className="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                            <span className="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-rose-500" />
                               <span>🔴 LIVE IN-PLAY</span>
                             </span>
@@ -2451,7 +2445,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
                           isAllSuspended
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
-                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
                         }`}
                       >
                         <AlertCircle className="w-4 h-4" />
@@ -2553,7 +2547,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                       {horse.name || `RUNNER #${slNo}`}
                                     </span>
                                     {isSuspended && (
-                                      <span className="px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                                      <span className="px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider">
                                         🚫 SUSPENDED
                                       </span>
                                     )}
@@ -2690,7 +2684,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
                                   className={`w-full max-w-[120px] py-1.5 px-3 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
                                     isSuspended
-                                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60 animate-pulse'
+                                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60'
                                       : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border-rose-500/50'
                                   }`}
                                   title={isSuspended ? 'Click RESUME to publish new odds live and enable betting' : 'Click SUSPEND to stop betting while changing odds'}
@@ -2730,7 +2724,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
                           isAllSuspended
                             ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
-                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40 animate-pulse'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
                         }`}
                       >
                         <AlertCircle className="w-4 h-4" />
@@ -4074,7 +4068,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {/* Status Badge */}
                         <div className="flex items-center gap-2 self-start sm:self-auto">
                           {dep.status === 'PENDING' && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />
                               <span>PENDING REVIEW</span>
                             </span>
@@ -4262,8 +4256,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             )}
                             {wth.status === 'IN_PROGRESS' && (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1 animate-pulse">
-                                <Timer className="w-3.5 h-3.5 animate-spin" />
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1">
+                                <Timer className="w-3.5 h-3.5" />
                                 <span>IN PROGRESS (120m SLA)</span>
                               </span>
                             )}
@@ -4452,7 +4446,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <h3 className="font-bold text-white text-base flex items-center gap-2">
                       <span>Declare Official Race Verdict</span>
                       {isDeadHeat && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
                           🔥 Dead Heat Active
                         </span>
                       )}
@@ -4763,7 +4757,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={handleExecuteSettlement}
                   className={`flex-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
                     isDeadHeat
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 ring-2 ring-amber-400/50 animate-pulse'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 ring-2 ring-amber-400/50'
                       : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                   }`}
                 >

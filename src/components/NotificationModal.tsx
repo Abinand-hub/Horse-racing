@@ -47,7 +47,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         );
       case 'WITHDRAWAL_IN_PROGRESS':
         return (
-          <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 animate-pulse">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
             <Timer className="w-4 h-4" />
           </div>
         );
@@ -168,7 +168,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 }`}
               >
                 {!n.is_read && (
-                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-emerald-400" />
                 )}
 
                 <div className="flex items-start gap-3">

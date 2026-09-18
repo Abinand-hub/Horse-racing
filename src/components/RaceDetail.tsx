@@ -146,8 +146,8 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
         {/* Live Status Badge */}
         <div className="flex items-center gap-1">
           {(race.status === 'LIVE' || race.status === 'OPEN_FOR_BETTING') && !race.is_suspended && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/60 text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               🟢 OPEN FOR BETTING
             </span>
           )}
@@ -438,11 +438,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                         {isSuspended ? (
                           <div 
                             id={`win-odds-btn-${horse.id}`}
-                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none animate-pulse shadow-inner"
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner"
                             title="Odds are currently changing. Betting is temporarily suspended."
                           >
                             <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                               Suspended
                             </span>
                             <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">
@@ -486,11 +486,11 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
                         {isSuspended ? (
                           <div 
                             id={`place-odds-btn-${horse.id}`}
-                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none animate-pulse shadow-inner"
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner"
                             title="Odds are currently changing. Betting is temporarily suspended."
                           >
                             <span className="text-[9px] sm:text-[10px] font-black uppercase text-rose-300 flex items-center gap-1 leading-tight">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                               Suspended
                             </span>
                             <span className="text-[7px] sm:text-[8px] text-rose-400/80 font-bold uppercase tracking-wider mt-0.5">

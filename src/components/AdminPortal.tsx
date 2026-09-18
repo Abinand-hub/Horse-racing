@@ -94,7 +94,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h2 className="text-xs sm:text-base font-black text-white tracking-tight">DERBYBET TURF — ADMIN CONSOLE</h2>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Live Session
                 </span>
               </div>

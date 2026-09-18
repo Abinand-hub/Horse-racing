@@ -274,7 +274,6 @@ export const RaceSimulator: React.FC<RaceSimulatorProps> = ({
       {/* Live Commentary Broadcast Ticker */}
       <div className="mb-4 px-3 py-2 rounded-xl bg-slate-950/80 border border-amber-500/30 flex items-center gap-2.5 shadow-inner">
         <span className="relative flex h-2.5 w-2.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
         </span>
         <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 shrink-0">
@@ -341,7 +340,6 @@ export const RaceSimulator: React.FC<RaceSimulatorProps> = ({
                         color={runner.horse.silk_color}
                         number={runner.horse.horse_no}
                         size="sm"
-                        className={isRunning ? 'animate-pulse' : ''}
                       />
                       <span className="text-base sm:text-lg ml-0.5 filter drop-shadow">
                         🏇

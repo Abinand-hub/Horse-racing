@@ -181,7 +181,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
       <div className="bg-[#091510] rounded-2xl border border-emerald-900/60 p-4 sm:p-6 shadow-xl space-y-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#e5b869] animate-pulse shadow-[0_0_8px_rgba(229,184,105,0.8)] shrink-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#e5b869] shadow-[0_0_8px_rgba(229,184,105,0.8)] shrink-0" />
             <h2 className="text-sm sm:text-base font-black text-white tracking-tight">
               Personal Details & Registration Info
             </h2>
@@ -310,7 +310,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
       <div className="bg-[#091510] rounded-2xl border border-emerald-900/60 p-4 sm:p-6 shadow-xl space-y-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)] shrink-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] shrink-0" />
             <h2 className="text-sm sm:text-base font-black text-white tracking-tight">
               Races & Financial Activity
             </h2>
@@ -555,7 +555,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
                                 </span>
                               )}
                               {isPending && (
-                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse shadow">
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
                                   <Clock className="w-3 h-3 text-amber-400" />
                                   <span>PENDING ADMIN APPROVAL</span>
                                 </span>
@@ -706,7 +706,7 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
                                 </span>
                               )}
                               {isInProgress && (
-                                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse shadow">
+                                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 text-[10px] font-black uppercase flex items-center gap-1 shadow">
                                   <Clock className="w-3 h-3 text-cyan-400" />
                                   <span>IN PROGRESS (120m SLA)</span>
                                 </span>
