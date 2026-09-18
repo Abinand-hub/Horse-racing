@@ -617,31 +617,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const cleanEmail = email ? String(email).trim().toLowerCase() : '';
     const cleanPhone = phone ? String(phone).trim() : '';
     const cleanUsername = String(username).trim().toLowerCase();
-    const cleanOtp = String(otp || '').trim();
-
-    // Check unique username in Memory and MongoDB
-    let existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
-    if (!existingUsername) {
-      const mongoUser = await UserModel.findOne({ username: cleanUsername }).lean().catch(() => null);
-      if (mongoUser) existingUsername = mongoUser as any;
-    }
-    if (existingUsername) {
-      return res.status(400).json({ error: 'Username already taken. Please choose another.' });
-    }
-
-    // Check unique email if provided
-    if (cleanEmail) {
-      let existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
-      if (!existingEmail) {
-        const mongoUser = await UserModel.findOne({ email: cleanEmail }).lean().catch(() => null);
-        if (mongoUser) existingEmail = mongoUser as any;
-      }
-      if (existingEmail) {
-        return res.status(400).json({ error: 'An account with this email already exists. Please log in.' });
-      }
-    }
-
-    // Check OTP
+    // 1. Check OTP first
     const primaryKey = cleanEmail || cleanPhone;
     const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
 
@@ -660,6 +636,55 @@ app.post('/api/auth/signup', async (req, res) => {
     if (!isTokenValid && !isDbValid && !isTestFallback) {
       return res.status(400).json({
         error: 'Invalid or expired OTP code. Please check your Gmail inbox or request a new code.',
+      });
+    }
+
+    // 2. Lookup existing user by username or email in Memory and MongoDB
+    await ensureMongoConnected();
+    const safeUser = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    let existingUsernameUser = db.users.find((u) => u.username && u.username.toLowerCase() === cleanUsername);
+    if (!existingUsernameUser) {
+      const mongoUser = await UserModel.findOne({ username: { $regex: new RegExp(`^${safeUser}$`, 'i') } }).lean().catch(() => null);
+      if (mongoUser) existingUsernameUser = mongoUser as any;
+    }
+
+    let existingEmailUser = cleanEmail ? db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail) : null;
+    if (!existingEmailUser && cleanEmail) {
+      const mongoEmailUser = await UserModel.findOne({ email: { $regex: new RegExp(`^${safeEmail}$`, 'i') } }).lean().catch(() => null);
+      if (mongoEmailUser) existingEmailUser = mongoEmailUser as any;
+    }
+
+    // 3. If account already exists with THIS verified Gmail or Phone, update password & credentials and log in
+    const ownExistingUser = existingEmailUser || (existingUsernameUser && (existingUsernameUser.email === cleanEmail || existingUsernameUser.phone === cleanPhone) ? existingUsernameUser : null);
+
+    if (ownExistingUser) {
+      ownExistingUser.password_hash = String(password).trim();
+      ownExistingUser.username = cleanUsername;
+      if (full_name) ownExistingUser.full_name = String(full_name).trim();
+      if (cleanPhone) ownExistingUser.phone = cleanPhone;
+      if (cleanEmail) ownExistingUser.email = cleanEmail;
+
+      const idx = db.users.findIndex((u) => u.id === ownExistingUser.id);
+      if (idx >= 0) db.users[idx] = ownExistingUser;
+      else db.users.push(ownExistingUser);
+
+      await UserModel.findOneAndUpdate({ id: ownExistingUser.id }, ownExistingUser, { upsert: true, new: true }).catch(() => {});
+      saveDatabase();
+
+      const { password_hash, ...userProfile } = ownExistingUser;
+      return res.json({
+        success: true,
+        user: userProfile,
+        token: `token_${ownExistingUser.id}`,
+      });
+    }
+
+    // 4. If username is taken by a DIFFERENT player with a different email
+    if (existingUsernameUser && existingUsernameUser.email && existingUsernameUser.email !== cleanEmail) {
+      return res.status(400).json({
+        error: `Username "${username}" is taken by another player. Please choose another username.`,
       });
     }
 
