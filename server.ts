@@ -1,6 +1,9 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
+import { connectMongoDB, syncMemoryToMongoDB, loadDataFromMongoDB, isMongoDBConnected } from './src/models/db';
+import { UserModel, RaceModel, BetModel, TransactionModel, BannerModel } from './src/models/index';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3005;
@@ -966,19 +969,47 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
-    if (process.env.VERCEL === '1' || process.env.NOW_REGION) {
-      return;
+    if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
     }
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Error saving database:', err);
+    console.error('Error saving database file:', err);
+  }
+
+  // Realtime background sync to MongoDB collections
+  if (isMongoDBConnected()) {
+    syncMemoryToMongoDB(db).catch((err) =>
+      console.error('⚠️ MongoDB sync error:', err.message)
+    );
   }
 }
 
 loadDatabase();
+
+// Initialize MongoDB Connection & Seed/Sync Collections
+connectMongoDB().then(async (connected) => {
+  if (connected) {
+    const mongoData = await loadDataFromMongoDB();
+    if (mongoData && mongoData.races && mongoData.races.length > 0) {
+      db.users = (mongoData.users as any) || db.users;
+      db.races = (mongoData.races as any) || db.races;
+      db.bets = (mongoData.bets as any) || db.bets;
+      db.transactions = (mongoData.transactions as any) || db.transactions;
+      db.banners = (mongoData.banners as any) || db.banners;
+      if (mongoData.race_centers) db.race_centers = mongoData.race_centers as any;
+      if (mongoData.race_days) db.race_days = mongoData.race_days as any;
+      if (mongoData.deposit_requests) db.deposit_requests = mongoData.deposit_requests as any;
+      if (mongoData.withdrawal_requests) db.withdrawal_requests = mongoData.withdrawal_requests as any;
+      console.log('✅ Loaded data from MongoDB collections into live app state');
+    } else {
+      await syncMemoryToMongoDB(db);
+      console.log('✅ Initialized and seeded MongoDB collections with starter data');
+    }
+  }
+}).catch((err) => console.error('MongoDB startup error:', err.message));
 
 // Helpers
 function generateId(prefix: string) {
@@ -986,10 +1017,38 @@ function generateId(prefix: string) {
 }
 
 // ----------------------------------------------------
-// HEALTH CHECK
+// HEALTH & DB STATUS CHECKS
 // ----------------------------------------------------
 app.get('/api/health', (req, res) => {
-  return res.json({ status: 'ok', time: new Date().toISOString() });
+  return res.json({
+    status: 'ok',
+    mongodb_connected: isMongoDBConnected(),
+    time: new Date().toISOString(),
+  });
+});
+
+app.get('/api/admin/mongo-status', async (req, res) => {
+  try {
+    const connected = isMongoDBConnected();
+    let counts: any = null;
+    if (connected) {
+      counts = {
+        users: await UserModel.countDocuments(),
+        races: await RaceModel.countDocuments(),
+        bets: await BetModel.countDocuments(),
+        transactions: await TransactionModel.countDocuments(),
+        banners: await BannerModel.countDocuments(),
+      };
+    }
+    return res.json({
+      connected,
+      provider: connected ? 'MongoDB Atlas / Server' : 'Local JSON Storage',
+      counts,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // ----------------------------------------------------
