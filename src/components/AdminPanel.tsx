@@ -91,6 +91,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
   const [auditRace, setAuditRace] = useState<Race | null>(null);
   const [auditBetSearch, setAuditBetSearch] = useState<string>('');
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   // Helper: 24h (HH:mm) <-> 12h (h:mm A) for native clock picker
   const format24To12 = (time24: string): string => {
@@ -3224,11 +3226,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                placeholder="Search by Unique ID (TURF-...), username, phone, or Gmail..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+            {userSearchQuery && (
+              <button
+                onClick={() => setUserSearchQuery('')}
+                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
+
           <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80 bg-slate-950">
             <table className="w-full min-w-[750px] text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[11px]">
-                  <th className="py-3 px-3.5">User Profile</th>
+                  <th className="py-3 px-3.5">User Profile & Unique ID</th>
                   <th className="py-3 px-3">Gmail / Email</th>
                   <th className="py-3 px-3">Phone</th>
                   <th className="py-3 px-3 text-center">Role</th>
@@ -3239,26 +3263,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-900/60 transition">
-                    {/* Profile */}
-                    <td className="py-3 px-3.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0">
-                          <img
-                            src={u.profile_photo || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
-                            alt={u.username}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-bold text-white flex items-center gap-1.5">
-                            <span>{u.full_name || u.username}</span>
+                {users
+                  .filter((u) => {
+                    if (!userSearchQuery) return true;
+                    const q = userSearchQuery.toLowerCase();
+                    return (
+                      (u.ref_id && u.ref_id.toLowerCase().includes(q)) ||
+                      u.id.toLowerCase().includes(q) ||
+                      u.username.toLowerCase().includes(q) ||
+                      (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+                      (u.email && u.email.toLowerCase().includes(q)) ||
+                      u.phone.includes(q)
+                    );
+                  })
+                  .map((u) => {
+                    const displayUniqueId = u.ref_id || u.id;
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-900/60 transition">
+                        {/* Profile & Unique ID */}
+                        <td className="py-3 px-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0">
+                              <img
+                                src={u.profile_photo || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                                alt={u.username}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                                <span>{u.full_name || u.username}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(displayUniqueId);
+                                    setCopiedUserId(displayUniqueId);
+                                    setTimeout(() => setCopiedUserId(null), 2000);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-black border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1 cursor-pointer"
+                                  title="Click to copy Unique User ID"
+                                >
+                                  <span>{displayUniqueId}</span>
+                                  {copiedUserId === displayUniqueId ? (
+                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-2.5 h-2.5 opacity-60" />
+                                  )}
+                                </button>
+                              </div>
+                              <span className="text-[11px] text-slate-400 font-mono font-semibold">@{u.username}</span>
+                            </div>
                           </div>
-                          <span className="text-[11px] text-amber-400 font-mono font-bold">@{u.username}</span>
-                        </div>
-                      </div>
-                    </td>
+                        </td>
 
                     {/* Email */}
                     <td className="py-3 px-3 text-slate-300 font-mono text-[11px]">
@@ -3332,7 +3388,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

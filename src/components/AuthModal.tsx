@@ -314,7 +314,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span>Screen 1: Sign Up (OTP)</span>
+              <span>Sign Up</span>
             </button>
           </div>
         ) : (

@@ -448,7 +448,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black shadow-[0_0_12px_rgba(245,158,11,0.35)] transition active:scale-95 cursor-pointer flex items-center gap-1"
                   >
-                    <span>Register (OTP)</span>
+                    <span>Register</span>
                   </button>
                 </div>
               )}

@@ -572,12 +572,18 @@ app.post('/api/auth/signup', (req, res) => {
     }
   }
 
+  // Generate unique User Reference ID (e.g. TURF-10001)
+  const nextUserSeq = 10000 + db.users.length + 1;
+  const uniqueRefId = `TURF-${nextUserSeq}`;
+  const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+
   // Create user with starting balance of ₹5000 as welcome credit!
   const newUser: User = {
-    id: generateId('usr'),
+    id: userId,
+    ref_id: uniqueRefId,
     phone: cleanPhone || '9876543210',
     email: cleanEmail,
-    full_name: full_name ? String(full_name).trim() : undefined,
+    full_name: full_name ? String(full_name).trim() : cleanUsername,
     username: cleanUsername,
     password_hash: String(password).trim(),
     balance: 5000,
@@ -610,6 +616,26 @@ app.post('/api/auth/signup', (req, res) => {
     user: userProfile,
     token: `token_${newUser.id}`,
   });
+});
+
+// Fetch single user by Unique ID (e.g. TURF-10001, usr_...) / username / phone
+app.get('/api/users/:identifier', (req, res) => {
+  const query = req.params.identifier.toLowerCase().trim();
+  const user = db.users.find(
+    (u) =>
+      u.id.toLowerCase() === query ||
+      (u.ref_id && u.ref_id.toLowerCase() === query) ||
+      u.username.toLowerCase() === query ||
+      (u.email && u.email.toLowerCase() === query) ||
+      u.phone === query
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const { password_hash, ...userProfile } = user;
+  return res.json({ success: true, user: userProfile });
 });
 
 // 3. Login: Username / Email / Phone + Password

@@ -593,8 +593,8 @@ export const api = {
         const text = await res.text();
         try {
           const data = JSON.parse(text);
-          if (Array.isArray(data.races) && data.races.length > 0) {
-            // Merge custom races from localStorage if not present
+          if (Array.isArray(data.races)) {
+            // Merge custom races from localStorage if any
             const remoteMap = new Map(data.races.map((r: Race) => [r.id, r]));
             for (const cr of customRaces) {
               if (!remoteMap.has(cr.id)) {
@@ -615,11 +615,11 @@ export const api = {
         } catch {}
       }
     } catch (e) {
-      console.warn('API getRaces failed, using local/dummy matches:', e);
+      console.warn('API getRaces failed:', e);
     }
     
-    // Combine custom races with dummy races
-    const allRaces = [...customRaces, ...DUMMY_RACES.filter((dr) => !customRaces.some((cr) => cr.id === dr.id))];
+    // Return custom races created by user or empty array (no hardcoded dummy races)
+    const allRaces = customRaces;
 
     if (status === 'live') {
       return allRaces.filter((r) => r.status === 'LIVE');
@@ -651,9 +651,20 @@ export const api = {
       }
     } catch {}
 
-    const found = DUMMY_RACES.find((r) => r.id === id);
-    if (found) return found;
-    return DUMMY_RACES[0];
+    throw new Error(`Race with ID "${id}" not found`);
+  },
+
+  async getUserByIdentifier(identifier: string): Promise<User | null> {
+    try {
+      const res = await fetch(`${API_BASE}/users/${encodeURIComponent(identifier)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) return data.user;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user by identifier:', e);
+    }
+    return null;
   },
 
   // Bets

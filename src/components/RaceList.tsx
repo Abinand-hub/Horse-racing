@@ -296,7 +296,7 @@ export const RaceList: React.FC<RaceListProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search runners, jockeys, race numbers (e.g. Speed Princess, Mysore)..."
+            placeholder="Search runners, jockeys, venues (e.g. Bangalore, 1200m)..."
             className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-[#091510] border border-emerald-900/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 transition shadow-inner"
           />
           {searchQuery && (
@@ -825,37 +825,26 @@ export const RaceList: React.FC<RaceListProps> = ({
                 Live Market Movers
               </h3>
             </div>
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-white">Speed Princess</p>
-                  <p className="text-[11px] text-slate-400">Bangalore Race 3</p>
-                </div>
-                <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold">
-                  ↓ 2.50 (Steamer 🔥)
-                </span>
+            {races.length > 0 ? (
+              <div className="space-y-2.5 text-xs">
+                {races.flatMap(r => (r.horses || []).map(h => ({ horse: h, race: r }))).slice(0, 3).map(({ horse, race }) => (
+                  <div key={`${race.id}_${horse.id}`} className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-white">{horse.name}</p>
+                      <p className="text-[11px] text-slate-400">{race.venue} • #{horse.horse_no || horse.serial_no}</p>
+                    </div>
+                    <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold">
+                      {formatOdds(horse.win_odds, oddsFormat)} (Active)
+                    </span>
+                  </div>
+                ))}
               </div>
-
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-white">Royal Commander</p>
-                  <p className="text-[11px] text-slate-400">Mumbai Race 5</p>
-                </div>
-                <span className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-400 font-mono font-bold">
-                  ↑ 3.75 (Drifter)
-                </span>
+            ) : (
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-400 text-xs text-center space-y-1">
+                <p className="font-semibold text-slate-300">Live Odds Feed In-Play</p>
+                <p className="text-[11px] text-slate-500">Market movers will show active price steamers and drifters once races open.</p>
               </div>
-
-              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-white">Fire Blade</p>
-                  <p className="text-[11px] text-slate-400">Pune Race 2</p>
-                </div>
-                <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold">
-                  ↓ 5.00 (Backed)
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Turf Expert Punter Insights Card */}
@@ -863,20 +852,29 @@ export const RaceList: React.FC<RaceListProps> = ({
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-red-400" />
               <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                Turf Expert Daily Pick
+                Turf Exchange Insights
               </h3>
             </div>
-            <p className="text-xs text-slate-300">
-              Form rating confidence score <strong>94%</strong> on good turf track conditions.
-            </p>
-            <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/30 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-white">Bangalore Derby</span>
-                <span className="text-xs font-mono font-bold text-emerald-400">Odds 2.50</span>
+            {races.length > 0 && races[0]?.horses?.length ? (
+              <>
+                <p className="text-xs text-slate-300">
+                  Top featured runner for {races[0].name}:
+                </p>
+                <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/30 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-white">{races[0].name}</span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">Odds {formatOdds(races[0].horses[0].win_odds, oddsFormat)}</span>
+                  </div>
+                  <p className="text-xs font-bold text-amber-300">#{races[0].horses[0].horse_no || 1} {races[0].horses[0].name} (J: {races[0].horses[0].jockey || 'TBD'})</p>
+                  <p className="text-[11px] text-slate-400">{races[0].venue} • {races[0].distance || 'Official Distance'}</p>
+                </div>
+              </>
+            ) : (
+              <div className="p-3 rounded-2xl bg-slate-950/90 border border-red-500/30 space-y-1.5 text-xs text-slate-300">
+                <p className="font-bold text-white">Instant Result & Exposure Settlement</p>
+                <p className="text-[11px] text-slate-400">Real-time Win & Place payout calculations with dead-heat multi-winner split rules.</p>
               </div>
-              <p className="text-xs font-bold text-amber-300">#1 Speed Princess (J: Kumar)</p>
-              <p className="text-[11px] text-slate-400">Optimal barrier draw with top speed rating.</p>
-            </div>
+            )}
           </div>
 
           {/* Quick Racing Rules & Integrity */}
