@@ -1447,15 +1447,32 @@ app.delete("/api/admin/race-days/:id", (req, res) => {
 });
 app.get("/api/admin/overview", async (req, res) => {
   try {
-    const realUsers = db.users.filter((u) => u.role !== "admin");
-    const totalBets = db.bets.length;
-    const totalVolume = db.bets.reduce((sum, b) => sum + (b.stake || 0), 0);
-    const pendingBets = db.bets.filter((b) => b.status === "PENDING").length;
-    const openRaces = db.races.filter((r) => r.status === "OPEN" || r.status === "LIVE" || r.status === "OPEN_FOR_BETTING").length;
+    let totalUsers = 0;
+    let totalBets = 0;
+    let totalVolume = 0;
+    let pendingBets = 0;
+    let openRaces = 0;
+    if (isMongoDBConnected()) {
+      totalUsers = await UserModel.countDocuments({ role: { $ne: "admin" } });
+      totalBets = await BetModel.countDocuments();
+      const volumeAgg = await BetModel.aggregate([
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+      ]);
+      totalVolume = volumeAgg[0]?.total || 0;
+      pendingBets = await BetModel.countDocuments({ status: "PENDING" });
+      openRaces = await RaceModel.countDocuments({ status: { $in: ["OPEN", "LIVE", "OPEN_FOR_BETTING", "UPCOMING"] } });
+    } else {
+      const realUsers = db.users.filter((u) => u.role !== "admin");
+      totalUsers = realUsers.length;
+      totalBets = db.bets.length;
+      totalVolume = db.bets.reduce((sum, b) => sum + (b.amount || b.stake || 0), 0);
+      pendingBets = db.bets.filter((b) => b.status === "PENDING").length;
+      openRaces = db.races.filter((r) => r.status === "OPEN" || r.status === "LIVE" || r.status === "OPEN_FOR_BETTING" || r.status === "UPCOMING").length;
+    }
     return res.json({
       success: true,
       stats: {
-        totalUsers: realUsers.length,
+        totalUsers,
         totalBets,
         totalVolume,
         openRaces,
@@ -1547,7 +1564,7 @@ app.post("/api/admin/races/:id/publish", (req, res) => {
   saveDatabase();
   return res.json({ success: true, message: `Race "${race.name}" published live for user betting!`, race });
 });
-app.post("/api/bets/place", (req, res) => {
+app.post("/api/bets/place", async (req, res) => {
   const { race_id, horse_id, bet_type, odds, stake, user_id } = req.body;
   if (!race_id || !horse_id || !bet_type || !odds || !stake) {
     return res.status(400).json({ error: "Missing required bet parameters" });
@@ -1565,10 +1582,10 @@ app.post("/api/bets/place", (req, res) => {
   if (!race) {
     return res.status(404).json({ error: "Race not found" });
   }
-  const isBettingOpen = race.status === "OPEN_FOR_BETTING" || race.status === "LIVE" || race.status === "OPEN";
+  const isBettingOpen = race.status === "OPEN_FOR_BETTING" || race.status === "LIVE" || race.status === "OPEN" || race.status === "UPCOMING";
   if (!isBettingOpen) {
     return res.status(400).json({
-      error: `Betting is not open for this race (${race.name} is ${race.status}). Only the currently active race allows betting.`
+      error: `Betting is not open for this race (${race.name} is ${race.status}).`
     });
   }
   if (race.is_suspended) {
@@ -1630,6 +1647,15 @@ app.post("/api/bets/place", (req, res) => {
   };
   db.transactions.unshift(tx);
   saveDatabase();
+  if (isMongoDBConnected()) {
+    try {
+      await BetModel.create(newBet);
+      await UserModel.updateOne({ id: user.id }, { $set: { balance: user.balance, exposure: user.exposure } });
+      await TransactionModel.create(tx);
+    } catch (mErr) {
+      console.error("Mongo bet sync error:", mErr);
+    }
+  }
   const { password_hash, ...userProfile } = user;
   return res.json({
     success: true,
@@ -1744,23 +1770,6 @@ app.delete("/api/banners/:id", (req, res) => {
   db.banners = db.banners.filter((b) => b.id !== req.params.id);
   saveDatabase();
   return res.json({ success: true });
-});
-app.get("/api/admin/overview", (req, res) => {
-  const totalUsers = db.users.length;
-  const totalBets = db.bets.length;
-  const totalVolume = db.bets.reduce((acc, b) => acc + b.stake, 0);
-  const openRaces = db.races.filter((r) => r.status === "OPEN").length;
-  const pendingBetsCount = db.bets.filter((b) => b.status === "PENDING").length;
-  return res.json({
-    success: true,
-    stats: {
-      totalUsers,
-      totalBets,
-      totalVolume,
-      openRaces,
-      pendingBetsCount
-    }
-  });
 });
 app.post("/api/admin/races", (req, res) => {
   const { name, race_no, venue, race_time, date_str, distance, going, class_grade, horses } = req.body;
@@ -2034,7 +2043,15 @@ app.get("/api/admin/users", (req, res) => {
   const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin").map(({ password_hash, ...u }) => u);
   return res.json({ success: true, users: usersList });
 });
-app.get("/api/admin/bets", (req, res) => {
+app.get("/api/admin/bets", async (req, res) => {
+  if (isMongoDBConnected()) {
+    try {
+      const bets = await BetModel.find().sort({ placed_at: -1 }).lean();
+      return res.json({ success: true, bets });
+    } catch (err) {
+      return res.json({ success: true, bets: db.bets });
+    }
+  }
   return res.json({ success: true, bets: db.bets });
 });
 app.post("/api/admin/users/:id/adjust-balance", (req, res) => {

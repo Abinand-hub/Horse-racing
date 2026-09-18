@@ -100,40 +100,8 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
-      setCountdown(3);
-      setProgress(10);
-      setStepText('Connecting to Turf Exchange...');
 
-      // 3-second realistic betting delay simulation with countdown updates
-      await new Promise<void>((resolve, reject) => {
-        let elapsed = 0;
-        const totalTime = 3000;
-        const intervalTime = 100;
-
-        const timer = setInterval(() => {
-          elapsed += intervalTime;
-          const currentProgress = Math.min(100, Math.round((elapsed / totalTime) * 100));
-          setProgress(currentProgress);
-
-          const remainingSeconds = Math.max(1, Math.ceil((totalTime - elapsed) / 1000));
-          setCountdown(remainingSeconds);
-
-          if (elapsed < 1000) {
-            setStepText('Checking market liquidity & odds stability...');
-          } else if (elapsed < 2000) {
-            setStepText(`Locking ${betType} odds at ${currentOdds.toFixed(2)}...`);
-          } else {
-            setStepText('Registering ticket on blockchain ledger...');
-          }
-
-          if (elapsed >= totalTime) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, intervalTime);
-      });
-
-      // Submit bet after 3-second delay
+      // Instant submit
       await onSubmitBet({
         race_id: betSlip.race.id,
         horse_id: betSlip.horse.id,
@@ -156,60 +124,6 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
         className="w-full max-w-md bg-[#091510] border-2 border-emerald-500/70 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 3-Second Processing Overlay when submitting */}
-        {isSubmitting && (
-          <div className="absolute inset-0 z-30 bg-[#040e08]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-in fade-in duration-150">
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  className="stroke-emerald-950"
-                  strokeWidth="8"
-                  fill="transparent"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  className="stroke-emerald-400 transition-all duration-100 ease-linear"
-                  strokeWidth="8"
-                  strokeDasharray="264"
-                  strokeDashoffset={264 - (264 * progress) / 100}
-                  strokeLinecap="round"
-                  fill="transparent"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
-                <span className="text-2xl font-black text-white">{countdown}s</span>
-                <span className="text-[9px] uppercase font-bold text-emerald-400">Delay</span>
-              </div>
-            </div>
-
-            <div className="space-y-1 max-w-xs">
-              <h4 className="text-base font-black text-white flex items-center justify-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                Matching Bet with Exchange...
-              </h4>
-              <p className="text-xs text-emerald-300/80 font-mono animate-pulse">
-                {stepText}
-              </p>
-            </div>
-
-            <div className="w-full max-w-xs bg-slate-900 rounded-full h-2 overflow-hidden border border-emerald-900">
-              <div 
-                className="bg-gradient-to-r from-emerald-500 via-teal-400 to-[#e5b869] h-full transition-all duration-100 ease-linear"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-
-            <p className="text-[10px] text-slate-400">
-              Securing stake of <strong className="text-white font-mono">₹{stake.toLocaleString()}</strong> on #{betSlip.horse.horse_no} {betSlip.horse.name}
-            </p>
-          </div>
-        )}
-
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 bg-slate-950 border-b border-slate-800">
           <div className="flex items-center gap-2">

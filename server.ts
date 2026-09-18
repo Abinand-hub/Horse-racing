@@ -1338,7 +1338,7 @@ app.post('/api/admin/races/:id/publish', (req, res) => {
 
 // POST /api/bets/place
 // Body: race_id, horse_id, bet_type (WIN/PLACE), odds, stake
-app.post('/api/bets/place', (req, res) => {
+app.post('/api/bets/place', async (req, res) => {
   const { race_id, horse_id, bet_type, odds, stake, user_id } = req.body;
 
   if (!race_id || !horse_id || !bet_type || !odds || !stake) {
@@ -1362,11 +1362,11 @@ app.post('/api/bets/place', (req, res) => {
     return res.status(404).json({ error: 'Race not found' });
   }
 
-  // 🔒 CRITICAL SECURITY CHECK: Only allow bet if race status is OPEN_FOR_BETTING, LIVE, or OPEN
-  const isBettingOpen = race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN';
+  // 🔒 Allow bet if race status is OPEN_FOR_BETTING, LIVE, OPEN, or UPCOMING
+  const isBettingOpen = race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN' || race.status === 'UPCOMING';
   if (!isBettingOpen) {
     return res.status(400).json({
-      error: `Betting is not open for this race (${race.name} is ${race.status}). Only the currently active race allows betting.`
+      error: `Betting is not open for this race (${race.name} is ${race.status}).`
     });
   }
 
@@ -1444,6 +1444,16 @@ app.post('/api/bets/place', (req, res) => {
   db.transactions.unshift(tx);
 
   saveDatabase();
+
+  if (isMongoDBConnected()) {
+    try {
+      await BetModel.create(newBet);
+      await UserModel.updateOne({ id: user.id }, { $set: { balance: user.balance, exposure: user.exposure } });
+      await TransactionModel.create(tx);
+    } catch (mErr) {
+      console.error('Mongo bet sync error:', mErr);
+    }
+  }
 
   const { password_hash, ...userProfile } = user;
   return res.json({
@@ -1938,7 +1948,15 @@ app.get('/api/admin/users', (req, res) => {
 });
 
 // 7. Admin All Bets List
-app.get('/api/admin/bets', (req, res) => {
+app.get('/api/admin/bets', async (req, res) => {
+  if (isMongoDBConnected()) {
+    try {
+      const bets = await BetModel.find().sort({ placed_at: -1 }).lean();
+      return res.json({ success: true, bets });
+    } catch (err) {
+      return res.json({ success: true, bets: db.bets });
+    }
+  }
   return res.json({ success: true, bets: db.bets });
 });
 

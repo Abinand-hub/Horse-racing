@@ -738,19 +738,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Level 3: Open Race For Betting (Single active race per center/day)
   const handleOpenRaceForBetting = async (race: Race) => {
     try {
-      setIsLoading(true);
-      const res = await api.openRaceForBetting(race.id);
-      soundManager.playClick();
-      setActionMessage(`🟢 Race #${race.race_no || ''} "${race.name}" is now OPEN FOR BETTING! Switched to Live Races lifecycle.`);
-      await onRefreshData();
-      await loadAdminData();
+      soundManager.playRaceBugle();
+      // 0ms instant optimistic update
+      setRaces((prev) =>
+        prev.map((r) => (r.id === race.id ? { ...r, status: 'LIVE' } : r))
+      );
+      setSelectedOddsRaceId(race.id);
       setActiveTab('live');
-      setTimeout(() => setActionMessage(null), 4000);
+      setAdminRaceFilter('live');
+      notify(`🟢 Race #${race.race_no || ''} "${race.name}" is now LIVE IN-PLAY!`, 'success');
+
+      // Background sync
+      api.openRaceForBetting(race.id).then(() => {
+        onRefreshData();
+        loadAdminData(true);
+      }).catch((err: any) => {
+        console.error('Failed to open race for betting:', err);
+        notify(err.message || 'Failed to open race for betting on server', 'error');
+      });
     } catch (err: any) {
-      setActionMessage(err.message || 'Failed to open race for betting');
-      setTimeout(() => setActionMessage(null), 3500);
-    } finally {
-      setIsLoading(false);
+      notify(err.message || 'Failed to open race for betting', 'error');
     }
   };
 
@@ -1677,6 +1684,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </div>
 
+                        {/* Real-time Match Bets Breakdown */}
+                        <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-rose-500/30 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                              <Coins className="w-4 h-4 text-amber-400" />
+                              <span>Punter Bets on this Match ({liveBets.length} Bets • ₹{liveTurnover.toLocaleString()} Pool)</span>
+                            </span>
+                            <span className="text-[11px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                              {liveBets.length > 0 ? `${new Set(liveBets.map((b) => b.user_id)).size} Bettors Active` : '0 Active Bettors'}
+                            </span>
+                          </div>
+
+                          {liveBets.length > 0 ? (
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {liveBets.map((b) => {
+                                const u = users.find((usr) => usr.id === b.user_id);
+                                return (
+                                  <div
+                                    key={b.id}
+                                    className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                        b.bet_type === 'WIN' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                                      }`}>
+                                        {b.bet_type}
+                                      </span>
+                                      <span className="text-white font-bold">{b.horse_name || `Horse #${b.horse_no}`}</span>
+                                      <span className="text-slate-400 text-[11px]">@{b.odds.toFixed(2)}x</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-slate-400 text-[11px] truncate max-w-[120px]">
+                                        {u?.username || u?.name || b.username || 'Bettor'}
+                                      </span>
+                                      <strong className="text-emerald-400 font-black">₹{b.stake?.toLocaleString() || b.amount?.toLocaleString()}</strong>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 italic py-1 text-center bg-slate-900/50 rounded-xl">
+                              No bets placed on this match yet. When users bet, each wager and stake amount updates here automatically.
+                            </p>
+                          )}
+                        </div>
+
                         {/* Cockpit Actions: Declare Settlement & Suspend All */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                           <div className="flex items-center gap-2">
@@ -1953,6 +2007,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                       ))}
                     </div>
+
+                    {/* Published Race Match Bets Summary */}
+                    {(() => {
+                      const pubBets = getRaceBets(race.id);
+                      const pubTurnover = getRaceTurnover(race.id);
+                      if (pubBets.length === 0) return null;
+                      return (
+                        <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/80 border border-emerald-500/30 text-xs flex items-center justify-between">
+                          <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                            <Coins className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Pre-Post Bets Placed: <strong className="text-white font-mono">{pubBets.length} Bets</strong></span>
+                          </span>
+                          <strong className="text-emerald-400 font-mono font-bold">Total ₹{pubTurnover.toLocaleString()}</strong>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
