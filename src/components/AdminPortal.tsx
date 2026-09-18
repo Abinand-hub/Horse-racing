@@ -34,7 +34,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   });
 
-  const [adminUsername, setAdminUsername] = useState('admin');
+  const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                Logged in as <strong className="text-red-400 font-mono">@{sessionStorage.getItem('derby_admin_user') || 'admin'}</strong> • Full Administrative Privileges
+                Administrator Session • Full Administrative Privileges
               </p>
             </div>
           </div>
@@ -182,7 +182,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               required
               value={adminUsername}
               onChange={(e) => setAdminUsername(e.target.value)}
-              placeholder="e.g. admin"
+              placeholder="Enter admin username"
               className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-sm font-medium focus:outline-none focus:border-red-500 transition shadow-inner"
             />
           </div>

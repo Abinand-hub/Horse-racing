@@ -270,98 +270,7 @@ const defaultData: DBData = {
     { id: 'cntr_pune', name: 'PUNE', code: 'PUN', city: 'Pune', is_active: true, order: 8, created_at: new Date().toISOString() },
     { id: 'cntr_mumbai', name: 'MUMBAI', code: 'MUM', city: 'Mumbai', is_active: true, order: 9, created_at: new Date().toISOString() },
   ],
-  race_days: [
-    {
-      id: 'day_mys_today',
-      center_id: 'cntr_mysore',
-      center_name: 'MYSORE',
-      race_date: '2026-09-17',
-      title: 'Mysore - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 6,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_btc_today',
-      center_id: 'cntr_bangalore',
-      center_name: 'BANGALORE',
-      race_date: '2026-09-17',
-      title: 'Bangalore - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 6,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_oot_today',
-      center_id: 'cntr_ooty',
-      center_name: 'OOTY',
-      race_date: '2026-09-17',
-      title: 'Ooty - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 3,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_mrc_today',
-      center_id: 'cntr_madras',
-      center_name: 'MADRAS',
-      race_date: '2026-09-17',
-      title: 'Madras - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_hyd_today',
-      center_id: 'cntr_hyderabad',
-      center_name: 'HYDERABAD',
-      race_date: '2026-09-17',
-      title: 'Hyderabad - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_cal_today',
-      center_id: 'cntr_kolkata',
-      center_name: 'KOLKATA',
-      race_date: '2026-09-17',
-      title: 'Kolkata - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_del_today',
-      center_id: 'cntr_delhi',
-      center_name: 'DELHI',
-      race_date: '2026-09-17',
-      title: 'Delhi - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_pun_today',
-      center_id: 'cntr_pune',
-      center_name: 'PUNE',
-      race_date: '2026-09-17',
-      title: 'Pune - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'day_mum_today',
-      center_id: 'cntr_mumbai',
-      center_name: 'MUMBAI',
-      race_date: '2026-09-17',
-      title: 'Mumbai - 17th Sep 2026',
-      status: 'PUBLISHED',
-      races_count: 4,
-      created_at: new Date().toISOString(),
-    },
-  ],
+  race_days: [],
   races: [],
   bets: [],
   transactions: [],
@@ -1258,6 +1167,39 @@ app.post('/api/admin/race-days/:id/publish', (req, res) => {
   raceDay.status = 'PUBLISHED';
   saveDatabase();
   return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
+});
+
+// DELETE /api/admin/race-days/:id
+app.delete('/api/admin/race-days/:id', (req, res) => {
+  const { id } = req.params;
+  db.race_days = db.race_days.filter((d) => d.id !== id);
+  RaceDayModel.deleteOne({ id }).catch(() => {});
+  saveDatabase();
+  return res.json({ success: true, message: 'Race Day deleted successfully!' });
+});
+
+// GET /api/admin/overview
+app.get('/api/admin/overview', async (req, res) => {
+  try {
+    const realUsers = db.users.filter((u) => u.role !== 'admin');
+    const totalBets = db.bets.length;
+    const totalVolume = db.bets.reduce((sum, b) => sum + (b.stake || 0), 0);
+    const pendingBets = db.bets.filter((b) => b.status === 'PENDING').length;
+    const openRaces = db.races.filter((r) => r.status === 'OPEN' || r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length;
+
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers: realUsers.length,
+        totalBets,
+        totalVolume,
+        openRaces,
+        pendingBetsCount: pendingBets,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // ----------------------------------------------------

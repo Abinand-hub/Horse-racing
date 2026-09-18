@@ -659,13 +659,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         status: 'PUBLISHED',
       });
       soundManager.playClick();
-      setActionMessage(`📅 ${res.message}`);
+      setActionMessage(`📅 ${res.message} • Directing to Add Race...`);
       setNewDayTitle('');
       await loadAdminData();
+
+      // Automatically preselect center and race day and transition directly to "+ Add New Race"
+      if (res.race_day) {
+        setNewRaceCenterId(res.race_day.center_id);
+        setNewRaceDayId(res.race_day.id);
+        setNewVenue(`${center.name} Turf Club`);
+        setActiveTab('add_race');
+      }
+
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to create race day');
       setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteRaceDay = async (dayId: string) => {
+    if (!confirm('Are you sure you want to delete this race day card?')) return;
+    try {
+      setIsLoading(true);
+      await api.deleteRaceDay(dayId);
+      soundManager.playClick();
+      setActionMessage('🗑️ Race day card deleted successfully');
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to delete race day');
     } finally {
       setIsLoading(false);
     }
@@ -2668,6 +2693,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>+ Add Race to Day</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRaceDay(day.id)}
+                            className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs transition cursor-pointer"
+                            title="Delete Race Day Card"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

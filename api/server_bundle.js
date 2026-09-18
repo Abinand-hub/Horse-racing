@@ -199,7 +199,7 @@ var RaceDaySchema = new import_mongoose.Schema(
   },
   { timestamps: true }
 );
-var RaceDayModel = import_mongoose.default.models.RaceDay || import_mongoose.default.model("RaceDay", RaceDaySchema, "race_days");
+var RaceDayModel2 = import_mongoose.default.models.RaceDay || import_mongoose.default.model("RaceDay", RaceDaySchema, "race_days");
 var DepositRequestSchema = new import_mongoose.Schema(
   {
     id: { type: String, required: true, unique: true, index: true },
@@ -441,7 +441,7 @@ async function syncMemoryToMongoDB(db2) {
     }
     if (db2.race_days?.length) {
       for (const rd of db2.race_days) {
-        await RaceDayModel.findOneAndUpdate({ id: rd.id }, rd, { upsert: true, new: true });
+        await RaceDayModel2.findOneAndUpdate({ id: rd.id }, rd, { upsert: true, new: true });
       }
     }
     if (db2.deposit_requests?.length) {
@@ -467,7 +467,7 @@ async function loadDataFromMongoDB() {
     const transactions = await TransactionModel.find({}).lean();
     const banners = await BannerModel.find({}).lean();
     const race_centers = await RaceCenterModel.find({}).lean();
-    const race_days = await RaceDayModel.find({}).lean();
+    const race_days = await RaceDayModel2.find({}).lean();
     const deposit_requests = await DepositRequestModel.find({}).lean();
     const withdrawal_requests = await WithdrawalRequestModel.find({}).lean();
     if (users.length > 0 || races.length > 0) {
@@ -723,98 +723,7 @@ var defaultData = {
     { id: "cntr_pune", name: "PUNE", code: "PUN", city: "Pune", is_active: true, order: 8, created_at: (/* @__PURE__ */ new Date()).toISOString() },
     { id: "cntr_mumbai", name: "MUMBAI", code: "MUM", city: "Mumbai", is_active: true, order: 9, created_at: (/* @__PURE__ */ new Date()).toISOString() }
   ],
-  race_days: [
-    {
-      id: "day_mys_today",
-      center_id: "cntr_mysore",
-      center_name: "MYSORE",
-      race_date: "2026-09-17",
-      title: "Mysore - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 6,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_btc_today",
-      center_id: "cntr_bangalore",
-      center_name: "BANGALORE",
-      race_date: "2026-09-17",
-      title: "Bangalore - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 6,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_oot_today",
-      center_id: "cntr_ooty",
-      center_name: "OOTY",
-      race_date: "2026-09-17",
-      title: "Ooty - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 3,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_mrc_today",
-      center_id: "cntr_madras",
-      center_name: "MADRAS",
-      race_date: "2026-09-17",
-      title: "Madras - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_hyd_today",
-      center_id: "cntr_hyderabad",
-      center_name: "HYDERABAD",
-      race_date: "2026-09-17",
-      title: "Hyderabad - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_cal_today",
-      center_id: "cntr_kolkata",
-      center_name: "KOLKATA",
-      race_date: "2026-09-17",
-      title: "Kolkata - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_del_today",
-      center_id: "cntr_delhi",
-      center_name: "DELHI",
-      race_date: "2026-09-17",
-      title: "Delhi - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_pun_today",
-      center_id: "cntr_pune",
-      center_name: "PUNE",
-      race_date: "2026-09-17",
-      title: "Pune - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    },
-    {
-      id: "day_mum_today",
-      center_id: "cntr_mumbai",
-      center_name: "MUMBAI",
-      race_date: "2026-09-17",
-      title: "Mumbai - 17th Sep 2026",
-      status: "PUBLISHED",
-      races_count: 4,
-      created_at: (/* @__PURE__ */ new Date()).toISOString()
-    }
-  ],
+  race_days: [],
   races: [],
   bets: [],
   transactions: [],
@@ -1527,6 +1436,35 @@ app.post("/api/admin/race-days/:id/publish", (req, res) => {
   raceDay.status = "PUBLISHED";
   saveDatabase();
   return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
+});
+app.delete("/api/admin/race-days/:id", (req, res) => {
+  const { id } = req.params;
+  db.race_days = db.race_days.filter((d) => d.id !== id);
+  RaceDayModel.deleteOne({ id }).catch(() => {
+  });
+  saveDatabase();
+  return res.json({ success: true, message: "Race Day deleted successfully!" });
+});
+app.get("/api/admin/overview", async (req, res) => {
+  try {
+    const realUsers = db.users.filter((u) => u.role !== "admin");
+    const totalBets = db.bets.length;
+    const totalVolume = db.bets.reduce((sum, b) => sum + (b.stake || 0), 0);
+    const pendingBets = db.bets.filter((b) => b.status === "PENDING").length;
+    const openRaces = db.races.filter((r) => r.status === "OPEN" || r.status === "LIVE" || r.status === "OPEN_FOR_BETTING").length;
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers: realUsers.length,
+        totalBets,
+        totalVolume,
+        openRaces,
+        pendingBetsCount: pendingBets
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 app.get("/api/races", (req, res) => {
   const statusFilter = (req.query.status || "").toLowerCase();

@@ -442,17 +442,22 @@ export const api = {
       if (cached) return JSON.parse(cached);
     } catch {}
 
-    return [
-      { id: 'day_mys_today', center_id: 'cntr_mysore', center_name: 'MYSORE', race_date: '2026-09-17', title: 'Mysore - 17th Sep 2026', status: 'PUBLISHED', races_count: 6 },
-      { id: 'day_btc_today', center_id: 'cntr_bangalore', center_name: 'BANGALORE', race_date: '2026-09-17', title: 'Bangalore - 17th Sep 2026', status: 'PUBLISHED', races_count: 6 },
-      { id: 'day_oot_today', center_id: 'cntr_ooty', center_name: 'OOTY', race_date: '2026-09-17', title: 'Ooty - 17th Sep 2026', status: 'PUBLISHED', races_count: 3 },
-      { id: 'day_mrc_today', center_id: 'cntr_madras', center_name: 'MADRAS', race_date: '2026-09-17', title: 'Madras - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-      { id: 'day_hyd_today', center_id: 'cntr_hyderabad', center_name: 'HYDERABAD', race_date: '2026-09-17', title: 'Hyderabad - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-      { id: 'day_cal_today', center_id: 'cntr_kolkata', center_name: 'KOLKATA', race_date: '2026-09-17', title: 'Kolkata - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-      { id: 'day_del_today', center_id: 'cntr_delhi', center_name: 'DELHI', race_date: '2026-09-17', title: 'Delhi - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-      { id: 'day_pun_today', center_id: 'cntr_pune', center_name: 'PUNE', race_date: '2026-09-17', title: 'Pune - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-      { id: 'day_mum_today', center_id: 'cntr_mumbai', center_name: 'MUMBAI', race_date: '2026-09-17', title: 'Mumbai - 17th Sep 2026', status: 'PUBLISHED', races_count: 4 },
-    ];
+    return [];
+  },
+
+  async deleteRaceDay(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      await fetch(`${API_BASE}/admin/race-days/${id}`, { method: 'DELETE' });
+    } catch {}
+    try {
+      const cached = localStorage.getItem('derby_race_days');
+      if (cached) {
+        const list: RaceDay[] = JSON.parse(cached);
+        const filtered = list.filter((d) => d.id !== id);
+        localStorage.setItem('derby_race_days', JSON.stringify(filtered));
+      }
+    } catch {}
+    return { success: true, message: 'Race day deleted successfully' };
   },
 
   async getRaceDay(center?: string, date?: string): Promise<{ center: RaceCenter; race_day: RaceDay; races: Race[] }> {
@@ -1613,13 +1618,22 @@ export const api = {
       }
     } catch {}
 
-    const races = await this.getRaces('all');
+    const [users, races, bets] = await Promise.all([
+      this.getUsers().catch(() => []),
+      this.getRaces('all').catch(() => []),
+      this.getAllBets().catch(() => []),
+    ]);
+
+    const realUsers = (users || []).filter((u) => u.role !== 'admin');
+    const realVolume = (bets || []).reduce((s, b) => s + (b.stake || 0), 0);
+    const pendingBets = (bets || []).filter((b) => b.status === 'PENDING');
+
     return {
-      totalUsers: 8,
-      totalBets: 24,
-      totalVolume: 125000,
-      openRaces: races.filter((r) => r.status === 'OPEN').length,
-      pendingBetsCount: 6,
+      totalUsers: realUsers.length,
+      totalBets: (bets || []).length,
+      totalVolume: realVolume,
+      openRaces: (races || []).filter((r) => r.status === 'OPEN' || r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length,
+      pendingBetsCount: pendingBets.length,
     };
   },
 
