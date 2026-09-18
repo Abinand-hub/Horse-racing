@@ -18,7 +18,11 @@ export async function connectMongoDB(uri?: string): Promise<boolean> {
     uri ||
     process.env.MONGODB_URI ||
     process.env.MONGO_URL ||
-    'mongodb+srv://turftactics2026_db_user:Turftactics2026@clusterhorse.mxwgoze.mongodb.net/derbybet?retryWrites=true&w=majority&appName=ClusterHorse';
+    '';
+
+  if (!mongoUri) {
+    return false;
+  }
 
   try {
     if (mongoose.connection.readyState === 1) {
