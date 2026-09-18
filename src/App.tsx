@@ -36,8 +36,22 @@ import {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [races, setRaces] = useState<Race[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [races, setRaces] = useState<Race[]>(() => {
+    try {
+      const raw = localStorage.getItem('derby_races');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [banners, setBanners] = useState<Banner[]>(() => {
+    try {
+      const raw = localStorage.getItem('derby_banners');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [myBets, setMyBets] = useState<Bet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
@@ -46,7 +60,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('races');
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('upcoming');
-  const [isLoadingRaces, setIsLoadingRaces] = useState(true);
+  const [isLoadingRaces, setIsLoadingRaces] = useState(false);
   const [isLoadingBets, setIsLoadingBets] = useState(false);
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -168,21 +182,24 @@ export default function App() {
   }, []);
 
   // Fetch races & banners
-  const loadRacesAndBanners = async () => {
+  const loadRacesAndBanners = async (isBackground = false) => {
     try {
-      setIsLoadingRaces(true);
-      // Clean up any legacy mock races cached in browser storage
-      try {
-        localStorage.removeItem('derby_custom_races');
-        localStorage.removeItem('derby_races');
-      } catch {}
+      if (!isBackground && races.length === 0) {
+        setIsLoadingRaces(true);
+      }
 
       const [racesData, bannersData] = await Promise.all([
         api.getRaces('all'),
         api.getBanners(),
       ]);
-      setRaces(racesData || []);
-      setBanners(bannersData);
+      if (racesData) {
+        setRaces(racesData);
+        try { localStorage.setItem('derby_races', JSON.stringify(racesData)); } catch {}
+      }
+      if (bannersData) {
+        setBanners(bannersData);
+        try { localStorage.setItem('derby_banners', JSON.stringify(bannersData)); } catch {}
+      }
     } catch (err: any) {
       console.error('Error fetching races:', err);
     } finally {
