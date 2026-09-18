@@ -54,7 +54,8 @@ function verifyOtpToken(target: string, code: string, token?: string): boolean {
   return hmac === expectedHmac;
 }
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // CORS & Vercel URL Rewriting normalizer (Fast non-blocking)
 app.use((req, res, next) => {
@@ -774,11 +775,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const query = String(username).trim().toLowerCase();
+  const cleanPass = String(password).trim();
 
   // Standalone Admin Login (independent of user table)
   if (
     (query === 'derby_admin' || query === 'admin' || query === 'admin@derbybet.turf') &&
-    String(password).trim() === 'admin123'
+    cleanPass === 'admin123'
   ) {
     const adminProfile: User = {
       id: 'usr_admin',
@@ -801,27 +803,51 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
+  // 1. Fast in-memory lookup (case-insensitive)
   let user = db.users.find(
     (u) =>
-      (u.username.toLowerCase() === query ||
+      ((u.username && u.username.toLowerCase() === query) ||
         (u.email && u.email.toLowerCase() === query) ||
-        u.phone === query) &&
-      u.password_hash === String(password).trim()
+        (u.phone && u.phone === query) ||
+        (u.ref_id && u.ref_id.toLowerCase() === query) ||
+        u.id.toLowerCase() === query) &&
+      u.password_hash === cleanPass
   );
 
+  // 2. Database lookup with strict 2.5s timeout to guarantee zero-freeze response
   if (!user) {
-    await ensureMongoConnected();
-    const mongoUser = await UserModel.findOne({
-      $or: [
-        { username: query },
-        { email: query },
-        { phone: query },
-      ],
-      password_hash: String(password).trim(),
-    }).lean();
-    if (mongoUser) {
-      user = mongoUser as any;
-      if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+    try {
+      const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const safeRegex = new RegExp(`^${safeQuery}$`, 'i');
+
+      const mongoLookup = async () => {
+        await Promise.race([
+          ensureMongoConnected(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Mongo timeout')), 2000))
+        ]);
+        return await UserModel.findOne({
+          $or: [
+            { username: { $regex: safeRegex } },
+            { email: { $regex: safeRegex } },
+            { phone: query },
+            { ref_id: query.toUpperCase() },
+            { id: query },
+          ],
+          password_hash: cleanPass,
+        }).lean();
+      };
+
+      const mongoUser = await Promise.race([
+        mongoLookup(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+      ]);
+
+      if (mongoUser) {
+        user = mongoUser as any;
+        if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+      }
+    } catch (e) {
+      console.error('Mongo login lookup timeout/error:', e);
     }
   }
 

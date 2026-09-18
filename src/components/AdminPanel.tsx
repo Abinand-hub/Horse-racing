@@ -215,6 +215,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 4500);
   };
 
+  const handleImageFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setImageCallback: (val: string) => void,
+    label = 'Banner'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify('Please select a valid image file (PNG, JPG, JPEG, WEBP, GIF)', 'warning');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      notify('Image size exceeds 15MB limit. Please choose a smaller image.', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setImageCallback(reader.result);
+        notify(`✅ ${label} image "${file.name}" loaded successfully!`, 'success');
+      }
+    };
+    reader.onerror = () => {
+      notify('Failed to process image file. Please try another image.', 'error');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   // Financial requests state
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
@@ -3137,35 +3167,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* Horse Race Action Image Selector */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            <label className="block text-xs font-bold text-white flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-              Race Banner & Fixture Horse Image
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {HORSE_IMAGE_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => setNewRaceImage(preset.url)}
-                  className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
-                    newRaceImage === preset.url
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/30'
-                      : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={preset.url} alt={preset.label} className="w-full h-20 object-cover" />
-                  <div className="p-1.5 bg-slate-950/90 text-xs">
-                    <p className="font-bold text-white text-[11px] truncate">{preset.label}</p>
-                  </div>
-                  {newRaceImage === preset.url && (
-                    <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] shadow">
-                      Selected
+          {/* Horse Race Action Image Selector & Custom Uploader */}
+          <div className="space-y-3 pt-3 border-t border-slate-800 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+                  Race Banner & Fixture Image
+                </label>
+                <p className="text-[11px] text-slate-400">Upload your own race banner or select from presets</p>
+              </div>
+
+              <label className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 border border-indigo-400/30">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Custom Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageFileChange(e, setNewRaceImage, 'Race fixture')}
+                />
+              </label>
+            </div>
+
+            {/* Custom / Currently Selected Image Live Preview */}
+            {newRaceImage && (
+              <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/60 bg-slate-900 group h-36 w-full flex items-center justify-center">
+                <img src={newRaceImage} alt="Race Preview" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent flex items-end justify-between p-3">
+                  <div>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] tracking-wide uppercase shadow">
+                      Active Race Banner
                     </span>
-                  )}
-                </button>
-              ))}
+                    <p className="text-white text-xs font-bold mt-1 line-clamp-1">
+                      {newRaceImage.startsWith('data:') ? 'Custom Uploaded Device Image' : newRaceImage}
+                    </p>
+                  </div>
+                  <label className="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow">
+                    <Upload className="w-3 h-3 text-indigo-400" />
+                    <span>Change</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImageFileChange(e, setNewRaceImage, 'Race fixture')}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Ready-made presets */}
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 mb-1.5">Or choose from ready-made presets:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {HORSE_IMAGE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setNewRaceImage(preset.url)}
+                    className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
+                      newRaceImage === preset.url
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={preset.url} alt={preset.label} className="w-full h-16 object-cover" />
+                    <div className="p-1.5 bg-slate-950/90 text-xs">
+                      <p className="font-bold text-white text-[11px] truncate">{preset.label}</p>
+                    </div>
+                    {newRaceImage === preset.url && (
+                      <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] shadow">
+                        Selected
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -3360,22 +3438,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* TAB 4: Manage Banners */}
       {activeTab === 'banners' && (
         <div className="space-y-5">
-          <form onSubmit={handleAddBanner} className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-3 max-w-xl">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Upload className="w-4 h-4 text-indigo-400" />
-              Upload New Advertisement Banner
-            </h2>
-
-            <div className="space-y-2 text-xs">
+          <form onSubmit={handleAddBanner} className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4 max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Banner Headline</label>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-indigo-400" />
+                  Create & Upload Promotional Banner
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Upload custom promotional graphics from your device or paste an image URL
+                </p>
+              </div>
+
+              <label className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 border border-indigo-400/30">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Banner Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageFileChange(e, setNewBannerImg, 'Promotional banner')}
+                />
+              </label>
+            </div>
+
+            {/* Live Banner Preview Card */}
+            {newBannerImg && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Live Banner Preview (How it appears in Slider)
+                </label>
+                <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-500/40 bg-slate-950 h-44 w-full shadow-lg">
+                  <img src={newBannerImg} alt="Banner Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent flex flex-col justify-end p-4">
+                    <span className="self-start text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 uppercase tracking-wider mb-1.5 shadow">
+                      {newBannerTag || 'PROMOTION'}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white leading-tight drop-shadow-md">
+                      {newBannerTitle || 'Your Banner Headline Here'}
+                    </h3>
+                    <p className="text-xs text-slate-300 line-clamp-1 mt-0.5 drop-shadow">
+                      {newBannerSubtitle || 'Your promotion details and subtitle will show here'}
+                    </p>
+                  </div>
+                  <label className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow">
+                    <Upload className="w-3 h-3 text-indigo-400" />
+                    <span>Change File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImageFileChange(e, setNewBannerImg, 'Promotional banner')}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Banner Headline <span className="text-rose-400">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={newBannerTitle}
                   onChange={(e) => setNewBannerTitle(e.target.value)}
-                  placeholder="e.g. Pune Derby Day 2026"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. Pune Derby Day 2026 - 100% Deposit Bonus"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -3385,42 +3516,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   type="text"
                   value={newBannerSubtitle}
                   onChange={(e) => setNewBannerSubtitle(e.target.value)}
-                  placeholder="e.g. Place your bets early for highest multiplier odds"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. Place your bets early for highest multiplier odds and instant payouts"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Image URL (Unsplash or direct asset)</label>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Or Paste Direct Image URL (Unsplash / Web CDN)
+                </label>
                 <input
-                  type="url"
-                  required
-                  value={newBannerImg}
+                  type="text"
+                  value={newBannerImg.startsWith('data:') ? '' : newBannerImg}
                   onChange={(e) => setNewBannerImg(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Tag</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Badge Tag</label>
                   <input
                     type="text"
                     value={newBannerTag}
                     onChange={(e) => setNewBannerTag(e.target.value)}
                     placeholder="e.g. SPECIAL OFFER"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Link Target</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Target Action / Link</label>
                   <input
                     type="text"
                     value={newBannerLink}
                     onChange={(e) => setNewBannerLink(e.target.value)}
-                    placeholder="e.g. /race/race_blr_01 or #deposit"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
+                    placeholder="e.g. #deposit or /race/race_blr_01"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
                   />
                 </div>
               </div>
@@ -3429,9 +3561,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs transition cursor-pointer shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Add Banner to Slider
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Publish Banner to Carousel Slider</span>
             </button>
           </form>
 
@@ -4829,35 +4962,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Edit Image Selector */}
-              <div className="space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <label className="block text-xs font-bold text-white flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-                  Race Fixture Image
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {HORSE_IMAGE_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => setEditRaceImage(preset.url)}
-                      className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
-                        editRaceImage === preset.url
-                          ? 'border-emerald-500 ring-2 ring-emerald-500/30'
-                          : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={preset.url} alt={preset.label} className="w-full h-20 object-cover" />
-                      <div className="p-1.5 bg-slate-950/90 text-[11px] font-bold text-white truncate">
-                        {preset.label}
-                      </div>
-                      {editRaceImage === preset.url && (
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px]">
-                          Selected
-                        </span>
-                      )}
-                    </button>
-                  ))}
+              {/* Edit Image Selector & Custom Uploader */}
+              <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+                      Race Fixture & Banner Image
+                    </label>
+                    <p className="text-[11px] text-slate-400">Upload your own fixture picture or pick a preset</p>
+                  </div>
+
+                  <label className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 border border-indigo-400/30">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Custom Image</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImageFileChange(e, setEditRaceImage, 'Race fixture')}
+                    />
+                  </label>
+                </div>
+
+                {editRaceImage && (
+                  <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/60 bg-slate-900 h-32 w-full flex items-center justify-center">
+                    <img src={editRaceImage} alt="Race Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex items-end justify-between p-2.5">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] tracking-wide uppercase shadow">
+                        Current Fixture Image
+                      </span>
+                      <label className="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow">
+                        <Upload className="w-3 h-3 text-indigo-400" />
+                        <span>Change</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageFileChange(e, setEditRaceImage, 'Race fixture')}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400 mb-1.5">Presets:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {HORSE_IMAGE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setEditRaceImage(preset.url)}
+                        className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
+                          editRaceImage === preset.url
+                            ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                            : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.label} className="w-full h-16 object-cover" />
+                        <div className="p-1 bg-slate-950/90 text-[10px] font-bold text-white truncate">
+                          {preset.label}
+                        </div>
+                        {editRaceImage === preset.url && (
+                          <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[8px] shadow">
+                            Selected
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

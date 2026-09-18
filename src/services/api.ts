@@ -247,15 +247,27 @@ export const api = {
   },
 
   async login(username: string, password: string): Promise<{ user: User; token: string }> {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await safeParseJson(res, 'Invalid username or password.');
-    localStorage.setItem('derby_token', data.token);
-    localStorage.setItem('derby_user', JSON.stringify(data.user));
-    return data;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await safeParseJson(res, 'Invalid username or password.');
+      localStorage.setItem('derby_token', data.token);
+      localStorage.setItem('derby_user', JSON.stringify(data.user));
+      return data;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Server connection timed out. Please try logging in again.');
+      }
+      throw err;
+    }
   },
 
   async forgotPasswordSendOtp(email: string): Promise<{ success: boolean; message: string; otp_token?: string; simulated_otp?: string }> {

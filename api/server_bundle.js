@@ -689,7 +689,8 @@ function verifyOtpToken(target, code, token) {
   const hmac = import_crypto.default.createHmac("sha256", OTP_SECRET).update(payload).digest("hex");
   return hmac === expectedHmac;
 }
-app.use(import_express.default.json());
+app.use(import_express.default.json({ limit: "50mb" }));
+app.use(import_express.default.urlencoded({ limit: "50mb", extended: true }));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -1139,7 +1140,8 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ error: "Username/Email and password are required" });
   }
   const query = String(username).trim().toLowerCase();
-  if ((query === "derby_admin" || query === "admin" || query === "admin@derbybet.turf") && String(password).trim() === "admin123") {
+  const cleanPass = String(password).trim();
+  if ((query === "derby_admin" || query === "admin" || query === "admin@derbybet.turf") && cleanPass === "admin123") {
     const adminProfile = {
       id: "usr_admin",
       ref_id: "ADM-001",
@@ -1161,21 +1163,38 @@ app.post("/api/auth/login", async (req, res) => {
     });
   }
   let user = db.users.find(
-    (u) => (u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone === query) && u.password_hash === String(password).trim()
+    (u) => (u.username && u.username.toLowerCase() === query || u.email && u.email.toLowerCase() === query || u.phone && u.phone === query || u.ref_id && u.ref_id.toLowerCase() === query || u.id.toLowerCase() === query) && u.password_hash === cleanPass
   );
   if (!user) {
-    await ensureMongoConnected();
-    const mongoUser = await UserModel.findOne({
-      $or: [
-        { username: query },
-        { email: query },
-        { phone: query }
-      ],
-      password_hash: String(password).trim()
-    }).lean();
-    if (mongoUser) {
-      user = mongoUser;
-      if (!db.users.find((u) => u.id === user.id)) db.users.push(user);
+    try {
+      const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const safeRegex = new RegExp(`^${safeQuery}$`, "i");
+      const mongoLookup = async () => {
+        await Promise.race([
+          ensureMongoConnected(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Mongo timeout")), 2e3))
+        ]);
+        return await UserModel.findOne({
+          $or: [
+            { username: { $regex: safeRegex } },
+            { email: { $regex: safeRegex } },
+            { phone: query },
+            { ref_id: query.toUpperCase() },
+            { id: query }
+          ],
+          password_hash: cleanPass
+        }).lean();
+      };
+      const mongoUser = await Promise.race([
+        mongoLookup(),
+        new Promise((resolve) => setTimeout(() => resolve(null), 2500))
+      ]);
+      if (mongoUser) {
+        user = mongoUser;
+        if (!db.users.find((u) => u.id === user.id)) db.users.push(user);
+      }
+    } catch (e) {
+      console.error("Mongo login lookup timeout/error:", e);
     }
   }
   if (!user) {
