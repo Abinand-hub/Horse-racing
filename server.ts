@@ -359,10 +359,18 @@ function loadDatabase() {
         });
       });
 
-      // Ensure registered users have ref_id and full_name
-      db.users.forEach((u) => {
-        if (!u.ref_id) u.ref_id = u.id;
+      // Ensure registered users have unique sequential ref_id and full_name
+      const usedRefIds = new Set<string>();
+      db.users.forEach((u, idx) => {
         if (!u.full_name) u.full_name = u.username;
+        if (u.role === 'admin' || u.id === 'usr_admin') {
+          u.ref_id = 'ADM-001';
+          return;
+        }
+        if (!u.ref_id || usedRefIds.has(u.ref_id) || (u.ref_id === 'TURF-10001' && idx > 0)) {
+          u.ref_id = `TURF-${10001 + idx}`;
+        }
+        usedRefIds.add(u.ref_id);
       });
 
       saveDatabase();
@@ -654,10 +662,19 @@ app.post('/api/auth/signup', async (req, res) => {
       });
     }
 
-    // Generate unique User Reference ID (e.g. TURF-10001)
-    const nextUserSeq = 10000 + db.users.length + 1;
+    // Generate guaranteed unique User Reference ID (e.g. TURF-10001, TURF-10002, ...)
+    let existingCount = 0;
+    if (isMongoDBConnected()) {
+      try {
+        existingCount = await UserModel.countDocuments({ role: { $ne: 'admin' } });
+      } catch {}
+    }
+    if (!existingCount) {
+      existingCount = db.users.filter((u) => u.role !== 'admin').length;
+    }
+    const nextUserSeq = 10001 + existingCount;
     const uniqueRefId = `TURF-${nextUserSeq}`;
-    const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+    const userId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
     // Create user with starting balance of ₹50 as welcome credit!
     const newUser: User = {
@@ -1939,11 +1956,42 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
   });
 });
 
-// 6. Admin Users List (Only registered punters, excluding admin)
-app.get('/api/admin/users', (req, res) => {
+// 6. Admin All Users List
+app.get('/api/admin/users', async (req, res) => {
+  if (isMongoDBConnected()) {
+    try {
+      const mongoUsers = await UserModel.find({ role: { $ne: 'admin' } }).sort({ created_at: 1 }).lean();
+      if (mongoUsers && mongoUsers.length > 0) {
+        const seenRefs = new Set<string>();
+        const uniqueUsers = mongoUsers.map((u, idx) => {
+          const userObj = { ...u } as any;
+          delete userObj.password_hash;
+          if (!userObj.ref_id || seenRefs.has(userObj.ref_id) || (userObj.ref_id === 'TURF-10001' && idx > 0)) {
+            userObj.ref_id = `TURF-${10001 + idx}`;
+            UserModel.updateOne({ id: userObj.id }, { $set: { ref_id: userObj.ref_id } }).catch(() => {});
+          }
+          seenRefs.add(userObj.ref_id);
+          return userObj;
+        });
+        return res.json({ success: true, users: uniqueUsers });
+      }
+    } catch (err) {
+      console.error('Mongo load users error:', err);
+    }
+  }
+
+  const seenRefs = new Set<string>();
   const usersList = db.users
     .filter((u) => u.role !== 'admin' && u.id !== 'usr_admin')
-    .map(({ password_hash, ...u }) => u);
+    .map(({ password_hash, ...u }, idx) => {
+      const userObj = { ...u };
+      if (!userObj.ref_id || seenRefs.has(userObj.ref_id) || (userObj.ref_id === 'TURF-10001' && idx > 0)) {
+        userObj.ref_id = `TURF-${10001 + idx}`;
+      }
+      seenRefs.add(userObj.ref_id);
+      return userObj;
+    });
+
   return res.json({ success: true, users: usersList });
 });
 

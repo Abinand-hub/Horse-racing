@@ -803,9 +803,17 @@ function loadDatabase() {
           if (h.gate_no === void 0) h.gate_no = idx + 1;
         });
       });
-      db.users.forEach((u) => {
-        if (!u.ref_id) u.ref_id = u.id;
+      const usedRefIds = /* @__PURE__ */ new Set();
+      db.users.forEach((u, idx) => {
         if (!u.full_name) u.full_name = u.username;
+        if (u.role === "admin" || u.id === "usr_admin") {
+          u.ref_id = "ADM-001";
+          return;
+        }
+        if (!u.ref_id || usedRefIds.has(u.ref_id) || u.ref_id === "TURF-10001" && idx > 0) {
+          u.ref_id = `TURF-${10001 + idx}`;
+        }
+        usedRefIds.add(u.ref_id);
       });
       saveDatabase();
     } else {
@@ -1037,9 +1045,19 @@ app.post("/api/auth/signup", async (req, res) => {
         error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
       });
     }
-    const nextUserSeq = 1e4 + db.users.length + 1;
+    let existingCount = 0;
+    if (isMongoDBConnected()) {
+      try {
+        existingCount = await UserModel.countDocuments({ role: { $ne: "admin" } });
+      } catch {
+      }
+    }
+    if (!existingCount) {
+      existingCount = db.users.filter((u) => u.role !== "admin").length;
+    }
+    const nextUserSeq = 10001 + existingCount;
     const uniqueRefId = `TURF-${nextUserSeq}`;
-    const userId = `usr_${nextUserSeq}_${Math.random().toString(36).slice(2, 6)}`;
+    const userId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newUser = {
       id: userId,
       ref_id: uniqueRefId,
@@ -2039,8 +2057,38 @@ app.post("/api/admin/races/:id/settle", (req, res) => {
     totalPayout
   });
 });
-app.get("/api/admin/users", (req, res) => {
-  const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin").map(({ password_hash, ...u }) => u);
+app.get("/api/admin/users", async (req, res) => {
+  if (isMongoDBConnected()) {
+    try {
+      const mongoUsers = await UserModel.find({ role: { $ne: "admin" } }).sort({ created_at: 1 }).lean();
+      if (mongoUsers && mongoUsers.length > 0) {
+        const seenRefs2 = /* @__PURE__ */ new Set();
+        const uniqueUsers = mongoUsers.map((u, idx) => {
+          const userObj = { ...u };
+          delete userObj.password_hash;
+          if (!userObj.ref_id || seenRefs2.has(userObj.ref_id) || userObj.ref_id === "TURF-10001" && idx > 0) {
+            userObj.ref_id = `TURF-${10001 + idx}`;
+            UserModel.updateOne({ id: userObj.id }, { $set: { ref_id: userObj.ref_id } }).catch(() => {
+            });
+          }
+          seenRefs2.add(userObj.ref_id);
+          return userObj;
+        });
+        return res.json({ success: true, users: uniqueUsers });
+      }
+    } catch (err) {
+      console.error("Mongo load users error:", err);
+    }
+  }
+  const seenRefs = /* @__PURE__ */ new Set();
+  const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin").map(({ password_hash, ...u }, idx) => {
+    const userObj = { ...u };
+    if (!userObj.ref_id || seenRefs.has(userObj.ref_id) || userObj.ref_id === "TURF-10001" && idx > 0) {
+      userObj.ref_id = `TURF-${10001 + idx}`;
+    }
+    seenRefs.add(userObj.ref_id);
+    return userObj;
+  });
   return res.json({ success: true, users: usersList });
 });
 app.get("/api/admin/bets", async (req, res) => {

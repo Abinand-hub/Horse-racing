@@ -396,13 +396,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         api.getRaceCenters(true),
         api.getRaceDays(),
       ]);
-      setStats(statsData);
-      setUsers(usersData);
-      setAllBets(betsData);
-      setDepositRequests(depositsData);
-      setWithdrawalRequests(withdrawalsData);
-      setRaceCenters(centersData);
-      setRaceDays(daysData);
+      setStats((prev: any) => (JSON.stringify(prev) === JSON.stringify(statsData) ? prev : statsData));
+      setUsers((prev) => (JSON.stringify(prev) === JSON.stringify(usersData) ? prev : usersData));
+      setAllBets((prev) => (JSON.stringify(prev) === JSON.stringify(betsData) ? prev : betsData));
+      setDepositRequests((prev) => (JSON.stringify(prev) === JSON.stringify(depositsData) ? prev : depositsData));
+      setWithdrawalRequests((prev) => (JSON.stringify(prev) === JSON.stringify(withdrawalsData) ? prev : withdrawalsData));
+      setRaceCenters((prev) => (JSON.stringify(prev) === JSON.stringify(centersData) ? prev : centersData));
+      setRaceDays((prev) => (JSON.stringify(prev) === JSON.stringify(daysData) ? prev : daysData));
       if (!newDayCenterId && centersData.length > 0) {
         setNewDayCenterId(centersData[0].id);
       }
