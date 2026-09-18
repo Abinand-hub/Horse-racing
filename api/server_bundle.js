@@ -285,11 +285,10 @@ async function connectMongoDB(uri) {
         isConnected = true;
         return true;
       }
-      import_mongoose2.default.set("bufferCommands", false);
       await import_mongoose2.default.connect(mongoUri, {
-        serverSelectionTimeoutMS: 1500,
-        connectTimeoutMS: 1500,
-        maxPoolSize: 5
+        serverSelectionTimeoutMS: 5e3,
+        connectTimeoutMS: 5e3,
+        maxPoolSize: 10
       });
       isConnected = true;
       lastMongoError = null;
