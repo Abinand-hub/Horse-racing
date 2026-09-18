@@ -869,7 +869,7 @@ export const api = {
     screenshot_url?: string;
     screenshotUrl?: string;
   }): Promise<{ depositRequest: DepositRequest; message: string }> {
-    let currentUser: User = DUMMY_USER;
+    let currentUser: Partial<User> = {};
     try {
       const saved = localStorage.getItem('derby_user');
       if (saved) currentUser = JSON.parse(saved);
@@ -882,7 +882,7 @@ export const api = {
     const newRequest: DepositRequest = {
       id: `dep_${Date.now()}`,
       user_id: params.userId,
-      username: currentUser.username || 'arjun_punters',
+      username: currentUser?.username || 'user',
       amount: params.amount,
       payment_method: method,
       utr_number: utr,
@@ -955,14 +955,14 @@ export const api = {
       screenshot_url,
     });
 
-    let currentUser: User = DUMMY_USER;
+    let currentUser: Partial<User> = {};
     try {
       const saved = localStorage.getItem('derby_user');
       if (saved) currentUser = JSON.parse(saved);
     } catch {}
 
     return {
-      user: currentUser,
+      user: currentUser as User,
       message: res.message,
     };
   },
@@ -995,38 +995,6 @@ export const api = {
       }
     } catch (e) {
       console.warn('Backend getDepositRequests fallback:', e);
-    }
-
-    if (list.length === 0) {
-      // Default seed demo requests
-      list = [
-        {
-          id: 'dep_01',
-          user_id: 'usr_arjun',
-          username: 'arjun_punters',
-          amount: 5000,
-          payment_method: 'UPI (PhonePe)',
-          utr_number: '329845729104',
-          screenshot_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
-          status: 'APPROVED',
-          created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-          reviewed_at: new Date(Date.now() - 3600000 * 2 + 120000).toISOString(),
-        },
-        {
-          id: 'dep_02',
-          user_id: 'usr_rahul',
-          username: 'rahul_derby',
-          amount: 10000,
-          payment_method: 'Google Pay',
-          utr_number: '329845729105',
-          status: 'PENDING',
-          created_at: new Date(Date.now() - 1800000).toISOString(),
-          reviewed_at: null,
-        }
-      ];
-      try {
-        localStorage.setItem('derby_deposit_requests', JSON.stringify(list));
-      } catch {}
     }
 
     let filtered = list;
@@ -1323,53 +1291,6 @@ export const api = {
       }
     } catch (e) {
       console.warn('Backend getWithdrawalRequests fallback:', e);
-    }
-
-    if (list.length === 0) {
-      // Default seed demo requests
-      list = [
-        {
-          id: 'wth_01',
-          user_id: 'usr_arjun',
-          username: 'arjun_punters',
-          amount: 3000,
-          upi_id: 'arjun@okaxis',
-          status: 'PENDING',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          approved_at: null,
-          completed_at: null,
-          estimated_minutes: 120,
-        },
-        {
-          id: 'wth_02',
-          user_id: 'usr_rahul',
-          username: 'rahul_derby',
-          amount: 2500,
-          bank_account: '98450123984',
-          ifsc: 'HDFC0001234',
-          account_holder: 'Rahul Varma',
-          status: 'IN_PROGRESS',
-          created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
-          approved_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
-          completed_at: null,
-          estimated_minutes: 120,
-        },
-        {
-          id: 'wth_03',
-          user_id: 'usr_rahul',
-          username: 'rahul_derby',
-          amount: 4200,
-          upi_id: 'rahul@okhdfcbank',
-          status: 'SUCCESSFUL',
-          created_at: new Date(Date.now() - 3600000 * 26).toISOString(),
-          approved_at: new Date(Date.now() - 3600000 * 25).toISOString(),
-          completed_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-          estimated_minutes: 120,
-        }
-      ];
-      try {
-        localStorage.setItem('derby_withdrawal_requests', JSON.stringify(list));
-      } catch {}
     }
 
     let filtered = list;

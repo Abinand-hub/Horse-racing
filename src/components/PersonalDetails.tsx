@@ -100,10 +100,10 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
   const totalWithdrawals = withdrawTxs.reduce((acc, t) => acc + Math.abs(t.amount), 0);
 
   // User Credentials
-  const refId = user.ref_id || 'usr_arjun';
-  const fullName = user.full_name || 'Arjun Kumar';
-  const phoneNumber = user.phone || '9876543210';
-  const emailAddress = user.email || 'arjun.punters@gmail.com';
+  const refId = user.ref_id || user.id || 'N/A';
+  const fullName = user.full_name || user.username || 'Punter';
+  const phoneNumber = user.phone || 'N/A';
+  const emailAddress = user.email || 'N/A';
   const userPassword = user.password || '••••••••';
 
   return (

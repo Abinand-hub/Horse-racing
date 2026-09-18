@@ -192,22 +192,7 @@ interface DBData {
 }
 
 const defaultData: DBData = {
-  users: [
-    {
-      id: 'usr_admin',
-      ref_id: '100001',
-      full_name: 'Turf Derby Master',
-      phone: '9999988888',
-      email: 'admin@derbybet.turf',
-      username: 'derby_admin',
-      password_hash: 'admin123',
-      balance: 500000,
-      exposure: 0,
-      role: 'admin',
-      profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
-      created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    },
-  ],
+  users: [],
   deposit_requests: [],
   withdrawal_requests: [],
   race_centers: [
@@ -394,17 +379,10 @@ function loadDatabase() {
         });
       });
 
-      // Ensure users have ref_id, full_name, email
+      // Ensure registered users have ref_id and full_name
       db.users.forEach((u) => {
-        if (!u.ref_id) u.ref_id = u.id === 'usr_arjun' ? 'usr_arjun' : '100001';
-        if (!u.full_name) u.full_name = u.id === 'usr_arjun' ? 'Arjun Kumar' : 'Turf Derby Master';
-        if (!u.email) u.email = u.id === 'usr_arjun' ? 'arjun.punters@gmail.com' : 'admin@derbybet.turf';
-        if (u.id === 'usr_arjun') {
-          u.full_name = 'Arjun Kumar';
-          u.phone = '9876543210';
-          u.email = 'arjun.punters@gmail.com';
-          u.ref_id = 'usr_arjun';
-        }
+        if (!u.ref_id) u.ref_id = u.id;
+        if (!u.full_name) u.full_name = u.username;
       });
 
       saveDatabase();
@@ -642,6 +620,33 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const query = String(username).trim().toLowerCase();
+
+  // Standalone Admin Login (independent of user table)
+  if (
+    (query === 'derby_admin' || query === 'admin' || query === 'admin@derbybet.turf') &&
+    String(password).trim() === 'admin123'
+  ) {
+    const adminProfile: User = {
+      id: 'usr_admin',
+      ref_id: 'ADM-001',
+      full_name: 'Turf Derby Master',
+      phone: '9999988888',
+      email: 'admin@derbybet.turf',
+      username: 'derby_admin',
+      password_hash: '',
+      balance: 0,
+      exposure: 0,
+      role: 'admin',
+      profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+      created_at: new Date().toISOString(),
+    };
+    return res.json({
+      success: true,
+      user: adminProfile,
+      token: 'token_usr_admin',
+    });
+  }
+
   const user = db.users.find(
     (u) =>
       (u.username.toLowerCase() === query ||
@@ -666,6 +671,24 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/me', (req, res) => {
   const authHeader = req.headers.authorization || '';
   const userId = req.query.user_id as string || authHeader.replace('Bearer token_', '');
+
+  if (userId === 'usr_admin') {
+    const adminProfile: User = {
+      id: 'usr_admin',
+      ref_id: 'ADM-001',
+      full_name: 'Turf Derby Master',
+      phone: '9999988888',
+      email: 'admin@derbybet.turf',
+      username: 'derby_admin',
+      password_hash: '',
+      balance: 0,
+      exposure: 0,
+      role: 'admin',
+      profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+      created_at: new Date().toISOString(),
+    };
+    return res.json({ success: true, user: adminProfile });
+  }
 
   const user = db.users.find((u) => u.id === userId);
   if (!user) {
@@ -1669,9 +1692,11 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
   });
 });
 
-// 6. Admin Users List
+// 6. Admin Users List (Only registered punters, excluding admin)
 app.get('/api/admin/users', (req, res) => {
-  const usersList = db.users.map(({ password_hash, ...u }) => u);
+  const usersList = db.users
+    .filter((u) => u.role !== 'admin' && u.id !== 'usr_admin')
+    .map(({ password_hash, ...u }) => u);
   return res.json({ success: true, users: usersList });
 });
 
