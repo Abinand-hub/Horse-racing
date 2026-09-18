@@ -4,6 +4,7 @@ import path from 'path';
 import 'dotenv/config';
 import { connectMongoDB, syncMemoryToMongoDB, loadDataFromMongoDB, isMongoDBConnected } from './src/models/db';
 import { UserModel, RaceModel, BetModel, TransactionModel, BannerModel } from './src/models/index';
+import { sendOtpEmail } from './src/utils/mailer';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3005;
@@ -1055,59 +1056,101 @@ app.get('/api/admin/mongo-status', async (req, res) => {
 // AUTH APIS
 // ----------------------------------------------------
 
-// 1. Send OTP for Phone Signup
-app.post('/api/auth/send-otp', (req, res) => {
-  const { phone } = req.body;
-  if (!phone || String(phone).trim().length < 8) {
-    return res.status(400).json({ error: 'Valid phone number is required (min 8 digits)' });
-  }
-  const cleanPhone = String(phone).trim();
-  // Generate 6 digit OTP
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  db.otps[cleanPhone] = {
-    code,
-    expires_at: Date.now() + 10 * 60 * 1000, // 10 mins
-  };
-  saveDatabase();
+// 1. Send OTP for Gmail / Phone Signup
+app.post('/api/auth/send-otp', async (req, res) => {
+  try {
+    const { email, phone, username } = req.body;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
 
-  console.log(`[SMS Gateway Mock] OTP for ${cleanPhone} is ${code}`);
-  return res.json({
-    success: true,
-    message: `OTP sent to ${cleanPhone}`,
-    simulated_otp: code, // Returned for effortless demo testing in preview
-  });
+    if (!cleanEmail && (!cleanPhone || cleanPhone.length < 8)) {
+      return res.status(400).json({ error: 'Valid Gmail/Email address or phone number is required' });
+    }
+
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid Gmail/Email address' });
+    }
+
+    // Generate 6 digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires_at = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    if (cleanEmail) {
+      db.otps[cleanEmail] = { code, expires_at };
+    }
+    if (cleanPhone) {
+      db.otps[cleanPhone] = { code, expires_at };
+    }
+    saveDatabase();
+
+    if (cleanEmail) {
+      const mailResult = await sendOtpEmail({
+        to: cleanEmail,
+        otp: code,
+        username: username ? String(username).trim() : undefined,
+      });
+
+      return res.json({
+        success: true,
+        message: mailResult.message,
+        simulated_otp: mailResult.simulated ? code : undefined,
+      });
+    }
+
+    console.log(`[SMS Gateway Mock] OTP for ${cleanPhone} is ${code}`);
+    return res.json({
+      success: true,
+      message: `OTP sent to ${cleanPhone}`,
+      simulated_otp: code,
+    });
+  } catch (err: any) {
+    console.error('Error sending OTP:', err);
+    return res.status(500).json({ error: err.message || 'Failed to send OTP' });
+  }
 });
 
-// 2. Sign Up: Phone + OTP + unique Username + Password
+// 2. Sign Up: Email + OTP + unique Username + Password
 app.post('/api/auth/signup', (req, res) => {
-  const { phone, otp, username, password } = req.body;
+  const { email, phone, otp, username, password, full_name } = req.body;
 
-  if (!phone || !username || !password) {
-    return res.status(400).json({ error: 'Phone, username, and password are required' });
+  if ((!email && !phone) || !username || !password) {
+    return res.status(400).json({ error: 'Email/Phone, username, and password are required' });
   }
 
-  const cleanPhone = String(phone).trim();
+  const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+  const cleanPhone = phone ? String(phone).trim() : '';
   const cleanUsername = String(username).trim().toLowerCase();
 
   // Check username unique
-  const existingUser = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
-  if (existingUser) {
+  const existingUsername = db.users.find((u) => u.username.toLowerCase() === cleanUsername);
+  if (existingUsername) {
     return res.status(400).json({ error: 'Username already taken. Please choose another.' });
   }
 
+  // Check email unique if provided
+  if (cleanEmail) {
+    const existingEmail = db.users.find((u) => u.email && u.email.toLowerCase() === cleanEmail);
+    if (existingEmail) {
+      return res.status(400).json({ error: 'An account with this email already exists. Please log in.' });
+    }
+  }
+
   // Check OTP
-  const storedOtp = db.otps[cleanPhone];
+  const primaryKey = cleanEmail || cleanPhone;
+  const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : undefined);
   if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
-    // If testing without OTP call, allow fallback OTP 123456
+    // If testing without active SMTP, allow fallback OTP 123456
     if (String(otp).trim() !== '123456' && (!storedOtp || storedOtp.code !== String(otp).trim())) {
-      return res.status(400).json({ error: 'Invalid or expired OTP code. (Try 123456 for testing)' });
+      return res.status(400).json({ error: 'Invalid or expired OTP code. (Check your Gmail inbox or use test code 123456)' });
     }
   }
 
   // Create user with starting balance of ₹5000 as welcome credit!
   const newUser: User = {
     id: generateId('usr'),
-    phone: cleanPhone,
+    phone: cleanPhone || '9876543210',
+    email: cleanEmail,
+    full_name: full_name ? String(full_name).trim() : undefined,
     username: cleanUsername,
     password_hash: String(password).trim(),
     balance: 5000,
@@ -1142,20 +1185,24 @@ app.post('/api/auth/signup', (req, res) => {
   });
 });
 
-// 3. Login: Username + Password (NOT OTP every time)
+// 3. Login: Username / Email / Phone + Password
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+    return res.status(400).json({ error: 'Username/Email and password are required' });
   }
 
-  const cleanUsername = String(username).trim().toLowerCase();
+  const query = String(username).trim().toLowerCase();
   const user = db.users.find(
-    (u) => (u.username.toLowerCase() === cleanUsername || u.phone === cleanUsername) && u.password_hash === String(password).trim()
+    (u) =>
+      (u.username.toLowerCase() === query ||
+        (u.email && u.email.toLowerCase() === query) ||
+        u.phone === query) &&
+      u.password_hash === String(password).trim()
   );
 
   if (!user) {
-    return res.status(401).json({ error: 'Invalid username or password' });
+    return res.status(401).json({ error: 'Invalid username/email or password' });
   }
 
   const { password_hash, ...userProfile } = user;

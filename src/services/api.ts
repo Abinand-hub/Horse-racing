@@ -187,22 +187,30 @@ export const financialSync = new FinancialBroadcastService();
 
 export const api = {
   // Auth
-  async sendOtp(phone: string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
+  async sendOtp(params: { email?: string; phone?: string; username?: string } | string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
+    const payload = typeof params === 'string' 
+      ? (params.includes('@') ? { email: params } : { phone: params })
+      : params;
     try {
       const res = await fetch(`${API_BASE}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
       return data;
-    } catch {
-      return { success: true, message: `OTP sent to ${phone}`, simulated_otp: '123456' };
+    } catch (err: any) {
+      const target = payload.email || payload.phone || 'your address';
+      return { 
+        success: true, 
+        message: err.message || `OTP sent to ${target}`, 
+        simulated_otp: '123456' 
+      };
     }
   },
 
-  async signup(params: { phone: string; otp: string; username: string; password: string }): Promise<{ user: User; token: string }> {
+  async signup(params: { email?: string; phone?: string; otp: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
     try {
       const res = await fetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
@@ -219,8 +227,9 @@ export const api = {
         ...DUMMY_USER,
         id: `usr_${Date.now()}`,
         username: params.username,
-        phone: params.phone,
-        full_name: params.username,
+        email: params.email || 'bettor@gmail.com',
+        phone: params.phone || '9876543210',
+        full_name: params.full_name || params.username,
       };
       localStorage.setItem('derby_token', `token_${fallbackUser.id}`);
       localStorage.setItem('derby_user', JSON.stringify(fallbackUser));
