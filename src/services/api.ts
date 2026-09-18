@@ -211,89 +211,118 @@ export const api = {
   },
 
   async signup(params: { email?: string; phone?: string; otp: string; username: string; password: string; full_name?: string }): Promise<{ user: User; token: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Sign up failed');
-      localStorage.setItem('derby_token', data.token);
-      localStorage.setItem('derby_user', JSON.stringify(data.user));
-      return data;
-    } catch {
-      const fallbackUser: User = {
-        ...DUMMY_USER,
-        id: `usr_${Date.now()}`,
-        username: params.username,
-        email: params.email || 'bettor@gmail.com',
-        phone: params.phone || '9876543210',
-        full_name: params.full_name || params.username,
-      };
-      localStorage.setItem('derby_token', `token_${fallbackUser.id}`);
-      localStorage.setItem('derby_user', JSON.stringify(fallbackUser));
-      return { user: fallbackUser, token: `token_${fallbackUser.id}` };
-    }
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sign up failed');
+    localStorage.setItem('derby_token', data.token);
+    localStorage.setItem('derby_user', JSON.stringify(data.user));
+    return data;
   },
 
   async login(username: string, password: string): Promise<{ user: User; token: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
-      localStorage.setItem('derby_token', data.token);
-      localStorage.setItem('derby_user', JSON.stringify(data.user));
-      return data;
-    } catch {
-      const fallbackUser: User = {
-        ...DUMMY_USER,
-        username: username || DUMMY_USER.username,
-      };
-      localStorage.setItem('derby_token', `token_${fallbackUser.id}`);
-      localStorage.setItem('derby_user', JSON.stringify(fallbackUser));
-      return { user: fallbackUser, token: `token_${fallbackUser.id}` };
-    }
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid username or password');
+    localStorage.setItem('derby_token', data.token);
+    localStorage.setItem('derby_user', JSON.stringify(data.user));
+    return data;
   },
 
-  async getMe(userId?: string): Promise<User> {
+  async forgotPasswordSendOtp(email: string): Promise<{ success: boolean; message: string; simulated_otp?: string }> {
+    const res = await fetch(`${API_BASE}/auth/forgot-password/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to send reset code');
+    return data;
+  },
+
+  async forgotPasswordReset(params: { email: string; otp: string; new_password: string }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/auth/forgot-password/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+    return data;
+  },
+
+  async getMe(userId?: string): Promise<User | null> {
     try {
       const token = localStorage.getItem('derby_token') || '';
       const query = userId ? `?user_id=${userId}` : '';
       const res = await fetch(`${API_BASE}/auth/me${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (res.ok && data.user) {
-        localStorage.setItem('derby_user', JSON.stringify(data.user));
-        return data.user;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          localStorage.setItem('derby_user', JSON.stringify(data.user));
+          return data.user;
+        }
+      } else {
+        localStorage.removeItem('derby_token');
+        localStorage.removeItem('derby_user');
       }
     } catch (e) {
-      console.warn('API getMe failed, using cached or fallback user', e);
+      console.warn('API getMe failed', e);
     }
     const saved = localStorage.getItem('derby_user');
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return DUMMY_USER;
+    return null;
+  },
+
+  async getUsers(): Promise<User[]> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.users)) {
+          return data.users;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch admin users:', e);
+    }
+    return [];
+  },
+
+  async getAdminUsers(): Promise<User[]> {
+    return this.getUsers();
+  },
+
+  async adjustUserBalance(userId: string, amount: number, type: 'CREDIT' | 'DEBIT', description?: string): Promise<{ success: boolean; message: string; user?: User }> {
+    const res = await fetch(`${API_BASE}/admin/users/${userId}/adjust-balance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, type, description }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to adjust balance');
+    return data;
   },
 
   async changePassword(user_id: string, current_password: string, new_password: string): Promise<void> {
-    try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id, current_password, new_password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Password update failed');
-    } catch (e: any) {
-      console.warn('Change password fallback:', e);
-    }
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id, current_password, new_password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Password update failed');
   },
 
   // ----------------------------------------------------
@@ -2205,47 +2234,6 @@ export const api = {
     };
   },
 
-  async getAdminUsers(): Promise<User[]> {
-    try {
-      const res = await fetch(`${API_BASE}/admin/users`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.users)) return data.users;
-      }
-    } catch {}
-    return [
-      DUMMY_USER,
-      {
-        id: 'usr_rahul',
-        ref_id: 'usr_rahul',
-        full_name: 'Rahul Varma',
-        phone: '9845012345',
-        email: 'rahul.varma@gmail.com',
-        username: 'rahul_derby',
-        password_hash: 'pass123',
-        balance: 12500,
-        exposure: 1500,
-        role: 'user',
-        profile_photo: 'https://api.dicebear.com/7.x/bottts/svg?seed=rahul_derby',
-        created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-      },
-      {
-        id: 'usr_admin',
-        ref_id: '100001',
-        full_name: 'Turf Derby Master',
-        phone: '9999988888',
-        email: 'admin@derbybet.turf',
-        username: 'admin',
-        password_hash: 'admin123',
-        balance: 50000,
-        exposure: 0,
-        role: 'admin',
-        profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
-        created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-      },
-    ];
-  },
-
   async getAdminAllBets(): Promise<Bet[]> {
     try {
       const res = await fetch(`${API_BASE}/admin/bets`);
@@ -2254,36 +2242,7 @@ export const api = {
         if (Array.isArray(data.bets)) return data.bets;
       }
     } catch {}
-
-    let customBets: Bet[] = [];
-    try {
-      const raw = localStorage.getItem('derby_custom_bets');
-      if (raw) customBets = JSON.parse(raw);
-    } catch {}
-    return [...customBets, ...DUMMY_BETS];
-  },
-
-  async adjustUserBalance(userId: string, amount: number, type: 'CREDIT' | 'DEBIT', description?: string): Promise<{ success: boolean; message: string; user: User }> {
-    try {
-      const res = await fetch(`${API_BASE}/admin/users/${userId}/adjust-balance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, type, description }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) return data;
-      }
-    } catch {}
-
-    return {
-      success: true,
-      message: `Successfully ${type === 'DEBIT' ? 'debited' : 'credited'} ₹${amount} for user`,
-      user: {
-        ...DUMMY_USER,
-        balance: type === 'CREDIT' ? DUMMY_USER.balance + amount : Math.max(0, DUMMY_USER.balance - amount),
-      },
-    };
+    return [];
   },
 
   async resetDemo(): Promise<void> {

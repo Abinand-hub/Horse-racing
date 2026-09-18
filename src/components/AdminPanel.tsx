@@ -17,6 +17,8 @@ import {
   RefreshCw, 
   Sliders, 
   Sparkles,
+  Mail,
+  Phone,
   TrendingUp,
   Image as ImageIcon,
   X,
@@ -3169,46 +3171,143 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 5: All Users & Wallet Operations */}
+      {/* TAB 5: All Registered Users & Wallet Operations */}
       {activeTab === 'users' && (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div>
-              <h2 className="text-base font-bold text-white">Registered Users & Wallet Balances</h2>
-              <p className="text-xs text-slate-400">View user exposure, approve transaction adjustments, credit or debit balances</p>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-400" />
+                <span>Registered Bettors & User Accounts</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Live database records of all registered bettors with full name, verified Gmail, phone, wallet balance, and exposure.
+              </p>
             </div>
-            <span className="text-xs text-slate-400">{users.length} Users</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadAdminData}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Users</span>
+              </button>
+              <span className="px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold">
+                {users.length} Total Users
+              </span>
+            </div>
           </div>
 
-          <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
-            <table className="w-full min-w-[650px] text-left text-xs border-collapse">
+          {/* Quick Stats Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 block font-medium">Total Registered</span>
+              <strong className="text-base sm:text-lg font-black text-white font-mono">{users.length} Accounts</strong>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 block font-medium">Bettors (Users)</span>
+              <strong className="text-base sm:text-lg font-black text-amber-400 font-mono">
+                {users.filter(u => u.role !== 'admin').length} Punters
+              </strong>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 block font-medium">Total User Balances</span>
+              <strong className="text-base sm:text-lg font-black text-emerald-400 font-mono">
+                ₹{users.reduce((sum, u) => sum + (u.balance || 0), 0).toLocaleString('en-IN')}
+              </strong>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 block font-medium">Total Active Exposure</span>
+              <strong className="text-base sm:text-lg font-black text-rose-400 font-mono">
+                ₹{users.reduce((sum, u) => sum + (u.exposure || 0), 0).toLocaleString('en-IN')}
+              </strong>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80 bg-slate-950">
+            <table className="w-full min-w-[750px] text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold">
-                  <th className="py-2.5 px-3">User</th>
-                  <th className="py-2.5 px-3">Phone</th>
-                  <th className="py-2.5 px-3">Role</th>
-                  <th className="py-2.5 px-3">Balance</th>
-                  <th className="py-2.5 px-3">Exposure</th>
-                  <th className="py-2.5 px-3">Registered</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
+                <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[11px]">
+                  <th className="py-3 px-3.5">User Profile</th>
+                  <th className="py-3 px-3">Gmail / Email</th>
+                  <th className="py-3 px-3">Phone</th>
+                  <th className="py-3 px-3 text-center">Role</th>
+                  <th className="py-3 px-3 text-right">Balance</th>
+                  <th className="py-3 px-3 text-right">Exposure</th>
+                  <th className="py-3 px-3 text-right">Joined</th>
+                  <th className="py-3 px-3.5 text-right">Balance Operations</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-850/50">
-                    <td className="py-3 px-3 font-bold text-white">@{u.username}</td>
-                    <td className="py-3 px-3 text-slate-300">{u.phone}</td>
-                    <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        u.role === 'admin' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-300'
+                  <tr key={u.id} className="hover:bg-slate-900/60 transition">
+                    {/* Profile */}
+                    <td className="py-3 px-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0">
+                          <img
+                            src={u.profile_photo || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                            alt={u.username}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{u.full_name || u.username}</span>
+                          </div>
+                          <span className="text-[11px] text-amber-400 font-mono font-bold">@{u.username}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Email */}
+                    <td className="py-3 px-3 text-slate-300 font-mono text-[11px]">
+                      {u.email ? (
+                        <span className="text-emerald-300 flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>{u.email}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic">No email</span>
+                      )}
+                    </td>
+
+                    {/* Phone */}
+                    <td className="py-3 px-3 text-slate-300 font-mono text-[11px]">
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span>{u.phone}</span>
+                      </span>
+                    </td>
+
+                    {/* Role */}
+                    <td className="py-3 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        u.role === 'admin' 
+                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
+                          : 'bg-slate-800 text-slate-300 border border-slate-700'
                       }`}>
                         {u.role}
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-emerald-400">₹{u.balance.toLocaleString()}</td>
-                    <td className="py-3 px-3 font-mono text-rose-400">₹{u.exposure.toLocaleString()}</td>
-                    <td className="py-3 px-3 text-slate-500">{new Date(u.created_at).toLocaleDateString()}</td>
-                    <td className="py-3 px-3 text-right">
+
+                    {/* Balance */}
+                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400 text-sm">
+                      ₹{u.balance.toLocaleString('en-IN')}
+                    </td>
+
+                    {/* Exposure */}
+                    <td className="py-3 px-3 text-right font-mono font-bold text-rose-400 text-xs">
+                      ₹{u.exposure.toLocaleString('en-IN')}
+                    </td>
+
+                    {/* Joined */}
+                    <td className="py-3 px-3 text-right text-slate-400 text-[11px]">
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 px-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
@@ -3216,9 +3315,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             setBalanceModalType('CREDIT');
                             setBalanceModalAmount('1000');
                           }}
-                          className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-bold text-[10px] transition cursor-pointer border border-emerald-500/30"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black font-black text-[11px] transition cursor-pointer border border-emerald-500/30 flex items-center gap-1"
                         >
-                          + Credit
+                          <span>+ Credit</span>
                         </button>
                         <button
                           onClick={() => {
@@ -3226,9 +3325,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             setBalanceModalType('DEBIT');
                             setBalanceModalAmount('500');
                           }}
-                          className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-[10px] transition cursor-pointer border border-rose-500/30"
+                          className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-black text-[11px] transition cursor-pointer border border-rose-500/30 flex items-center gap-1"
                         >
-                          - Debit
+                          <span>- Debit</span>
                         </button>
                       </div>
                     </td>

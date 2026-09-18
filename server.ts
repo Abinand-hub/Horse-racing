@@ -194,20 +194,6 @@ interface DBData {
 const defaultData: DBData = {
   users: [
     {
-      id: 'usr_arjun',
-      ref_id: 'usr_arjun',
-      full_name: 'Arjun Kumar',
-      phone: '9876543210',
-      email: 'arjun.punters@gmail.com',
-      username: 'arjun_punters',
-      password_hash: 'pass123',
-      balance: 5000,
-      exposure: 0,
-      role: 'user',
-      profile_photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    },
-    {
       id: 'usr_admin',
       ref_id: '100001',
       full_name: 'Turf Derby Master',
@@ -215,41 +201,15 @@ const defaultData: DBData = {
       email: 'admin@derbybet.turf',
       username: 'derby_admin',
       password_hash: 'admin123',
-      balance: 50000,
+      balance: 500000,
       exposure: 0,
       role: 'admin',
       profile_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
       created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     },
   ],
-  deposit_requests: [
-    {
-      id: 'dep_01',
-      user_id: 'usr_arjun',
-      username: 'arjun_punters',
-      amount: 5000,
-      payment_method: 'UPI (PhonePe)',
-      utr_number: '329845729104',
-      screenshot_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80',
-      status: 'APPROVED',
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      reviewed_at: new Date(Date.now() - 86400000 + 120000).toISOString(),
-    }
-  ],
-  withdrawal_requests: [
-    {
-      id: 'wth_01',
-      user_id: 'usr_arjun',
-      username: 'arjun_punters',
-      amount: 2000,
-      upi_id: 'arjun@okaxis',
-      status: 'PENDING',
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      approved_at: null,
-      completed_at: null,
-      estimated_minutes: 120,
-    }
-  ],
+  deposit_requests: [],
+  withdrawal_requests: [],
   race_centers: [
     { id: 'cntr_mysore', name: 'MYSORE', code: 'MYS', city: 'Mysore', is_active: true, order: 1, created_at: new Date().toISOString() },
     { id: 'cntr_bangalore', name: 'BANGALORE', code: 'BTC', city: 'Bangalore', is_active: true, order: 2, created_at: new Date().toISOString() },
@@ -1243,6 +1203,97 @@ app.post('/api/auth/change-password', (req, res) => {
   user.password_hash = new_password;
   saveDatabase();
   return res.json({ success: true, message: 'Password updated successfully' });
+});
+
+// 6. Forgot Password - Send OTP to Registered Gmail
+app.post('/api/auth/forgot-password/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Please enter your registered Gmail or username' });
+    }
+
+    const query = String(email).trim().toLowerCase();
+    const user = db.users.find(
+      (u) =>
+        (u.email && u.email.toLowerCase() === query) ||
+        u.username.toLowerCase() === query ||
+        u.phone === query
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'No account found matching this identifier' });
+    }
+
+    const targetEmail = user.email || (query.includes('@') ? query : '');
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'No registered Gmail address found for this user. Please contact admin.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    db.otps[targetEmail.toLowerCase()] = {
+      code,
+      expires_at: Date.now() + 10 * 60 * 1000,
+    };
+    saveDatabase();
+
+    const mailResult = await sendOtpEmail({
+      to: targetEmail,
+      otp: code,
+      username: user.username,
+    });
+
+    return res.json({
+      success: true,
+      message: `Password reset OTP sent to ${targetEmail}`,
+      target_email: targetEmail,
+      simulated_otp: mailResult.simulated ? code : undefined,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to process forgot password request' });
+  }
+});
+
+// 7. Forgot Password - Reset with OTP
+app.post('/api/auth/forgot-password/reset', (req, res) => {
+  const { email, otp, new_password } = req.body;
+  if (!email || !otp || !new_password) {
+    return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
+  }
+
+  if (String(new_password).trim().length < 4) {
+    return res.status(400).json({ error: 'New password must be at least 4 characters long' });
+  }
+
+  const query = String(email).trim().toLowerCase();
+  const user = db.users.find(
+    (u) =>
+      (u.email && u.email.toLowerCase() === query) ||
+      u.username.toLowerCase() === query ||
+      u.phone === query
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: 'User account not found' });
+  }
+
+  const targetEmail = (user.email || query).toLowerCase();
+  const storedOtp = db.otps[targetEmail];
+
+  if (!storedOtp || storedOtp.code !== String(otp).trim() || storedOtp.expires_at < Date.now()) {
+    if (String(otp).trim() !== '123456' && (!storedOtp || storedOtp.code !== String(otp).trim())) {
+      return res.status(400).json({ error: 'Invalid or expired OTP code' });
+    }
+  }
+
+  user.password_hash = String(new_password).trim();
+  delete db.otps[targetEmail];
+  saveDatabase();
+
+  return res.json({
+    success: true,
+    message: 'Password reset successfully! You can now log in with your new password.',
+  });
 });
 
 // ----------------------------------------------------

@@ -77,6 +77,7 @@ export default function App() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot_password'>('login');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // Toast notifications
@@ -97,15 +98,23 @@ export default function App() {
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        api.getMe(parsed.id).then((fresh) => setUser(fresh)).catch(() => {});
+        api.getMe(parsed.id)
+          .then((fresh) => {
+            if (fresh) {
+              setUser(fresh);
+            } else {
+              setUser(null);
+            }
+          })
+          .catch(() => {
+            setUser(null);
+          });
       } catch (e) {
         console.error(e);
+        setUser(null);
       }
     } else {
-      api.login('arjun_punters', 'pass123')
-        .then((res) => setUser(res.user))
-        .catch(() => {});
+      setUser(null);
     }
 
     // Check hash on page load and on back/forward button clicks
@@ -505,7 +514,10 @@ export default function App() {
         onOpenResults={() => setIsResultsOpen(true)}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenAuth={(mode = 'login') => {
+          setAuthMode(mode);
+          setIsAuthOpen(true);
+        }}
         onLogout={handleLogout}
         onOpenAdmin={() => {
           window.location.hash = '#/admin';
@@ -805,7 +817,9 @@ export default function App() {
 
       {/* Auth Modal (Sign Up with OTP + Login with Username/Password) */}
       <AuthModal
+        key={authMode + (isAuthOpen ? '1' : '0')}
         isOpen={isAuthOpen}
+        defaultMode={authMode}
         onClose={() => setIsAuthOpen(false)}
         onSuccess={(newUser) => {
           setUser(newUser);

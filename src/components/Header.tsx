@@ -26,7 +26,7 @@ interface HeaderProps {
   onOpenResults: () => void;
   onOpenChangePassword: () => void;
   onOpenHelp: () => void;
-  onOpenAuth: () => void;
+  onOpenAuth: (mode?: 'login' | 'signup') => void;
   onLogout: () => void;
   onOpenAdmin: () => void;
   onGoHome: () => void;
@@ -429,16 +429,28 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </>
               ) : (
-                <button
-                  id="header-login-btn"
-                  onClick={() => {
-                    soundManager.playClick();
-                    onOpenAuth();
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-[0_0_12px_rgba(239,68,68,0.45)] transition active:scale-95 cursor-pointer"
-                >
-                  <span>Sign In</span>
-                </button>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <button
+                    id="header-login-btn"
+                    onClick={() => {
+                      soundManager.playClick();
+                      onOpenAuth('login');
+                    }}
+                    className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition active:scale-95 cursor-pointer"
+                  >
+                    <span>Log In</span>
+                  </button>
+                  <button
+                    id="header-register-btn"
+                    onClick={() => {
+                      soundManager.playClick();
+                      onOpenAuth('signup');
+                    }}
+                    className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black shadow-[0_0_12px_rgba(245,158,11,0.35)] transition active:scale-95 cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Register (OTP)</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
