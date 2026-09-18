@@ -326,11 +326,13 @@ const defaultData: DBData = {
 
 let db: DBData = defaultData;
 
-// Initialize DB file
 function loadDatabase() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const isServerless = process.env.VERCEL === '1' || !!process.env.NOW_REGION;
+    if (!isServerless) {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
     }
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
