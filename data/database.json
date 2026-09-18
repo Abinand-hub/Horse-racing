@@ -200,5 +200,14 @@
       "is_active": true
     }
   ],
-  "otps": {}
+  "otps": {
+    "abinand720@gmail.com": {
+      "code": "471932",
+      "expires_at": 1789734871829
+    },
+    "6385633325": {
+      "code": "471932",
+      "expires_at": 1789734871829
+    }
+  }
 }
