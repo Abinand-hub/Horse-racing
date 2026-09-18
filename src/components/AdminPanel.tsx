@@ -1900,44 +1900,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </p>
             </div>
 
-            {/* Quick race picker if multiple races */}
-            {races.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Select Race:</span>
-                <select
-                  value={selectedOddsRaceId || (races.find(r => r.status === 'LIVE')?.id || races[0]?.id || '')}
-                  onChange={(e) => setSelectedOddsRaceId(e.target.value)}
-                  className="bg-slate-900 border border-emerald-500/40 text-xs font-bold text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#e5b869]"
-                >
-                  {races.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.race_no ? `R#${r.race_no} - ` : ''}{r.name} ({r.venue} • {r.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Quick race picker for eligible open/live races only */}
+            {(() => {
+              const oddsEligibleRaces = races.filter(r => r.status !== 'CLOSED' && r.status !== 'RESULTED');
+              if (oddsEligibleRaces.length === 0) return null;
+              return (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Select Race:</span>
+                  <select
+                    value={selectedOddsRaceId && oddsEligibleRaces.some(r => r.id === selectedOddsRaceId) ? selectedOddsRaceId : (oddsEligibleRaces.find(r => r.status === 'LIVE')?.id || oddsEligibleRaces[0]?.id || '')}
+                    onChange={(e) => setSelectedOddsRaceId(e.target.value)}
+                    className="bg-slate-900 border border-emerald-500/40 text-xs font-bold text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#e5b869]"
+                  >
+                    {oddsEligibleRaces.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.race_no ? `R#${r.race_no} - ` : ''}{r.name} ({r.venue} • {r.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
           </div>
 
           {(() => {
-            const currentRaceId = selectedOddsRaceId || (races.find(r => r.status === 'LIVE')?.id || races[0]?.id);
-            const activeRace = races.find(r => r.id === currentRaceId) || races[0];
+            const oddsEligibleRaces = races.filter(r => r.status !== 'CLOSED' && r.status !== 'RESULTED');
 
-            if (!activeRace) {
+            if (oddsEligibleRaces.length === 0) {
               return (
-                <div className="p-8 text-center bg-[#091510] rounded-2xl border border-emerald-900/50 space-y-3">
-                  <p className="text-xs text-slate-400">No race fixtures available. Add a race in the Add Race tab.</p>
+                <div className="p-10 text-center bg-slate-900 rounded-3xl border border-slate-800 space-y-3 max-w-xl mx-auto my-6 shadow-xl">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                    🏁
+                  </div>
+                  <h3 className="text-base font-bold text-white">No Live or Open Races</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    This race has been closed/settled. The Live Odds Editor only operates on races that are currently in-play (<strong>LIVE</strong>) or scheduled upcoming fixtures.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('lifecycle')}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs transition cursor-pointer shadow mt-2"
+                  >
+                    Go to Race Lifecycle & Control
+                  </button>
                 </div>
               );
             }
+
+            const currentRaceId = selectedOddsRaceId && oddsEligibleRaces.some(r => r.id === selectedOddsRaceId)
+              ? selectedOddsRaceId
+              : (oddsEligibleRaces.find(r => r.status === 'LIVE')?.id || oddsEligibleRaces[0]?.id);
+            const activeRace = oddsEligibleRaces.find(r => r.id === currentRaceId) || oddsEligibleRaces[0];
 
             const isAllSuspended = activeRace.is_suspended || activeRace.horses.every(h => h.is_suspended);
 
             return (
               <div className="space-y-4">
-                {/* Race Quick Switcher Pills */}
+                {/* Race Quick Switcher Pills (Eligible Open/Upcoming Races Only) */}
                 <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
-                  {races.map((r) => {
+                  {oddsEligibleRaces.map((r) => {
                     const isSelected = r.id === activeRace.id;
                     const isLive = r.status === 'LIVE';
                     return (
