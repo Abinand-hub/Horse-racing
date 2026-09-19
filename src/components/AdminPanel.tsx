@@ -2795,48 +2795,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* Sub-Filter: Center Selector Pills */}
-          <div className="space-y-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-            <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
-              <span className="flex items-center gap-1 text-emerald-400">
-                <Globe className="w-3.5 h-3.5" />
-                <span>Filter by Race Center:</span>
-              </span>
-              <span className="text-[10px] text-slate-500">1 active live race per center</span>
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
-              <button
-                onClick={() => setSelectedCenterFilter('all')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
-                  selectedCenterFilter === 'all'
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
-                    : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                }`}
-              >
-                All Centers ({races.filter(r => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})
-              </button>
-              {(raceCenters || []).map((cntr) => {
-                const centerCount = (races || []).filter(r => 
-                  (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
-                  (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
-                ).length;
-                return (
+          {/* Sub-Filter: Center Selector Pills (Only shown when active centers exist) */}
+          {(() => {
+            const activeCentersWithUpcoming = (raceCenters || []).filter((cntr) => {
+              const centerCount = (races || []).filter(r => 
+                (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
+                (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
+              ).length;
+              return centerCount > 0;
+            });
+
+            if (activeCentersWithUpcoming.length === 0) return null;
+
+            return (
+              <div className="space-y-2 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Active Centers for Today ({activeCentersWithUpcoming.length}):</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">1 active live race per center</span>
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
                   <button
-                    key={cntr.id}
-                    onClick={() => setSelectedCenterFilter(cntr.id)}
-                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
-                      selectedCenterFilter === cntr.id
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
+                    onClick={() => setSelectedCenterFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
+                      selectedCenterFilter === 'all'
+                        ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
                     }`}
                   >
-                    <span>{cntr.name}</span>
-                    <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
+                    All Active Centers ({races.filter(r => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})
                   </button>
-                );
-              })}
-            </div>
-          </div>
+                  {activeCentersWithUpcoming.map((cntr) => {
+                    const centerCount = (races || []).filter(r => 
+                      (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
+                      (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
+                    ).length;
+                    return (
+                      <button
+                        key={cntr.id}
+                        onClick={() => setSelectedCenterFilter(cntr.id)}
+                        className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
+                          selectedCenterFilter === cntr.id
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
+                            : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        <span>{cntr.name}</span>
+                        <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Upcoming Races List */}
           <div className="space-y-3">
@@ -3034,39 +3048,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
-          {/* Center Selector Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-900 p-2 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
-            <button
-              onClick={() => setSelectedCenterFilter('all')}
-              className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
-                selectedCenterFilter === 'all'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                  : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-              }`}
-            >
-              All Centers ({races.filter(r => r.status === 'RESULTED' || r.status === 'CLOSED').length})
-            </button>
-            {(raceCenters || []).map((cntr) => {
+          {/* Center Selector Filter (Only shown when settled centers exist) */}
+          {(() => {
+            const activeSettledCenters = (raceCenters || []).filter((cntr) => {
               const count = races.filter(r => 
                 (r.status === 'RESULTED' || r.status === 'CLOSED') &&
                 (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
               ).length;
-              return (
+              return count > 0;
+            });
+
+            if (activeSettledCenters.length === 0) return null;
+
+            return (
+              <div className="flex items-center gap-1.5 bg-slate-900 p-2 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
                 <button
-                  key={cntr.id}
-                  onClick={() => setSelectedCenterFilter(cntr.id)}
-                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
-                    selectedCenterFilter === cntr.id
-                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black shadow-sm'
+                  onClick={() => setSelectedCenterFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
+                    selectedCenterFilter === 'all'
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
                   }`}
                 >
-                  <span>{cntr.name}</span>
-                  <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                  All Settled Centers ({races.filter(r => r.status === 'RESULTED' || r.status === 'CLOSED').length})
                 </button>
-              );
-            })}
-          </div>
+                {activeSettledCenters.map((cntr) => {
+                  const count = races.filter(r => 
+                    (r.status === 'RESULTED' || r.status === 'CLOSED') &&
+                    (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
+                  ).length;
+                  return (
+                    <button
+                      key={cntr.id}
+                      onClick={() => setSelectedCenterFilter(cntr.id)}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
+                        selectedCenterFilter === cntr.id
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black shadow-sm'
+                          : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      <span>{cntr.name}</span>
+                      <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Finished Races Cards */}
           <div className="space-y-4">
