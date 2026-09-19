@@ -429,6 +429,21 @@ export const api = {
     }
   },
 
+  async deleteRaceCenter(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      await fetch(`${API_BASE}/admin/race-centers/${id}`, { method: 'DELETE' });
+    } catch {}
+    try {
+      const cached = localStorage.getItem('derby_race_centers');
+      if (cached) {
+        const list: RaceCenter[] = JSON.parse(cached);
+        const filtered = list.filter((c) => c.id !== id);
+        localStorage.setItem('derby_race_centers', JSON.stringify(filtered));
+      }
+    } catch {}
+    return { success: true, message: 'Race center deleted successfully' };
+  },
+
   // ----------------------------------------------------
   // RACE DAYS (Level 2)
   // ----------------------------------------------------
@@ -455,6 +470,28 @@ export const api = {
     } catch {}
 
     return [];
+  },
+
+  async updateRaceDay(id: string, data: Partial<RaceDay>): Promise<{ success: boolean; message: string; race_day: RaceDay }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/race-days/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to update Race Day');
+      return resData;
+    } catch (e: any) {
+      const days = await this.getRaceDays();
+      const d = days.find(day => day.id === id);
+      if (d) {
+        Object.assign(d, data);
+        localStorage.setItem('derby_race_days', JSON.stringify(days));
+        return { success: true, message: `Race Day "${d.title}" updated!`, race_day: d };
+      }
+      throw new Error('Race Day not found');
+    }
   },
 
   async deleteRaceDay(id: string): Promise<{ success: boolean; message: string }> {

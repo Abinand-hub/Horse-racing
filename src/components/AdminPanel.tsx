@@ -210,6 +210,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newDayDate, setNewDayDate] = useState(new Date().toISOString().split('T')[0]);
   const [newDayTitle, setNewDayTitle] = useState('');
 
+  // Center Edit Modal State
+  const [editingCenter, setEditingCenter] = useState<RaceCenter | null>(null);
+  const [editCenterName, setEditCenterName] = useState('');
+  const [editCenterCode, setEditCenterCode] = useState('');
+  const [editCenterCity, setEditCenterCity] = useState('');
+  const [editCenterActive, setEditCenterActive] = useState(true);
+
+  // Race Day Edit Modal State
+  const [editingDay, setEditingDay] = useState<RaceDay | null>(null);
+  const [editDayTitle, setEditDayTitle] = useState('');
+  const [editDayDate, setEditDayDate] = useState('');
+  const [editDayCenterId, setEditDayCenterId] = useState('');
+  const [editDayStatus, setEditDayStatus] = useState<'DRAFT' | 'PUBLISHED'>('PUBLISHED');
+
   const [users, setUsers] = useState<User[]>([]);
   const [allBets, setAllBets] = useState<Bet[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -585,36 +599,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleStatusChange = async (raceId: string, status: RaceStatus) => {
-    try {
-      // Enforce 1-Race-per-center OPEN invariant: When opening a race, auto-close previous open races in the same center
-      if (status === 'OPEN_FOR_BETTING' || status === 'LIVE') {
-        const targetRace = races.find(r => r.id === raceId);
-        if (targetRace) {
-          const centerId = targetRace.center_id;
-          const otherOpenRaces = races.filter(r => 
-            r.id !== targetRace.id && 
-            (r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING') &&
-            (r.center_id === centerId || (r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase()))
-          );
-          for (const other of otherOpenRaces) {
-            await api.updateRaceStatus(other.id, 'CLOSED');
-          }
-        }
-      }
-
-      await api.updateRaceStatus(raceId, status);
-      soundManager.playClick();
-      setActionMessage(`⚡ Race status updated to ${status}`);
-      await onRefreshData();
-      await loadAdminData();
-      setTimeout(() => setActionMessage(null), 3000);
-    } catch (err: any) {
-      setActionMessage(err.message || 'Failed to update status');
-      setTimeout(() => setActionMessage(null), 3500);
-    }
-  };
-
   const handleAbandonRace = async (race: Race) => {
     const reason = window.prompt(`Declare "${race.name}" as ABANDONED / VOID?\nAll punter bets will be 100% refunded to user wallets instantly.\n\nEnter reason:`, 'Weather / Track Unfit / False Start');
     if (reason === null) return;
@@ -906,6 +890,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleOpenEditCenter = (center: RaceCenter) => {
+    setEditingCenter(center);
+    setEditCenterName(center.name);
+    setEditCenterCode(center.code);
+    setEditCenterCity(center.city || center.name);
+    setEditCenterActive(center.is_active);
+  };
+
+  const handleSaveEditCenter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCenter) return;
+    try {
+      setIsLoading(true);
+      await api.updateRaceCenter(editingCenter.id, {
+        name: editCenterName,
+        code: editCenterCode,
+        city: editCenterCity,
+        is_active: editCenterActive,
+      });
+      soundManager.playChip();
+      notify(`✅ Race Center "${editCenterName}" updated successfully!`, 'success');
+      setEditingCenter(null);
+      await loadAdminData();
+    } catch (err: any) {
+      notify(err.message || 'Failed to update race center', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCenter = async (centerId: string, centerName: string) => {
+    if (!window.confirm(`Are you sure you want to delete Race Center "${centerName}"? All related race fixtures should be deleted first.`)) return;
+    try {
+      setIsLoading(true);
+      await api.deleteRaceCenter(centerId);
+      soundManager.playClick();
+      notify(`🗑️ Race Center "${centerName}" deleted successfully!`, 'success');
+      await loadAdminData();
+    } catch (err: any) {
+      notify(err.message || 'Failed to delete race center', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Level 2: Create Race Day Handler
   const handleCreateRaceDay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -949,6 +978,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleOpenEditDay = (day: RaceDay) => {
+    setEditingDay(day);
+    setEditDayTitle(day.title);
+    setEditDayDate(day.race_date);
+    setEditDayCenterId(day.center_id);
+    setEditDayStatus(day.status);
+  };
+
+  const handleSaveEditDay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDay) return;
+    try {
+      setIsLoading(true);
+      await api.updateRaceDay(editingDay.id, {
+        title: editDayTitle,
+        race_date: editDayDate,
+        center_id: editDayCenterId,
+        status: editDayStatus,
+      });
+      soundManager.playChip();
+      notify(`✅ Race Day "${editDayTitle}" updated!`, 'success');
+      setEditingDay(null);
+      await loadAdminData();
+    } catch (err: any) {
+      notify(err.message || 'Failed to update race day', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDeleteRaceDay = async (dayId: string) => {
     if (!confirm('Are you sure you want to delete this race day card?')) return;
     try {
@@ -981,18 +1040,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // Level 3: Open Race For Betting (Single active race per center/day)
+  // 1-Click Race Status Master Controller (OPEN / LIVE, SUSPEND, CLOSE, UPCOMING)
+  // 🔒 MASTER INVARIANT: Only 1 race per center should be OPEN at a time! When Race 3 opens, Race 2 auto-closes.
+  const handleStatusChange = async (raceId: string, newStatus: RaceStatus) => {
+    try {
+      soundManager.playClick();
+      const targetRace = races.find((r) => r.id === raceId);
+      if (!targetRace) return;
+
+      // 0ms instant optimistic update
+      setRaces((prev) =>
+        prev.map((r) => {
+          if (r.id === raceId) {
+            return {
+              ...r,
+              status: newStatus,
+              is_suspended: newStatus === 'SUSPENDED' ? true : newStatus === 'CLOSED' ? false : r.is_suspended,
+            };
+          }
+          // When opening a race, auto-close any other active race in the same center
+          if (['OPEN', 'LIVE', 'OPEN_FOR_BETTING'].includes(newStatus)) {
+            const isSameCenter =
+              (targetRace.center_id && r.center_id === targetRace.center_id) ||
+              (targetRace.race_day_id && r.race_day_id === targetRace.race_day_id) ||
+              (r.venue && targetRace.venue && r.venue.toLowerCase() === targetRace.venue.toLowerCase());
+            if (isSameCenter && r.status !== 'RESULTED' && r.status !== 'DRAFT') {
+              return { ...r, status: 'UPCOMING' as RaceStatus, is_suspended: false };
+            }
+          }
+          return r;
+        })
+      );
+
+      if (newStatus === 'LIVE' || newStatus === 'OPEN_FOR_BETTING' || newStatus === 'OPEN') {
+        setSelectedOddsRaceId(raceId);
+        setActiveTab('live');
+        setAdminRaceFilter('live');
+        notify(`🟢 Race #${targetRace.race_no || ''} "${targetRace.name}" is now OPEN FOR BETTING! (Any previous open race in this center was auto-closed)`, 'success');
+      } else if (newStatus === 'SUSPENDED') {
+        notify(`⚠️ Race #${targetRace.race_no || ''} "${targetRace.name}" BETTING SUSPENDED!`, 'warning');
+      } else if (newStatus === 'CLOSED') {
+        notify(`🔒 Race #${targetRace.race_no || ''} "${targetRace.name}" WAGERING CLOSED / LOCKED!`, 'info');
+      } else {
+        notify(`Race #${targetRace.race_no || ''} status set to ${newStatus}`, 'info');
+      }
+
+      await api.updateRaceStatus(raceId, newStatus);
+      await onRefreshData();
+      await loadAdminData(true);
+    } catch (err: any) {
+      notify(err.message || 'Failed to update race status', 'error');
+    }
+  };
+
+  // Level 3: Open Race For Betting (1-click master activator with 1-open-race invariant per center)
   const handleOpenRaceForBetting = async (race: Race) => {
     try {
       soundManager.playRaceBugle();
-      // 0ms instant optimistic update
+      // 0ms instant optimistic update: Only this race becomes LIVE, all other races in this center become UPCOMING
       setRaces((prev) =>
-        prev.map((r) => (r.id === race.id ? { ...r, status: 'LIVE' } : r))
+        prev.map((r) => {
+          if (r.id === race.id) {
+            return { ...r, status: 'LIVE', is_suspended: false };
+          }
+          const isSameCenter =
+            (race.center_id && r.center_id === race.center_id) ||
+            (race.race_day_id && r.race_day_id === race.race_day_id) ||
+            (r.venue && race.venue && r.venue.toLowerCase() === race.venue.toLowerCase());
+          if (isSameCenter && r.status !== 'RESULTED' && r.status !== 'DRAFT') {
+            return { ...r, status: 'UPCOMING' as RaceStatus, is_suspended: false };
+          }
+          return r;
+        })
       );
       setSelectedOddsRaceId(race.id);
       setActiveTab('live');
       setAdminRaceFilter('live');
-      notify(`🟢 Race #${race.race_no || ''} "${race.name}" is now LIVE IN-PLAY!`, 'success');
+      notify(`🟢 Race #${race.race_no || ''} "${race.name}" is now LIVE IN-PLAY! Other races in this center auto-closed.`, 'success');
 
       // Background sync
       api.openRaceForBetting(race.id).then(() => {
@@ -3237,6 +3361,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           >
                             {center.is_active ? 'ACTIVE' : 'INACTIVE'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCenter(center)}
+                            className="p-1 rounded-lg bg-slate-800 hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-300 border border-slate-700 text-xs transition cursor-pointer"
+                            title="Edit Race Center"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCenter(center.id, center.name)}
+                            className="p-1 rounded-lg bg-slate-800 hover:bg-rose-500/30 text-slate-400 hover:text-rose-400 border border-slate-700 text-xs transition cursor-pointer"
+                            title="Delete Race Center"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -3360,6 +3500,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </button>
                           <button
                             type="button"
+                            onClick={() => handleOpenEditDay(day)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/30 text-slate-300 hover:text-amber-300 border border-slate-700 text-xs transition cursor-pointer"
+                            title="Edit Race Day Card"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteRaceDay(day.id)}
                             className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs transition cursor-pointer"
                             title="Delete Race Day Card"
@@ -3414,7 +3562,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* Race Master Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs text-slate-300 font-semibold mb-1">
                 Race Center / Location <span className="text-rose-400">*</span>
@@ -3432,6 +3580,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   const matchingDays = raceDays.filter(d => d.center_id === val);
                   if (matchingDays.length > 0) {
                     setNewRaceDayId(matchingDays[0].id);
+                  } else {
+                    setNewRaceDayId('');
                   }
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500"
@@ -3439,6 +3589,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {(raceCenters || []).map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.code}) - {c.city}</option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-semibold mb-1">
+                Race Day Card (Fixture Date)
+              </label>
+              <select
+                id="new-race-day-select"
+                value={newRaceDayId}
+                onChange={(e) => setNewRaceDayId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-500"
+              >
+                <option value="">-- General / Today's Card --</option>
+                {(raceDays || [])
+                  .filter(d => !newRaceCenterId || d.center_id === newRaceCenterId)
+                  .map(d => (
+                    <option key={d.id} value={d.id}>{d.title} ({d.race_date})</option>
+                  ))}
               </select>
             </div>
 
@@ -3454,7 +3623,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 value={newRaceNo}
                 onChange={(e) => setNewRaceNo(e.target.value)}
                 placeholder="e.g. 1"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono font-bold focus:outline-none focus:border-indigo-500"
               />
             </div>
 
@@ -3514,7 +3683,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-xs text-slate-300 font-semibold mb-1">
                 Name of the Race <span className="text-rose-400">*</span>
               </label>
@@ -3540,7 +3709,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 value={newDistance}
                 onChange={(e) => setNewDistance(e.target.value)}
                 placeholder="e.g. 1400m"
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
@@ -6752,6 +6921,185 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Close Log
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT RACE CENTER MODAL */}
+      {editingCenter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Flag className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">
+                  Edit Race Center: {editingCenter.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCenter(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCenter} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Center Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editCenterName}
+                  onChange={(e) => setEditCenterName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold uppercase text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCenterCode}
+                    onChange={(e) => setEditCenterCode(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono font-bold uppercase text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Status</label>
+                  <select
+                    value={editCenterActive ? 'active' : 'inactive'}
+                    onChange={(e) => setEditCenterActive(e.target.value === 'active')}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">City / Region</label>
+                <input
+                  type="text"
+                  value={editCenterCity}
+                  onChange={(e) => setEditCenterCity(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingCenter(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition cursor-pointer flex items-center gap-1.5 shadow"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Center</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT RACE DAY MODAL */}
+      {editingDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">
+                  Edit Race Day Card
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDay(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditDay} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Center *</label>
+                <select
+                  required
+                  value={editDayCenterId}
+                  onChange={(e) => setEditDayCenterId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-amber-500"
+                >
+                  {(raceCenters || []).map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Race Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editDayDate}
+                    onChange={(e) => setEditDayDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Status</label>
+                  <select
+                    value={editDayStatus}
+                    onChange={(e) => setEditDayStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="PUBLISHED">PUBLISHED</option>
+                    <option value="DRAFT">DRAFT</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-semibold">Card Title</label>
+                <input
+                  type="text"
+                  value={editDayTitle}
+                  onChange={(e) => setEditDayTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingDay(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 font-black transition cursor-pointer flex items-center gap-1.5 shadow"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Race Day</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

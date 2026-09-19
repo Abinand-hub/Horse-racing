@@ -1188,7 +1188,24 @@ app.put('/api/admin/race-centers/:id', (req, res) => {
   if (req.body.order !== undefined) center.order = Number(req.body.order);
 
   saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceCenterModel.findOneAndUpdate({ id: center.id }, center, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
   return res.json({ success: true, message: `Race Center "${center.name}" updated!`, center });
+});
+
+// DELETE /api/admin/race-centers/:id
+app.delete('/api/admin/race-centers/:id', (req, res) => {
+  const { id } = req.params;
+  const center = db.race_centers.find((c) => c.id === id);
+  if (!center) return res.status(404).json({ error: 'Race Center not found' });
+
+  db.race_centers = db.race_centers.filter((c) => c.id !== id);
+  saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceCenterModel.deleteOne({ id }).catch(() => {});
+  }).catch(() => {});
+  return res.json({ success: true, message: `Race Center "${center.name}" deleted successfully!` });
 });
 
 // ----------------------------------------------------
@@ -1332,6 +1349,29 @@ app.post('/api/admin/race-days/:id/publish', (req, res) => {
     RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true }).catch(() => {});
   }).catch(() => {});
   return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
+});
+
+// PUT /api/admin/race-days/:id
+app.put('/api/admin/race-days/:id', (req, res) => {
+  const raceDay = db.race_days.find((d) => d.id === req.params.id);
+  if (!raceDay) return res.status(404).json({ error: 'Race Day not found' });
+
+  if (req.body.title !== undefined) raceDay.title = String(req.body.title).trim();
+  if (req.body.race_date !== undefined) raceDay.race_date = String(req.body.race_date).trim();
+  if (req.body.status !== undefined) raceDay.status = req.body.status;
+  if (req.body.center_id !== undefined) {
+    const center = db.race_centers.find((c) => c.id === req.body.center_id);
+    if (center) {
+      raceDay.center_id = center.id;
+      raceDay.center_name = center.name;
+    }
+  }
+
+  saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
+  return res.json({ success: true, message: `Race Day "${raceDay.title}" updated!`, race_day: raceDay });
 });
 
 // DELETE /api/admin/race-days/:id
@@ -1898,19 +1938,62 @@ app.delete('/api/admin/races/:id', (req, res) => {
   return res.json({ success: true, message: 'Race deleted successfully' });
 });
 
-// 3. Edit Race Status (Open -> Closed -> Resulted)
+// 3. Edit Race Status (Open -> Closed -> Resulted -> Suspended -> Upcoming)
 app.put('/api/admin/races/:id/status', (req, res) => {
   const { status } = req.body;
   const race = db.races.find((r) => r.id === req.params.id);
   if (!race) return res.status(404).json({ error: 'Race not found' });
 
-  if (!['OPEN', 'CLOSED', 'RESULTED'].includes(status)) {
-    return res.status(400).json({ error: 'Invalid race status' });
+  const validStatuses = ['OPEN', 'LIVE', 'OPEN_FOR_BETTING', 'UPCOMING', 'SUSPENDED', 'CLOSED', 'RESULTED', 'ABANDONED', 'DRAFT'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid race status: "${status}". Valid statuses are: ${validStatuses.join(', ')}` });
   }
 
-  race.status = status;
+  // 🔒 MASTER INVARIANT: Only 1 race per center should be OPEN at a time!
+  // When opening Race 3, Race 2 (and any other open race in that center) auto-closes to UPCOMING/CLOSED
+  if (['OPEN', 'LIVE', 'OPEN_FOR_BETTING'].includes(status)) {
+    const centerId = race.center_id;
+    const raceDayId = race.race_day_id;
+
+    db.races.forEach((r) => {
+      const isSameCenter = (raceDayId && r.race_day_id === raceDayId) ||
+                           (centerId && r.center_id === centerId) ||
+                           (r.venue && race.venue && r.venue.toLowerCase() === race.venue.toLowerCase());
+      if (r.id !== race.id && isSameCenter) {
+        if (r.status !== 'RESULTED' && r.status !== 'DRAFT') {
+          r.status = 'UPCOMING';
+          r.is_suspended = false;
+          r.horses.forEach((h) => {
+            h.is_suspended = false;
+          });
+        }
+      }
+    });
+
+    race.status = status;
+    race.is_suspended = false;
+    race.horses.forEach((h) => {
+      h.is_suspended = false;
+    });
+  } else if (status === 'SUSPENDED') {
+    race.status = 'SUSPENDED';
+    race.is_suspended = true;
+    race.horses.forEach((h) => {
+      h.is_suspended = true;
+    });
+  } else {
+    race.status = status;
+    if (status === 'CLOSED') {
+      race.is_suspended = false;
+    }
+  }
+
   saveDatabase();
-  return res.json({ success: true, race });
+  ensureMongoConnected().then(() => {
+    RaceModel.findOneAndUpdate({ id: race.id }, race, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
+
+  return res.json({ success: true, race, races: db.races });
 });
 
 // 4. Update Horse Odds
