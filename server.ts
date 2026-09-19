@@ -1449,7 +1449,15 @@ app.get('/api/admin/overview', async (req, res) => {
 // ----------------------------------------------------
 
 // GET /api/races?status=open (or upcoming, resulted, draft, all, center_id=..., race_day_id=...)
-app.get('/api/races', (req, res) => {
+app.get('/api/races', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    const mongoRaces = await RaceModel.find({}).lean().catch(() => []);
+    if (mongoRaces && mongoRaces.length > 0) {
+      db.races = mongoRaces as any;
+    }
+  } catch {}
+
   const statusFilter = (req.query.status as string || '').toLowerCase();
   const centerId = req.query.center_id as string;
   const raceDayId = req.query.race_day_id as string;
@@ -1921,6 +1929,9 @@ app.post('/api/admin/races', (req, res) => {
 
   db.races.unshift(newRace);
   saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceModel.findOneAndUpdate({ id: newRace.id }, newRace, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
   return res.json({ success: true, race: newRace });
 });
 
@@ -1941,11 +1952,6 @@ app.put('/api/admin/races/:id', (req, res) => {
   if (class_grade !== undefined) race.class_grade = String(class_grade).trim();
   if (status !== undefined) race.status = status;
   if (image_url !== undefined) race.image_url = image_url;
-  if (race_time !== undefined) race.race_time = String(race_time).trim();
-  if (date_str !== undefined) race.date_str = String(date_str).trim();
-  if (distance !== undefined) race.distance = String(distance).trim();
-  if (going !== undefined) race.going = String(going).trim();
-  if (class_grade !== undefined) race.class_grade = String(class_grade).trim();
 
   if (Array.isArray(horses)) {
     race.horses = horses.map((h: any, index: number) => {
@@ -1970,6 +1976,9 @@ app.put('/api/admin/races/:id', (req, res) => {
   }
 
   saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceModel.findOneAndUpdate({ id: race.id }, race, { upsert: true, new: true }).catch(() => {});
+  }).catch(() => {});
   return res.json({ success: true, race });
 });
 
@@ -1981,6 +1990,9 @@ app.delete('/api/admin/races/:id', (req, res) => {
   db.races.splice(raceIndex, 1);
   db.bets = db.bets.filter((b) => b.race_id !== req.params.id);
   saveDatabase();
+  ensureMongoConnected().then(() => {
+    RaceModel.deleteOne({ id: req.params.id }).catch(() => {});
+  }).catch(() => {});
   return res.json({ success: true, message: 'Race deleted successfully' });
 });
 
