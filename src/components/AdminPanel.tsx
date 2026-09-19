@@ -3,22 +3,22 @@ import { api, financialSync } from '../services/api';
 import { soundManager } from '../utils/audio';
 import { getRaceBettingCloseStatus, formatAutoCloseTime } from '../utils/raceTiming';
 import { Banner, Bet, Horse, Race, RaceCenter, RaceDay, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
-import { 
-  Shield, 
-  Trophy, 
-  Plus, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Shield,
+  Trophy,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
   AlertTriangle,
-  Edit3, 
-  Trash2, 
-  Upload, 
-  Users, 
+  Edit3,
+  Trash2,
+  Upload,
+  Users,
   Search,
-  Coins, 
-  ArrowLeft, 
-  RefreshCw, 
-  Sliders, 
+  Coins,
+  ArrowLeft,
+  RefreshCw,
+  Sliders,
   Sparkles,
   Mail,
   Phone,
@@ -232,7 +232,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const getRaceTurnover = (raceId: string) => getRaceBets(raceId).reduce((sum, b) => sum + (b.amount || 0), 0);
   const getRacePayouts = (raceId: string) => getRaceBets(raceId).reduce((sum, b) => sum + (b.payout_amount || 0), 0);
 
-  
+
   // Masters: Level 1 (Centers) & Level 2 (Race Days) state
   const [raceCenters, setRaceCenters] = useState<RaceCenter[]>([]);
   const [raceDays, setRaceDays] = useState<RaceDay[]>([]);
@@ -339,7 +339,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newVenue, setNewVenue] = useState('Hyderabad Race Club');
   const [newTime, setNewTime] = useState('');
   const [newDistance, setNewDistance] = useState('');
-  const [newGoing, setNewGoing] = useState('Good');
+  const [newGoing, setNewGoing] = useState('');
   const [newClassGrade, setNewClassGrade] = useState('Grade 1 • Terms');
   const [newRaceImage, setNewRaceImage] = useState('/images/race_action.jpg');
   const [newRaceStatus, setNewRaceStatus] = useState<RaceStatus>('UPCOMING');
@@ -361,7 +361,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editRaceImage, setEditRaceImage] = useState('/images/race_action.jpg');
   const [editRaceStatus, setEditRaceStatus] = useState<RaceStatus>('UPCOMING');
   const [editHorses, setEditHorses] = useState<any[]>([]);
-  
+
   // Bulk Paste Horses State
   const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
   const [bulkPasteTarget, setBulkPasteTarget] = useState<'new' | 'edit'>('new');
@@ -377,8 +377,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean);
     const parsedRunners: any[] = [];
     const silkColors = [
-      '#e11d48', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', 
-      '#ec4899', '#f97316', '#64748b', '#14b8a6', '#a855f7', '#84cc16', 
+      '#e11d48', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4',
+      '#ec4899', '#f97316', '#64748b', '#14b8a6', '#a855f7', '#84cc16',
       '#0ea5e9', '#d97706', '#ef4444', '#10b981'
     ];
 
@@ -876,8 +876,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleToggleGlobalBetting = async () => {
     const nextState = !(systemSettings.betting_enabled ?? true);
     const confirm = window.confirm(
-      nextState 
-        ? 'Resume all live betting platform-wide?' 
+      nextState
+        ? 'Resume all live betting platform-wide?'
         : '🚨 EMERGENCY: Freeze all betting across the entire app immediately?'
     );
     if (!confirm) return;
@@ -983,7 +983,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           const u = JSON.parse(savedUserStr);
           if (u && u.id) userId = u.id;
         }
-      } catch {}
+      } catch { }
 
       await api.changePassword(userId, adminCurrentPassword, adminNewPassword);
       soundManager.playWinPayout();
@@ -1623,7 +1623,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const gateNo = quickHorseData.gate_no ? (parseInt(quickHorseData.gate_no) || sNo) : sNo;
       const winOdds = parseFloat(quickHorseData.win_odds) || 2.50;
       const placeOdds = parseFloat(quickHorseData.place_odds) || 1.40;
-      
+
       const newHorse: Horse = {
         id: `h_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         race_id: quickAddHorseRace.id,
@@ -1809,7 +1809,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       race_time: newTime || '1:55 PM',
       date_str: 'Today',
       distance: newDistance || '1400m',
-      going: newGoing || 'Good',
+      going: newGoing || undefined,
       class_grade: newClassGrade || 'Grade 1 • Terms',
       status: finalStatus,
       image_url: newRaceImage || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
@@ -2074,15 +2074,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {toast && (
         <div className="fixed top-5 right-5 z-[9999] max-w-md w-[calc(100%-2.5rem)] sm:w-auto animate-in slide-in-from-top-3 fade-in duration-300">
           <div
-            className={`flex items-start gap-3 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-300 ${
-              toast.type === 'error'
+            className={`flex items-start gap-3 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-300 ${toast.type === 'error'
                 ? 'bg-red-950/95 border-red-500/50 text-red-100 shadow-red-950/50'
                 : toast.type === 'warning'
-                ? 'bg-amber-950/95 border-amber-500/50 text-amber-100 shadow-amber-950/50'
-                : toast.type === 'info'
-                ? 'bg-sky-950/95 border-sky-500/50 text-sky-100 shadow-sky-950/50'
-                : 'bg-slate-900/95 border-emerald-500/50 text-emerald-100 shadow-emerald-950/50'
-            }`}
+                  ? 'bg-amber-950/95 border-amber-500/50 text-amber-100 shadow-amber-950/50'
+                  : toast.type === 'info'
+                    ? 'bg-sky-950/95 border-sky-500/50 text-sky-100 shadow-sky-950/50'
+                    : 'bg-slate-900/95 border-emerald-500/50 text-emerald-100 shadow-emerald-950/50'
+              }`}
           >
             <div className="mt-0.5 shrink-0">
               {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400" />}
@@ -2115,17 +2114,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* 🚨 MASTER EMERGENCY BETTING KILL-SWITCH BANNER */}
-      <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl ${
-        (systemSettings.betting_enabled ?? true)
+      <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl ${(systemSettings.betting_enabled ?? true)
           ? 'bg-[#08150d] border-emerald-500/40 text-emerald-200'
           : 'bg-[#20080c] border-red-500/60 text-red-200 shadow-red-950/50'
-      }`}>
+        }`}>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-            (systemSettings.betting_enabled ?? true)
+          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold shrink-0 ${(systemSettings.betting_enabled ?? true)
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
               : 'bg-red-500/30 text-red-400 border border-red-500/60'
-          }`}>
+            }`}>
             <Shield className="w-5 h-5" />
           </div>
           <div>
@@ -2133,11 +2130,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span className="font-black text-white text-xs sm:text-sm tracking-wide">
                 GLOBAL BETTING ENGINE:
               </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider border ${
-                (systemSettings.betting_enabled ?? true)
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider border ${(systemSettings.betting_enabled ?? true)
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                   : 'bg-red-600 text-white border-red-400'
-              }`}>
+                }`}>
                 {(systemSettings.betting_enabled ?? true) ? '🟢 BETTING ACTIVE (OPEN)' : '🚨 BETTING FROZEN (STOPPED)'}
               </span>
             </div>
@@ -2153,11 +2149,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             type="button"
             onClick={handleToggleGlobalBetting}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-lg active:scale-95 border flex items-center gap-1.5 ${
-              (systemSettings.betting_enabled ?? true)
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-lg active:scale-95 border flex items-center gap-1.5 ${(systemSettings.betting_enabled ?? true)
                 ? 'bg-red-600 hover:bg-red-500 text-white border-red-400/60 shadow-red-950/40'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/60 shadow-emerald-950/40'
-            }`}
+              }`}
           >
             <Lock className="w-3.5 h-3.5" />
             <span>{(systemSettings.betting_enabled ?? true) ? '🛑 FREEZE ALL BETTING' : '▶️ RESUME BETTING'}</span>
@@ -2183,11 +2178,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-live"
           onClick={() => setActiveTab('live')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'live' || activeTab === 'lifecycle' || activeTab === 'races'
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'live' || activeTab === 'lifecycle' || activeTab === 'races'
               ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md font-black'
               : 'text-rose-400 hover:text-white hover:bg-slate-800'
-          }`}
+            }`}
         >
           <Flame className="w-3.5 h-3.5" />
           <span>🔴 Live Races ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
@@ -2200,11 +2194,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-upcoming"
           onClick={() => setActiveTab('upcoming')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'upcoming'
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'upcoming'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md font-black'
               : 'text-emerald-400 hover:text-white hover:bg-slate-800'
-          }`}
+            }`}
         >
           <Clock className="w-3.5 h-3.5" />
           <span>⏱️ Published Races ({races.filter((r) => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})</span>
@@ -2214,11 +2207,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-finished"
           onClick={() => setActiveTab('finished')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'finished'
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'finished'
               ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-md font-black'
               : 'text-amber-400 hover:text-white hover:bg-slate-800'
-          }`}
+            }`}
         >
           <Trophy className="w-3.5 h-3.5" />
           <span>🏆 Finished Races & Audit ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
@@ -2228,11 +2220,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-masters"
             onClick={() => setActiveTab('masters')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'masters'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'masters'
                 ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm font-black'
                 : 'text-indigo-400 hover:text-white hover:bg-slate-800'
-            }`}
+              }`}
           >
             <Globe className="w-3.5 h-3.5 text-indigo-400" />
             <span>Race Centers & Days ({(raceCenters || []).length})</span>
@@ -2242,11 +2233,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <button
           id="admin-tab-odds"
           onClick={() => setActiveTab('odds')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'odds'
+          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'odds'
               ? 'bg-rose-600 text-white shadow-sm font-bold'
               : 'text-slate-400 hover:text-white'
-          }`}
+            }`}
         >
           <Sliders className="w-3.5 h-3.5 text-rose-400" />
           <span>Live Odds Editor ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
@@ -2256,11 +2246,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-add-race"
             onClick={() => setActiveTab('add_race')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'add_race'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'add_race'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <Plus className="w-3.5 h-3.5" />
             Add New Race
@@ -2271,11 +2260,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-banners"
             onClick={() => setActiveTab('banners')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'banners'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'banners'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
             Manage Banners ({banners.length})
@@ -2286,11 +2274,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-users"
             onClick={() => setActiveTab('users')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'users'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'users'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <Users className="w-3.5 h-3.5" />
             All Users ({users.length})
@@ -2301,18 +2288,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-financials"
             onClick={() => setActiveTab('financials')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'financials'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'financials'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
                 : 'text-amber-400 hover:text-white hover:bg-slate-800/80'
-            }`}
+              }`}
           >
             <Banknote className="w-3.5 h-3.5" />
             <span>Financials & Reports</span>
             {(depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length) > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
-              }`}>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
+                }`}>
                 {depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length}
               </span>
             )}
@@ -2323,11 +2308,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-bets"
             onClick={() => setActiveTab('bets')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'bets'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'bets'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <Coins className="w-3.5 h-3.5" />
             Global Bets Book ({allBets.length})
@@ -2338,11 +2322,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             id="admin-tab-system"
             onClick={() => setActiveTab('system')}
-            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'system'
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${activeTab === 'system'
                 ? 'bg-rose-700 text-white shadow-sm font-black'
                 : 'text-rose-400 hover:text-white hover:bg-slate-800'
-            }`}
+              }`}
           >
             <Shield className="w-3.5 h-3.5" />
             <span>System Control & Staff</span>
@@ -2479,8 +2462,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </span>
                           <span className="text-slate-600">•</span>
                           <span className="text-slate-400">{liveRace.distance}</span>
-                          <span className="text-slate-600">•</span>
-                          <span className="text-emerald-400 font-medium">Going: {liveRace.going || 'Good'}</span>
                         </div>
 
                         {/* Live Quick Odds Table */}
@@ -2502,11 +2483,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             {liveRace.horses.map((horse) => (
                               <div
                                 key={horse.id}
-                                className={`p-2 rounded-xl border flex items-center justify-between text-xs transition ${
-                                  horse.is_suspended
+                                className={`p-2 rounded-xl border flex items-center justify-between text-xs transition ${horse.is_suspended
                                     ? 'bg-rose-950/40 border-rose-500/40 opacity-75'
                                     : 'bg-slate-900 border-slate-800'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] bg-slate-800 text-white shrink-0">
@@ -2531,11 +2511,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => handleToggleHorseSuspend(liveRace.id, horse.id)}
-                                    className={`p-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                                      horse.is_suspended
+                                    className={`p-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${horse.is_suspended
                                         ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600'
                                         : 'bg-rose-600/20 text-rose-300 border-rose-500/30 hover:bg-rose-600 hover:text-white'
-                                    }`}
+                                      }`}
                                     title={horse.is_suspended ? 'Resume Runner' : 'Suspend Runner'}
                                   >
                                     {horse.is_suspended ? 'RESUME' : 'SUSP'}
@@ -2578,21 +2557,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               const winStake = runnerWinBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
                               const placeStake = runnerPlaceBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
                               const totalRunnerStake = winStake + placeStake;
-                              
+
                               const winPayoutLiability = runnerWinBets.reduce((s, b) => s + ((b.stake || b.amount || 0) * b.odds), 0);
                               const netWinExposure = winPayoutLiability - liveTurnover;
                               const isHighRisk = netWinExposure > 0;
-                              
+
                               return (
                                 <div
                                   key={horse.id}
-                                  className={`p-3 rounded-xl border transition ${
-                                    isHighRisk && totalRunnerStake > 0
+                                  className={`p-3 rounded-xl border transition ${isHighRisk && totalRunnerStake > 0
                                       ? 'bg-[#1a080d] border-red-500/50 shadow-sm'
                                       : totalRunnerStake > 0
-                                      ? 'bg-[#0a150d] border-emerald-500/40'
-                                      : 'bg-slate-900/80 border-slate-800'
-                                  }`}
+                                        ? 'bg-[#0a150d] border-emerald-500/40'
+                                        : 'bg-slate-900/80 border-slate-800'
+                                    }`}
                                 >
                                   <div className="flex items-center justify-between mb-1.5">
                                     <div className="flex items-center gap-1.5 truncate">
@@ -2619,11 +2597,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </div>
                                     <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
                                       <span className="text-[10px] text-slate-400 font-sans font-bold">Admin Net Exposure:</span>
-                                      <span className={`px-2 py-0.2 rounded font-bold text-[10px] ${
-                                        netWinExposure > 0
+                                      <span className={`px-2 py-0.2 rounded font-bold text-[10px] ${netWinExposure > 0
                                           ? 'bg-red-500/20 text-red-300 border border-red-500/40'
                                           : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                      }`}>
+                                        }`}>
                                         {netWinExposure > 0
                                           ? `-₹${Math.round(netWinExposure).toLocaleString('en-IN')} (RISK)`
                                           : `+₹${Math.round(Math.abs(netWinExposure)).toLocaleString('en-IN')} (SAFE)`}
@@ -2658,9 +2635,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono"
                                   >
                                     <div className="flex items-center gap-2">
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                                        b.bet_type === 'WIN' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
-                                      }`}>
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${b.bet_type === 'WIN' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                                        }`}>
                                         {b.bet_type}
                                       </span>
                                       <span className="text-white font-bold">{b.horse_name || `Horse #${b.horse_no}`}</span>
@@ -2699,11 +2675,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <button
                               type="button"
                               onClick={() => handleToggleRaceSuspendAll(liveRace.id)}
-                              className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
-                                liveRace.horses.every((h) => h.is_suspended)
+                              className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${liveRace.horses.every((h) => h.is_suspended)
                                   ? 'bg-emerald-600 text-white border-emerald-400 hover:bg-emerald-500 shadow-md'
                                   : 'bg-rose-600/30 text-rose-300 border-rose-500/40 hover:bg-rose-600 hover:text-white'
-                              }`}
+                                }`}
                             >
                               <AlertCircle className="w-3.5 h-3.5" />
                               <span>{liveRace.horses.every((h) => h.is_suspended) ? 'RESUME ALL RUNNERS' : 'SUSPEND ALL BETTING'}</span>
@@ -2800,7 +2775,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Sub-Filter: Center Selector Pills (Only shown when active centers exist) */}
           {(() => {
             const activeCentersWithUpcoming = (raceCenters || []).filter((cntr) => {
-              const centerCount = (races || []).filter(r => 
+              const centerCount = (races || []).filter(r =>
                 (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
                 (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
               ).length;
@@ -2821,16 +2796,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold pb-0.5">
                   <button
                     onClick={() => setSelectedCenterFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
-                      selectedCenterFilter === 'all'
+                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${selectedCenterFilter === 'all'
                         ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
                         : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                    }`}
+                      }`}
                   >
                     All Active Centers ({races.filter(r => r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT').length})
                   </button>
                   {activeCentersWithUpcoming.map((cntr) => {
-                    const centerCount = (races || []).filter(r => 
+                    const centerCount = (races || []).filter(r =>
                       (r.status === 'UPCOMING' || r.status === 'OPEN' || r.status === 'DRAFT') &&
                       (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
                     ).length;
@@ -2838,11 +2812,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         key={cntr.id}
                         onClick={() => setSelectedCenterFilter(cntr.id)}
-                        className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
-                          selectedCenterFilter === cntr.id
+                        className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${selectedCenterFilter === cntr.id
                             ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-sm'
                             : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                        }`}
+                          }`}
                       >
                         <span>{cntr.name}</span>
                         <span className="text-[10px] opacity-75 font-mono">({centerCount})</span>
@@ -2859,7 +2832,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {races
               .filter((race) => {
                 if (selectedCenterFilter !== 'all') {
-                  const matchesCenter = race.center_id === selectedCenterFilter || 
+                  const matchesCenter = race.center_id === selectedCenterFilter ||
                     (race.venue && race.venue.toLowerCase().includes(selectedCenterFilter.replace('cntr_', '')));
                   if (!matchesCenter) return false;
                 }
@@ -2905,14 +2878,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </span>
                           <span className="text-slate-600">•</span>
                           <span className="text-slate-400">{race.date_str || 'Today'}</span>
-                          {race.going && (
-                            <>
-                              <span className="text-slate-600">•</span>
-                              <span className="text-emerald-400">Going: {race.going}</span>
-                            </>
-                          )}
                         </div>
-                        
+
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <h4 className="text-base font-bold text-white">
                             {race.name}
@@ -3053,7 +3020,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Center Selector Filter (Only shown when settled centers exist) */}
           {(() => {
             const activeSettledCenters = (raceCenters || []).filter((cntr) => {
-              const count = races.filter(r => 
+              const count = races.filter(r =>
                 (r.status === 'RESULTED' || r.status === 'CLOSED') &&
                 (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
               ).length;
@@ -3066,16 +3033,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="flex items-center gap-1.5 bg-slate-900 p-2 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
                 <button
                   onClick={() => setSelectedCenterFilter('all')}
-                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${
-                    selectedCenterFilter === 'all'
+                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs ${selectedCenterFilter === 'all'
                       ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                  }`}
+                    }`}
                 >
                   All Settled Centers ({races.filter(r => r.status === 'RESULTED' || r.status === 'CLOSED').length})
                 </button>
                 {activeSettledCenters.map((cntr) => {
-                  const count = races.filter(r => 
+                  const count = races.filter(r =>
                     (r.status === 'RESULTED' || r.status === 'CLOSED') &&
                     (r.center_id === cntr.id || (r.venue && r.venue.toLowerCase().includes(cntr.name.toLowerCase())))
                   ).length;
@@ -3083,11 +3049,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       key={cntr.id}
                       onClick={() => setSelectedCenterFilter(cntr.id)}
-                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${
-                        selectedCenterFilter === cntr.id
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap text-xs flex items-center gap-1 ${selectedCenterFilter === cntr.id
                           ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black shadow-sm'
                           : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-800'
-                      }`}
+                        }`}
                     >
                       <span>{cntr.name}</span>
                       <span className="text-[10px] opacity-75 font-mono">({count})</span>
@@ -3103,7 +3068,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {races
               .filter((race) => {
                 if (selectedCenterFilter !== 'all') {
-                  const matchesCenter = race.center_id === selectedCenterFilter || 
+                  const matchesCenter = race.center_id === selectedCenterFilter ||
                     (race.venue && race.venue.toLowerCase().includes(selectedCenterFilter.replace('cntr_', '')));
                   if (!matchesCenter) return false;
                 }
@@ -3376,7 +3341,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             });
 
             // Find the worst case risk runner for bookmaker
-            const worstCase = runnerAnalysis.length > 0 
+            const worstCase = runnerAnalysis.length > 0
               ? runnerAnalysis.reduce((worst, curr) => curr.bookmakerPnL < worst.bookmakerPnL ? curr : worst, runnerAnalysis[0])
               : null;
 
@@ -3396,13 +3361,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             soundManager.playClick();
                             setSelectedOddsRaceId(r.id);
                           }}
-                          className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                            isSelected
+                          className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
                               ? 'bg-gradient-to-r from-[#d4af37] to-[#e5b869] text-black font-black shadow-md'
                               : isLive
-                              ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 hover:text-white'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                          }`}
+                                ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 hover:text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
                         >
                           {isLive && <span className="w-2 h-2 rounded-full bg-rose-500" />}
                           <span>{r.race_no ? `R#${r.race_no} - ` : ''}{r.name}</span>
@@ -3416,27 +3380,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => setCockpitViewMode('BOARD')}
-                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                        cockpitViewMode === 'BOARD' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${cockpitViewMode === 'BOARD' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       <span>📋 Odds Board</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCockpitViewMode('MARKET')}
-                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                        cockpitViewMode === 'MARKET' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${cockpitViewMode === 'MARKET' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       <span>📊 Market Analysis</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCockpitViewMode('SPLIT')}
-                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                        cockpitViewMode === 'SPLIT' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${cockpitViewMode === 'SPLIT' ? 'bg-[#e5b869] text-black font-black shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       <span>⚡ Split View</span>
                     </button>
@@ -3473,11 +3434,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {/* Worst-Case Book Liability & Exposure */}
-                  <div className={`p-2.5 rounded-xl border ${
-                    worstCase && worstCase.isLoss 
-                      ? 'bg-rose-950/40 border-rose-500/60 text-rose-300' 
+                  <div className={`p-2.5 rounded-xl border ${worstCase && worstCase.isLoss
+                      ? 'bg-rose-950/40 border-rose-500/60 text-rose-300'
                       : 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                  }`}>
+                    }`}>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] sm:text-xs font-sans block">Worst-Case Result</span>
                       {worstCase && (
@@ -3558,13 +3518,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <span>Post: {activeRace.race_time || '1:00 PM'}</span>
                                 </span>
                                 {/* 1-Minute Auto-Close Status Badge */}
-                                <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 border shadow-sm ${
-                                  timingStatus.badgeColor === 'rose'
+                                <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 border shadow-sm ${timingStatus.badgeColor === 'rose'
                                     ? 'bg-rose-950/60 text-rose-300 border-rose-500/60'
                                     : timingStatus.badgeColor === 'amber'
-                                    ? 'bg-amber-950/60 text-amber-300 border-amber-500/60 animate-pulse'
-                                    : 'bg-slate-900 text-emerald-300 border-emerald-500/40'
-                                }`}>
+                                      ? 'bg-amber-950/60 text-amber-300 border-amber-500/60 animate-pulse'
+                                      : 'bg-slate-900 text-emerald-300 border-emerald-500/40'
+                                  }`}>
                                   <Timer className="w-3.5 h-3.5" />
                                   <span>Closes: {timingStatus.closeTimeStr} (1 min prior)</span>
                                 </span>
@@ -3599,11 +3558,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 type="button"
                                 id={`master-susp-all-btn-${activeRace.id}`}
                                 onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
-                                className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
-                                  isAllSuspended
+                                className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${isAllSuspended
                                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
                                     : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
-                                }`}
+                                  }`}
                               >
                                 <AlertCircle className="w-4 h-4" />
                                 <span>{isAllSuspended ? '🟢 RESUME ALL' : '🚫 SUSP ALL'}</span>
@@ -3685,21 +3643,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <React.Fragment key={horse.id || slNo}>
                                       <tr
                                         id={`admin-horse-row-${horse.id}`}
-                                        className={`transition-colors font-mono ${
-                                          isSuspended
+                                        className={`transition-colors font-mono ${isSuspended
                                             ? 'bg-rose-950/30'
                                             : item.slNo % 2 === 0
-                                            ? 'bg-[#091510]'
-                                            : 'bg-[#07100c]'
-                                        } hover:bg-[#0f241a]`}
+                                              ? 'bg-[#091510]'
+                                              : 'bg-[#07100c]'
+                                          } hover:bg-[#0f241a]`}
                                       >
                                         {/* SL (Serial Number) */}
                                         <td className="py-3 px-3 text-center font-black text-sm text-slate-200 border-r border-emerald-900/50">
-                                          <span className={`inline-flex w-8 h-8 rounded-xl items-center justify-center font-bold text-sm ${
-                                            isSuspended
+                                          <span className={`inline-flex w-8 h-8 rounded-xl items-center justify-center font-bold text-sm ${isSuspended
                                               ? 'bg-rose-950 border border-rose-500 text-rose-300'
                                               : 'bg-[#040805] border border-emerald-900/80 text-[#e5b869]'
-                                          }`}>
+                                            }`}>
                                             {slNo}
                                           </span>
                                         </td>
@@ -3746,11 +3702,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 Payout if Wins: <strong className="text-amber-400">₹{Math.round(item.totalPayoutIfWins).toLocaleString('en-IN')}</strong>
                                               </span>
                                               <span className="text-slate-600">|</span>
-                                              <span className={`px-1.5 py-0.5 rounded font-black border ${
-                                                item.isLoss 
-                                                  ? 'bg-rose-950/60 text-rose-300 border-rose-500/60' 
+                                              <span className={`px-1.5 py-0.5 rounded font-black border ${item.isLoss
+                                                  ? 'bg-rose-950/60 text-rose-300 border-rose-500/60'
                                                   : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/60'
-                                              }`}>
+                                                }`}>
                                                 Book P&L: {item.isLoss ? `-₹${Math.abs(Math.round(item.bookmakerPnL)).toLocaleString('en-IN')}` : `+₹${Math.round(item.bookmakerPnL).toLocaleString('en-IN')}`}
                                               </span>
                                             </div>
@@ -3790,9 +3745,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                   handleUpdateOdds(horse.id, val, numPlace);
                                                 }
                                               }}
-                                              className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${
-                                                isSuspended ? 'border-rose-500/80' : 'border-amber-500/60 focus:border-amber-300'
-                                              }`}
+                                              className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${isSuspended ? 'border-rose-500/80' : 'border-amber-500/60 focus:border-amber-300'
+                                                }`}
                                             />
 
                                             <button
@@ -3845,9 +3799,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                   handleUpdateOdds(horse.id, numWin, val);
                                                 }
                                               }}
-                                              className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${
-                                                isSuspended ? 'border-rose-500/80' : 'border-emerald-500/60 focus:border-emerald-300'
-                                              }`}
+                                              className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${isSuspended ? 'border-rose-500/80' : 'border-emerald-500/60 focus:border-emerald-300'
+                                                }`}
                                             />
 
                                             <button
@@ -3972,11 +3925,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                           const next = Math.max(1.05, Math.round((numWin + step) * 100) / 100);
                                                           setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
                                                         }}
-                                                        className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${
-                                                          step < 0 
-                                                            ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60' 
+                                                        className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${step < 0
+                                                            ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60'
                                                             : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
-                                                        }`}
+                                                          }`}
                                                       >
                                                         {step > 0 ? `+${step.toFixed(2)}` : step.toFixed(2)}
                                                       </button>
@@ -4014,11 +3966,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                           const next = Math.max(1.02, Math.round((numPlace + step) * 100) / 100);
                                                           setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
                                                         }}
-                                                        className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${
-                                                          step < 0 
-                                                            ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60' 
+                                                        className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${step < 0
+                                                            ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60'
                                                             : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
-                                                        }`}
+                                                          }`}
                                                       >
                                                         {step > 0 ? `+${step.toFixed(2)}` : step.toFixed(2)}
                                                       </button>
@@ -4119,11 +4070,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 type="button"
                                 id={`bottom-susp-all-btn-${activeRace.id}`}
                                 onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
-                                className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
-                                  isAllSuspended
+                                className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${isAllSuspended
                                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
                                     : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
-                                }`}
+                                  }`}
                               >
                                 <AlertCircle className="w-4 h-4" />
                                 <span>{isAllSuspended ? '🟢 RESUME ALL RUNNERS' : '🚫 SUSPEND ALL RUNNERS'}</span>
@@ -4182,13 +4132,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             return (
                               <tr
                                 key={`matrix-${horse.id}`}
-                                className={`transition-colors ${
-                                  item.isLoss 
-                                    ? 'bg-rose-950/20 hover:bg-rose-950/30' 
-                                    : item.slNo % 2 === 0 
-                                    ? 'bg-[#040805] hover:bg-[#08150e]' 
-                                    : 'bg-[#030604] hover:bg-[#08150e]'
-                                }`}
+                                className={`transition-colors ${item.isLoss
+                                    ? 'bg-rose-950/20 hover:bg-rose-950/30'
+                                    : item.slNo % 2 === 0
+                                      ? 'bg-[#040805] hover:bg-[#08150e]'
+                                      : 'bg-[#030604] hover:bg-[#08150e]'
+                                  }`}
                               >
                                 {/* SL */}
                                 <td className="py-2.5 px-3 text-center font-bold text-slate-300">
@@ -4232,15 +4181,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </div>
                                     {/* Progress bar */}
                                     <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
-                                      <div 
-                                        className={`h-full rounded-full transition-all ${
-                                          item.marketSharePct > 35 
-                                            ? 'bg-rose-500' 
-                                            : item.marketSharePct > 20 
-                                            ? 'bg-amber-400' 
-                                            : 'bg-emerald-500'
-                                        }`} 
-                                        style={{ width: `${Math.min(100, item.marketSharePct)}%` }} 
+                                      <div
+                                        className={`h-full rounded-full transition-all ${item.marketSharePct > 35
+                                            ? 'bg-rose-500'
+                                            : item.marketSharePct > 20
+                                              ? 'bg-amber-400'
+                                              : 'bg-emerald-500'
+                                          }`}
+                                        style={{ width: `${Math.min(100, item.marketSharePct)}%` }}
                                       />
                                     </div>
                                     <div className="text-[9px] text-slate-500 flex items-center justify-between font-sans">
@@ -4262,11 +4210,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                                 {/* Bookmaker Net P&L (Profit or Loss) */}
                                 <td className="py-2.5 px-4 text-right">
-                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-xl font-black text-xs border ${
-                                    item.isLoss 
-                                      ? 'bg-rose-950/60 text-rose-300 border-rose-500/60 shadow-inner' 
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-xl font-black text-xs border ${item.isLoss
+                                      ? 'bg-rose-950/60 text-rose-300 border-rose-500/60 shadow-inner'
                                       : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/60 shadow-inner'
-                                  }`}>
+                                    }`}>
                                     {item.isLoss ? `-₹${Math.abs(Math.round(item.bookmakerPnL)).toLocaleString('en-IN')}` : `+₹${Math.round(item.bookmakerPnL).toLocaleString('en-IN')}`}
                                   </span>
                                   <span className="block text-[9px] text-slate-500 font-sans mt-0.5">
@@ -4296,11 +4243,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => isSuspended ? handleResumeHorse(activeRace.id, horse.id) : handleSuspendHorse(activeRace.id, horse.id)}
-                                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition active:scale-95 cursor-pointer ${
-                                        isSuspended 
-                                          ? 'bg-emerald-600 text-white border-emerald-400' 
+                                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition active:scale-95 cursor-pointer ${isSuspended
+                                          ? 'bg-emerald-600 text-white border-emerald-400'
                                           : 'bg-rose-950/60 text-rose-300 border-rose-500/60 hover:bg-rose-900/80'
-                                      }`}
+                                        }`}
                                     >
                                       {isSuspended ? 'Resume' : 'Suspend'}
                                     </button>
@@ -4449,11 +4395,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </div>
                             </div>
 
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider border ${
-                              currentCenter.is_active
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider border ${currentCenter.is_active
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                                 : 'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}>
+                              }`}>
                               {currentCenter.is_active ? '🟢 ACTIVE' : '⚪ INACTIVE'}
                             </span>
                           </div>
@@ -4462,11 +4407,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <button
                               type="button"
                               onClick={() => handleToggleCenter(currentCenter)}
-                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer border flex items-center justify-center gap-1 ${
-                                currentCenter.is_active
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer border flex items-center justify-center gap-1 ${currentCenter.is_active
                                   ? 'bg-rose-950/40 text-rose-300 border-rose-800/60 hover:bg-rose-900/60'
                                   : 'bg-emerald-600 text-white border-emerald-400 hover:bg-emerald-500'
-                              }`}
+                                }`}
                             >
                               {currentCenter.is_active ? 'Set Inactive' : 'Activate Center'}
                             </button>
@@ -4568,11 +4512,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-white text-sm">{day.title}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              day.status === 'PUBLISHED'
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${day.status === 'PUBLISHED'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                 : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }`}>
+                              }`}>
                               {day.status}
                             </span>
                           </div>
@@ -4771,7 +4714,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={(e) => {
                     try {
                       (e.target as any).showPicker?.();
-                    } catch {}
+                    } catch { }
                   }}
                   className="w-full px-3 py-2 pl-9 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-emerald-500 cursor-pointer [color-scheme:dark]"
                 />
@@ -4790,11 +4733,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     key={preset}
                     type="button"
                     onClick={() => setNewTime(preset)}
-                    className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${
-                      format24To12(newTime) === preset
+                    className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${format24To12(newTime) === preset
                         ? 'bg-emerald-600 text-slate-950 font-black border border-emerald-400 shadow-sm'
                         : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-800'
-                    }`}
+                      }`}
                   >
                     {preset}
                   </button>
@@ -4892,11 +4834,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     key={preset.id}
                     type="button"
                     onClick={() => setNewRaceImage(preset.url)}
-                    className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
-                      newRaceImage === preset.url
+                    className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${newRaceImage === preset.url
                         ? 'border-emerald-500 ring-2 ring-emerald-500/30'
                         : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                    }`}
+                      }`}
                   >
                     <img src={preset.url} alt={preset.label} className="w-full h-16 object-cover" />
                     <div className="p-1.5 bg-slate-950/90 text-xs">
@@ -5434,11 +5375,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               🛑 BLOCKED
                             </span>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              u.role === 'admin' 
-                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${u.role === 'admin'
+                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                                 : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            }`}>
+                              }`}>
                               {u.role === 'admin' ? 'ADMIN' : 'ACTIVE'}
                             </span>
                           )}
@@ -5485,11 +5425,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <button
                               type="button"
                               onClick={() => handleToggleBlockUser(u)}
-                              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border flex items-center gap-1 ${
-                                u.is_blocked
+                              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border flex items-center gap-1 ${u.is_blocked
                                   ? 'bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border-emerald-500/40'
                                   : 'bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border-rose-500/40'
-                              }`}
+                                }`}
                               title={u.is_blocked ? 'Unblock user' : 'Block user from betting & login'}
                             >
                               <Lock className="w-3 h-3" />
@@ -5696,12 +5635,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <td className="p-2.5 text-amber-400 font-bold">{b.odds.toFixed(2)}x</td>
                             <td className="p-2.5 text-white">₹{b.stake.toLocaleString()}</td>
                             <td className="p-2.5">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                b.status === 'WON' ? 'bg-emerald-500/20 text-emerald-400' :
-                                b.status === 'LOST' ? 'bg-rose-500/20 text-rose-400' :
-                                b.status === 'CANCELLED' || b.status === 'REFUNDED' ? 'bg-slate-700 text-slate-300' :
-                                'bg-amber-500/20 text-amber-400'
-                              }`}>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${b.status === 'WON' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  b.status === 'LOST' ? 'bg-rose-500/20 text-rose-400' :
+                                    b.status === 'CANCELLED' || b.status === 'REFUNDED' ? 'bg-slate-700 text-slate-300' :
+                                      'bg-amber-500/20 text-amber-400'
+                                }`}>
                                 {b.status}
                               </span>
                             </td>
@@ -5790,11 +5728,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${
-                        balanceModalType === 'CREDIT'
+                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${balanceModalType === 'CREDIT'
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                           : 'bg-rose-600 hover:bg-rose-500 text-white'
-                      }`}
+                        }`}
                     >
                       Confirm {balanceModalType === 'CREDIT' ? 'Credit' : 'Debit'}
                     </button>
@@ -5921,13 +5858,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return (
                       <div
                         key={horse.id}
-                        className={`p-3.5 rounded-2xl border transition-all ${
-                          isHighRisk && totalRunnerStake > 0
+                        className={`p-3.5 rounded-2xl border transition-all ${isHighRisk && totalRunnerStake > 0
                             ? 'bg-[#1a080d] border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
                             : totalRunnerStake > 0
-                            ? 'bg-[#0a150d] border-emerald-500/40'
-                            : 'bg-slate-950 border-slate-800/80'
-                        }`}
+                              ? 'bg-[#0a150d] border-emerald-500/40'
+                              : 'bg-slate-950 border-slate-800/80'
+                          }`}
                       >
                         {/* Header: Horse No, Name & Odds */}
                         <div className="flex items-center justify-between mb-2">
@@ -5978,11 +5914,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {/* Net Admin Exposure */}
                           <div className="flex items-center justify-between pt-1 border-t border-slate-800">
                             <span className="text-[10px] text-slate-400 font-sans font-bold">Risk Status:</span>
-                            <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                              netWinExposure > 0
+                            <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${netWinExposure > 0
                                 ? 'bg-red-500/20 text-red-300 border border-red-500/40'
                                 : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            }`}>
+                              }`}>
                               {netWinExposure > 0
                                 ? `-₹${Math.round(netWinExposure).toLocaleString('en-IN')} (HIGH RISK)`
                                 : `+₹${Math.round(Math.abs(netWinExposure)).toLocaleString('en-IN')} (PROFIT)`}
@@ -6171,15 +6106,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
                         <td className="py-2.5 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              b.status === 'WON'
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${b.status === 'WON'
                                 ? 'bg-emerald-500/20 text-emerald-400'
                                 : b.status === 'LOST'
-                                ? 'bg-rose-500/20 text-rose-400'
-                                : b.status === 'CANCELLED' || b.status === 'REFUNDED'
-                                ? 'bg-slate-700 text-slate-300'
-                                : 'bg-amber-500/20 text-amber-400'
-                            }`}
+                                  ? 'bg-rose-500/20 text-rose-400'
+                                  : b.status === 'CANCELLED' || b.status === 'REFUNDED'
+                                    ? 'bg-slate-700 text-slate-300'
+                                    : 'bg-amber-500/20 text-amber-400'
+                              }`}
                           >
                             {b.status}
                           </span>
@@ -6330,11 +6264,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   id="fin-subtab-overview"
                   onClick={() => setFinancialSubTab('OVERVIEW')}
-                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    financialSubTab === 'OVERVIEW'
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${financialSubTab === 'OVERVIEW'
                       ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Coins className="w-3.5 h-3.5" />
                   <span>Overview & Outstanding</span>
@@ -6343,11 +6276,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   id="fin-subtab-deposits"
                   onClick={() => setFinancialSubTab('DEPOSITS')}
-                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    financialSubTab === 'DEPOSITS'
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${financialSubTab === 'DEPOSITS'
                       ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Deposits</span>
@@ -6361,11 +6293,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   id="fin-subtab-withdrawals"
                   onClick={() => setFinancialSubTab('WITHDRAWALS')}
-                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    financialSubTab === 'WITHDRAWALS'
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${financialSubTab === 'WITHDRAWALS'
                       ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <ArrowUpRight className="w-3.5 h-3.5 text-blue-400" />
                   <span>Withdrawals</span>
@@ -6379,11 +6310,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   id="fin-subtab-pnl"
                   onClick={() => setFinancialSubTab('PNL_REPORT')}
-                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    financialSubTab === 'PNL_REPORT'
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${financialSubTab === 'PNL_REPORT'
                       ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Day-Wise Center P/L</span>
@@ -6392,11 +6322,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   id="fin-subtab-credit-debit"
                   onClick={() => setFinancialSubTab('CREDIT_DEBIT')}
-                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    financialSubTab === 'CREDIT_DEBIT'
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${financialSubTab === 'CREDIT_DEBIT'
                       ? 'bg-amber-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Manual Credit / Debit</span>
@@ -6458,17 +6387,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {/* Today's Net Bookmaker P/L */}
-                  <div className={`rounded-3xl p-5 border shadow-xl space-y-2 relative overflow-hidden ${
-                    pnlNetProfit >= 0
+                  <div className={`rounded-3xl p-5 border shadow-xl space-y-2 relative overflow-hidden ${pnlNetProfit >= 0
                       ? 'bg-emerald-950/40 border-emerald-500/50'
                       : 'bg-rose-950/40 border-rose-500/50'
-                  }`}>
+                    }`}>
                     <span className="text-[11px] font-bold uppercase tracking-wider block text-slate-300">
                       Today's Bookmaker P/L
                     </span>
-                    <div className={`text-2xl sm:text-3xl font-black font-mono ${
-                      pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                    }`}>
+                    <div className={`text-2xl sm:text-3xl font-black font-mono ${pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
                       {pnlNetProfit >= 0 ? `+₹${pnlNetProfit.toLocaleString('en-IN')}` : `-₹${Math.abs(pnlNetProfit).toLocaleString('en-IN')}`}
                     </div>
                     <p className="text-[11px] text-slate-400">
@@ -6612,11 +6539,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         key={st}
                         onClick={() => setDepositStatusFilter(st)}
-                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
-                          depositStatusFilter === st
+                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${depositStatusFilter === st
                             ? 'bg-amber-500 text-slate-950 font-black shadow'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {st} ({st === 'ALL' ? depositRequests.length : depositRequests.filter((d) => d.status === st).length})
                       </button>
@@ -6783,11 +6709,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         key={st}
                         onClick={() => setWithdrawalStatusFilter(st)}
-                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
-                          withdrawalStatusFilter === st
+                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${withdrawalStatusFilter === st
                             ? 'bg-amber-500 text-slate-950 font-black shadow'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {st} ({st === 'ALL' ? withdrawalRequests.length : withdrawalRequests.filter((w) => w.status === st).length})
                       </button>
@@ -6998,11 +6923,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         key={df}
                         onClick={() => setPnlDateFilter(df)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                          pnlDateFilter === df
+                        className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${pnlDateFilter === df
                             ? 'bg-amber-500 text-slate-950 font-black shadow'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {df === 'TODAY' ? "Today's P/L" : df === 'YESTERDAY' ? 'Yesterday' : df === 'LAST7' ? 'Last 7 Days' : df === 'ALL' ? 'All Time' : 'Pick Date'}
                       </button>
@@ -7038,15 +6962,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </span>
                   </div>
 
-                  <div className={`p-4 rounded-2xl border space-y-1 ${
-                    pnlNetProfit >= 0
+                  <div className={`p-4 rounded-2xl border space-y-1 ${pnlNetProfit >= 0
                       ? 'bg-emerald-950/40 border-emerald-500/50'
                       : 'bg-rose-950/40 border-rose-500/50'
-                  }`}>
-                    <span className="text-[11px] font-bold uppercase text-slate-300">Net Bookmaker P/L</span>
-                    <div className={`text-xl font-black font-mono ${
-                      pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
+                    <span className="text-[11px] font-bold uppercase text-slate-300">Net Bookmaker P/L</span>
+                    <div className={`text-xl font-black font-mono ${pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
                       {pnlNetProfit >= 0 ? `+₹${pnlNetProfit.toLocaleString('en-IN')}` : `-₹${Math.abs(pnlNetProfit).toLocaleString('en-IN')}`}
                     </div>
                     <span className={`text-[10px] font-bold ${pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -7184,11 +7106,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => setQuickAdjustType('CREDIT')}
-                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                            quickAdjustType === 'CREDIT'
+                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${quickAdjustType === 'CREDIT'
                               ? 'bg-emerald-600 text-white shadow-md'
                               : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                          }`}
+                            }`}
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>CREDIT (Add Funds)</span>
@@ -7197,11 +7118,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => setQuickAdjustType('DEBIT')}
-                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                            quickAdjustType === 'DEBIT'
+                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${quickAdjustType === 'DEBIT'
                               ? 'bg-rose-600 text-white shadow-md'
                               : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                          }`}
+                            }`}
                         >
                           <Minus className="w-3.5 h-3.5" />
                           <span>DEBIT (Deduct Funds)</span>
@@ -7251,11 +7171,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       type="submit"
                       disabled={isLoading || !quickAdjustUserId}
-                      className={`w-full py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-lg ${
-                        quickAdjustType === 'CREDIT'
+                      className={`w-full py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-lg ${quickAdjustType === 'CREDIT'
                           ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
                           : 'bg-rose-600 hover:bg-rose-500 text-white'
-                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
                       <Coins className="w-4 h-4" />
                       <span>Execute {quickAdjustType === 'CREDIT' ? 'Credit (+)' : 'Debit (-)'} ₹{Number(quickAdjustAmount || 0).toLocaleString('en-IN')}</span>
@@ -7354,19 +7273,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-              (systemSettings.betting_enabled ?? true)
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${(systemSettings.betting_enabled ?? true)
                 ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
                 : 'bg-red-950/50 border-red-500/50 text-red-200'
-            }`}>
+              }`}>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm">Status:</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
-                    (systemSettings.betting_enabled ?? true)
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${(systemSettings.betting_enabled ?? true)
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                       : 'bg-red-600 text-white border border-red-400'
-                  }`}>
+                    }`}>
                     {(systemSettings.betting_enabled ?? true) ? '🟢 Betting Engine ACTIVE' : '🛑 Emergency FREEZE Active'}
                   </span>
                 </div>
@@ -7380,11 +7297,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <button
                 type="button"
                 onClick={handleToggleGlobalBetting}
-                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 ${
-                  (systemSettings.betting_enabled ?? true)
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 ${(systemSettings.betting_enabled ?? true)
                     ? 'bg-red-600 hover:bg-red-500 text-white'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                }`}
+                  }`}
               >
                 {(systemSettings.betting_enabled ?? true) ? '🛑 Activate Emergency Freeze' : '▶️ Resume Platform Betting'}
               </button>
@@ -7711,11 +7627,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* SCREENSHOT LIGHTBOX PREVIEW MODAL */}
       {previewScreenshot && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in"
           onClick={() => setPreviewScreenshot(null)}
         >
-          <div 
+          <div
             className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
@@ -7817,22 +7733,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setSettleViewMode('DROPDOWN')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      settleViewMode === 'DROPDOWN'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${settleViewMode === 'DROPDOWN'
                         ? 'bg-amber-500 text-slate-950 shadow'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span>Dropdown Selection (1st-4th)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSettleViewMode('RUNNERS')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      settleViewMode === 'RUNNERS'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${settleViewMode === 'RUNNERS'
                         ? 'bg-amber-500 text-slate-950 shadow'
                         : 'text-slate-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span>Runner Cards Mode</span>
                   </button>
@@ -8175,17 +8089,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return (
                       <div
                         key={horse.id}
-                        className={`p-3 rounded-2xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          currentPos === 1
+                        className={`p-3 rounded-2xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${currentPos === 1
                             ? 'bg-amber-500/15 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
                             : currentPos === 2
-                            ? 'bg-blue-500/15 border-blue-500/50'
-                            : currentPos === 3
-                            ? 'bg-emerald-500/15 border-emerald-500/50'
-                            : currentPos === 4
-                            ? 'bg-purple-500/15 border-purple-500/50'
-                            : 'bg-slate-950/80 border-slate-800/80 opacity-70 hover:opacity-100'
-                        }`}
+                              ? 'bg-blue-500/15 border-blue-500/50'
+                              : currentPos === 3
+                                ? 'bg-emerald-500/15 border-emerald-500/50'
+                                : currentPos === 4
+                                  ? 'bg-purple-500/15 border-purple-500/50'
+                                  : 'bg-slate-950/80 border-slate-800/80 opacity-70 hover:opacity-100'
+                          }`}
                       >
                         {/* Horse Info */}
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -8223,11 +8136,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               soundManager.playClick();
                               setSettlePositions((prev) => ({ ...prev, [horse.id]: 1 }));
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-black font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                              currentPos === 1
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-black font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${currentPos === 1
                                 ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md font-black'
                                 : 'bg-slate-900 hover:bg-slate-800 text-amber-400 border-slate-700'
-                            }`}
+                              }`}
                             title="Assign 1st Place (Winner)"
                           >
                             <span>🥇 1st</span>
@@ -8240,11 +8152,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               soundManager.playClick();
                               setSettlePositions((prev) => ({ ...prev, [horse.id]: 2 }));
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                              currentPos === 2
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${currentPos === 2
                                 ? 'bg-blue-500 text-white border-blue-300 shadow-md font-black'
                                 : 'bg-slate-900 hover:bg-slate-800 text-blue-400 border-slate-700'
-                            }`}
+                              }`}
                             title="Assign 2nd Place"
                           >
                             <span>🥈 2nd</span>
@@ -8257,11 +8168,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               soundManager.playClick();
                               setSettlePositions((prev) => ({ ...prev, [horse.id]: 3 }));
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                              currentPos === 3
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${currentPos === 3
                                 ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md font-black'
                                 : 'bg-slate-900 hover:bg-slate-800 text-emerald-400 border-slate-700'
-                            }`}
+                              }`}
                             title="Assign 3rd Place"
                           >
                             <span>🥉 3rd</span>
@@ -8274,11 +8184,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               soundManager.playClick();
                               setSettlePositions((prev) => ({ ...prev, [horse.id]: 4 }));
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                              currentPos === 4
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${currentPos === 4
                                 ? 'bg-purple-500 text-white border-purple-300 shadow-md font-black'
                                 : 'bg-slate-900 hover:bg-slate-800 text-purple-400 border-slate-700'
-                            }`}
+                              }`}
                             title="Assign 4th Place"
                           >
                             <span>🎖 4th</span>
@@ -8291,11 +8200,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               soundManager.playClick();
                               setSettlePositions((prev) => ({ ...prev, [horse.id]: 0 }));
                             }}
-                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold font-mono transition cursor-pointer border ${
-                              currentPos === 0
+                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold font-mono transition cursor-pointer border ${currentPos === 0
                                 ? 'bg-slate-800 text-slate-400 border-slate-700'
                                 : 'bg-slate-950 hover:bg-slate-900 text-slate-500 border-slate-800'
-                            }`}
+                              }`}
                             title="Unplaced"
                           >
                             ✕
@@ -8377,11 +8285,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   id="execute-settle-btn"
                   disabled={isLoading || p1.length === 0}
                   onClick={handleExecuteSettlement}
-                  className={`flex-1 min-w-[200px] py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                    isDeadHeat
+                  className={`flex-1 min-w-[200px] py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${isDeadHeat
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 ring-2 ring-amber-400/50'
                       : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                  }`}
+                    }`}
                 >
                   <Trophy className="w-4 h-4" />
                   <span>{isDeadHeat ? 'Confirm & Settle Dead Heat Result' : 'Confirm & Settle Official Payouts'}</span>
@@ -8506,7 +8413,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onClick={(e) => {
                         try {
                           (e.target as any).showPicker?.();
-                        } catch {}
+                        } catch { }
                       }}
                       className="w-full px-3 py-2 pl-9 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
                     />
@@ -8525,11 +8432,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         key={preset}
                         type="button"
                         onClick={() => setEditTime(preset)}
-                        className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${
-                          format24To12(editTime) === preset
+                        className={`px-1.5 py-0.5 rounded transition cursor-pointer whitespace-nowrap font-mono ${format24To12(editTime) === preset
                             ? 'bg-indigo-600 text-white font-bold border border-indigo-500'
                             : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-800'
-                        }`}
+                          }`}
                       >
                         {preset}
                       </button>
@@ -8630,11 +8536,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         key={preset.id}
                         type="button"
                         onClick={() => setEditRaceImage(preset.url)}
-                        className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${
-                          editRaceImage === preset.url
+                        className={`relative rounded-xl overflow-hidden border-2 text-left transition cursor-pointer group ${editRaceImage === preset.url
                             ? 'border-emerald-500 ring-2 ring-emerald-500/30'
                             : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                        }`}
+                          }`}
                       >
                         <img src={preset.url} alt={preset.label} className="w-full h-16 object-cover" />
                         <div className="p-1 bg-slate-950/90 text-[10px] font-bold text-white truncate">
@@ -8993,11 +8898,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                               {/* Market */}
                               <td className="py-3 px-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                                  bet.bet_type === 'WIN'
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${bet.bet_type === 'WIN'
                                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                                     : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                }`}>
+                                  }`}>
                                   {bet.bet_type}
                                 </span>
                               </td>

@@ -1740,7 +1740,7 @@ export const api = {
       race_time: String(raceData.race_time || '2:00 PM').trim(),
       date_str: String(raceData.date_str || 'Today, 5th Sep').trim(),
       distance: String(raceData.distance || '1600m').trim(),
-      going: String(raceData.going || 'Good').trim(),
+      going: raceData.going ? String(raceData.going).trim() : undefined,
       class_grade: String(raceData.class_grade || 'Grade 1 • Terms').trim(),
       status: raceData.status || 'OPEN',
       image_url: raceData.image_url || '/images/race_action.jpg',
