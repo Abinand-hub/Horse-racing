@@ -2550,11 +2550,88 @@ app.delete('/api/admin/sub-admins/:id', (req, res) => {
   return res.json({ success: true, message: 'Sub-Admin removed successfully' });
 });
 
-// 18. Admin Reset Demo Data
-app.post('/api/admin/reset-demo', (req, res) => {
-  db = JSON.parse(JSON.stringify(defaultData));
+// 18. Admin Reset Database / Clean Slate Wipe
+app.post(['/api/admin/reset-demo', '/api/admin/reset-database', '/api/admin/clean-reset'], async (req, res) => {
+  try {
+    if (isMongoDBConnected()) {
+      await UserModel.deleteMany({});
+      await RaceModel.deleteMany({});
+      await BetModel.deleteMany({});
+      await TransactionModel.deleteMany({});
+      await DepositRequestModel.deleteMany({});
+      await WithdrawalRequestModel.deleteMany({});
+      await OtpModel.deleteMany({});
+      await RaceDayModel.deleteMany({});
+      await RaceCenterModel.deleteMany({});
+      await BannerModel.deleteMany({});
+
+      const cleanMasterAdmin = {
+        id: 'usr_admin_master',
+        ref_id: 'ADMIN-001',
+        full_name: 'Master Administrator',
+        phone: '9999999999',
+        email: 'admin@derbybet.com',
+        username: 'admin',
+        password_hash: 'admin123',
+        balance: 500000,
+        exposure: 0,
+        role: 'admin',
+        is_blocked: false,
+        profile_photo: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin',
+        created_at: new Date().toISOString(),
+      };
+      await UserModel.create(cleanMasterAdmin);
+
+      for (const center of defaultData.race_centers) {
+        await RaceCenterModel.create(center);
+      }
+      for (const banner of defaultData.banners) {
+        await BannerModel.create(banner);
+      }
+    }
+  } catch (err: any) {
+    console.error('MongoDB reset error:', err.message);
+  }
+
+  const cleanMasterAdmin = {
+    id: 'usr_admin_master',
+    ref_id: 'ADMIN-001',
+    full_name: 'Master Administrator',
+    phone: '9999999999',
+    email: 'admin@derbybet.com',
+    username: 'admin',
+    password_hash: 'admin123',
+    balance: 500000,
+    exposure: 0,
+    role: 'admin' as const,
+    is_blocked: false,
+    profile_photo: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin',
+    created_at: new Date().toISOString(),
+  };
+
+  db = {
+    users: [cleanMasterAdmin],
+    races: [],
+    bets: [],
+    transactions: [],
+    deposit_requests: [],
+    withdrawal_requests: [],
+    race_centers: defaultData.race_centers,
+    race_days: [],
+    banners: defaultData.banners,
+    system_settings: {
+      betting_enabled: true,
+      emergency_message: '',
+      announcement: '',
+      max_bet_per_horse: 50000,
+      max_win_per_race: 500000,
+      min_bet_amount: 100,
+      sub_admins: [],
+    },
+    otps: {},
+  };
   saveDatabase();
-  return res.json({ success: true, message: 'Platform demo data successfully reseeded!' });
+  return res.json({ success: true, message: 'Platform database successfully wiped and reset to clean initial state!' });
 });
 
 // ----------------------------------------------------

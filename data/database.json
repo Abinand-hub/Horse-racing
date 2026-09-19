@@ -1,307 +1,138 @@
 {
   "users": [
     {
-      "_id": "6aad5631fc02997cbe29c1b5",
-      "id": "usr_10001_38av",
-      "__v": 0,
-      "balance": 50,
-      "createdAt": "2026-09-18T15:18:09.003Z",
-      "created_at": "2026-09-18T15:18:09.001Z",
-      "email": "abinand720@gmail.com",
+      "id": "usr_admin_master",
+      "ref_id": "ADMIN-001",
+      "full_name": "Master Administrator",
+      "phone": "9999999999",
+      "email": "admin@derbybet.com",
+      "username": "admin",
+      "password_hash": "admin123",
+      "balance": 500000,
       "exposure": 0,
-      "full_name": "S Abinand",
-      "password_hash": "Abinand@100",
-      "phone": "6385633325",
-      "profile_photo": "https://api.dicebear.com/7.x/bottts/svg?seed=abinand",
-      "ref_id": "TURF-10001",
-      "role": "user",
-      "updatedAt": "2026-09-18T20:04:58.382Z",
-      "username": "abinand"
-    },
-    {
-      "_id": "6aad6b8efc02997cbe29c3ee",
-      "id": "usr_10001_hh4u",
-      "__v": 0,
-      "balance": 50,
-      "createdAt": "2026-09-18T16:49:18.293Z",
-      "created_at": "2026-09-18T16:49:18.292Z",
-      "email": "beingpk2912@gmail.com",
-      "exposure": 0,
-      "full_name": "Raju",
-      "password_hash": "Turfbet2912",
-      "phone": "9632587412",
-      "profile_photo": "https://api.dicebear.com/7.x/bottts/svg?seed=rockybhai29",
-      "ref_id": "TURF-10002",
-      "role": "user",
-      "updatedAt": "2026-09-18T19:02:17.461Z",
-      "username": "rockybhai29"
+      "role": "admin",
+      "is_blocked": false,
+      "profile_photo": "https://api.dicebear.com/7.x/bottts/svg?seed=admin",
+      "created_at": "2026-09-19T04:46:10.374Z"
     }
   ],
-  "races": [
-    {
-      "_id": "6aad8125fc02997cbe29c6d0",
-      "id": "race_1789755683617_ygd6h",
-      "__v": 0,
-      "center_id": "",
-      "class_grade": "Grade 1 • Terms",
-      "createdAt": "2026-09-18T18:21:23.618Z",
-      "date_str": "Today",
-      "distance": "1600m",
-      "going": "Good",
-      "horses": [
-        {
-          "id": "h_1789755683457_1_7i80",
-          "race_id": "race_1789755683617_ygd6h",
-          "horse_no": 1,
-          "serial_no": 1,
-          "gate_no": 1,
-          "name": "STAR",
-          "jockey": "man",
-          "trainer": "women",
-          "win_odds": 2.5,
-          "place_odds": 1.5,
-          "silk_color": "#dc2626",
-          "form": "1-1-2-1",
-          "weight": "56.0 kg",
-          "is_suspended": false
-        },
-        {
-          "id": "h_1789755683457_2_t2rg",
-          "race_id": "race_1789755683617_ygd6h",
-          "horse_no": 2,
-          "serial_no": 2,
-          "gate_no": 2,
-          "name": "SILVER",
-          "jockey": "gold",
-          "trainer": "copper",
-          "win_odds": 2.5,
-          "place_odds": 1.5,
-          "silk_color": "#3b82f6",
-          "form": "1-1-2-1",
-          "weight": "56.0 kg",
-          "is_suspended": false
-        }
-      ],
-      "image_url": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80",
-      "is_dead_heat": false,
-      "is_suspended": false,
-      "name": "The Star Future Cup",
-      "place_horses_ids": [
-        "h_1789755683457_1_7i80",
-        "h_1789755683457_2_t2rg"
-      ],
-      "position_1": [
-        "h_1789755683457_1_7i80"
-      ],
-      "position_2": [
-        "h_1789755683457_2_t2rg"
-      ],
-      "position_3": [],
-      "race_day_id": "",
-      "race_no": 1,
-      "race_time": "1:10 AM",
-      "settled_at": "2026-09-18T20:33:28.799Z",
-      "status": "RESULTED",
-      "updatedAt": "2026-09-18T18:28:47.044Z",
-      "venue": "MYSORE Turf Club",
-      "winner_horse_id": "h_1789755683457_1_7i80"
-    }
-  ],
+  "races": [],
   "bets": [],
-  "transactions": [
-    {
-      "_id": "6aad5631fc02997cbe29c1b7",
-      "id": "tx_1789744689001_apvqe",
-      "__v": 0,
-      "amount": 50,
-      "balance_after": 50,
-      "createdAt": "2026-09-18T15:18:09.003Z",
-      "created_at": "2026-09-18T15:18:09.001Z",
-      "description": "Welcome Sign-up Bonus",
-      "reference_id": "",
-      "type": "DEPOSIT",
-      "updatedAt": "2026-09-18T18:28:47.333Z",
-      "user_id": "usr_10001_38av"
-    },
-    {
-      "_id": "6aad6b8efc02997cbe29c3ef",
-      "id": "tx_1789750158292_8svuj",
-      "__v": 0,
-      "amount": 50,
-      "balance_after": 50,
-      "createdAt": "2026-09-18T16:49:18.293Z",
-      "created_at": "2026-09-18T16:49:18.292Z",
-      "description": "Welcome Sign-up Bonus",
-      "reference_id": "",
-      "type": "DEPOSIT",
-      "updatedAt": "2026-09-18T18:28:47.627Z",
-      "user_id": "usr_10001_hh4u"
-    }
-  ],
+  "transactions": [],
   "deposit_requests": [],
   "withdrawal_requests": [],
   "race_centers": [
     {
-      "_id": "6aad5526fc02997cbe29c180",
       "id": "cntr_mysore",
-      "__v": 0,
-      "city": "Mysore",
-      "code": "MYS",
-      "createdAt": "2026-09-18T15:13:39.027Z",
-      "created_at": "2026-09-18T20:04:35.820Z",
-      "is_active": true,
       "name": "MYSORE",
+      "code": "MYS",
+      "city": "Mysore",
+      "is_active": true,
       "order": 1,
-      "updatedAt": "2026-09-18T20:05:02.047Z"
+      "created_at": "2026-09-19T04:46:10.373Z"
     },
     {
-      "_id": "6aad5527fc02997cbe29c181",
       "id": "cntr_bangalore",
-      "__v": 0,
-      "city": "Bangalore",
-      "code": "BTC",
-      "createdAt": "2026-09-18T15:13:40.775Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "BANGALORE",
+      "code": "BTC",
+      "city": "Bangalore",
+      "is_active": true,
       "order": 2,
-      "updatedAt": "2026-09-18T20:05:02.236Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5527fc02997cbe29c182",
       "id": "cntr_ooty",
-      "__v": 0,
-      "city": "Ooty",
-      "code": "OOT",
-      "createdAt": "2026-09-18T15:13:41.588Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "OOTY",
+      "code": "OOT",
+      "city": "Ooty",
+      "is_active": true,
       "order": 3,
-      "updatedAt": "2026-09-18T20:05:02.426Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5527fc02997cbe29c183",
       "id": "cntr_madras",
-      "__v": 0,
-      "city": "Chennai",
-      "code": "MRC",
-      "createdAt": "2026-09-18T15:13:42.047Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "MADRAS",
+      "code": "MRC",
+      "city": "Chennai",
+      "is_active": true,
       "order": 4,
-      "updatedAt": "2026-09-18T20:05:02.615Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5527fc02997cbe29c184",
       "id": "cntr_kolkata",
-      "__v": 0,
-      "city": "Kolkata",
-      "code": "CAL",
-      "createdAt": "2026-09-18T15:13:42.119Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "KOLKATA",
+      "code": "CAL",
+      "city": "Kolkata",
+      "is_active": true,
       "order": 5,
-      "updatedAt": "2026-09-18T20:05:02.845Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5527fc02997cbe29c185",
       "id": "cntr_delhi",
-      "__v": 0,
-      "city": "Delhi",
-      "code": "DEL",
-      "createdAt": "2026-09-18T15:13:42.188Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "DELHI",
+      "code": "DEL",
+      "city": "Delhi",
+      "is_active": true,
       "order": 6,
-      "updatedAt": "2026-09-18T20:05:04.136Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5528fc02997cbe29c186",
       "id": "cntr_hyderabad",
-      "__v": 0,
-      "city": "Hyderabad",
-      "code": "HYD",
-      "createdAt": "2026-09-18T15:13:42.298Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "HYDERABAD",
+      "code": "HYD",
+      "city": "Hyderabad",
+      "is_active": true,
       "order": 7,
-      "updatedAt": "2026-09-18T20:05:04.326Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5528fc02997cbe29c187",
       "id": "cntr_pune",
-      "__v": 0,
-      "city": "Pune",
-      "code": "PUN",
-      "createdAt": "2026-09-18T15:13:42.440Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "PUNE",
+      "code": "PUN",
+      "city": "Pune",
+      "is_active": true,
       "order": 8,
-      "updatedAt": "2026-09-18T20:05:04.515Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     },
     {
-      "_id": "6aad5528fc02997cbe29c188",
       "id": "cntr_mumbai",
-      "__v": 0,
-      "city": "Mumbai",
-      "code": "MUM",
-      "createdAt": "2026-09-18T15:13:42.507Z",
-      "created_at": "2026-09-18T20:04:35.821Z",
-      "is_active": true,
       "name": "MUMBAI",
+      "code": "MUM",
+      "city": "Mumbai",
+      "is_active": true,
       "order": 9,
-      "updatedAt": "2026-09-18T20:05:04.704Z"
+      "created_at": "2026-09-19T04:46:10.374Z"
     }
   ],
   "race_days": [],
   "banners": [
     {
-      "_id": "6aad5523fc02997cbe29c17d",
       "id": "bnr_01",
-      "__v": 0,
-      "createdAt": "2026-09-18T15:13:37.124Z",
-      "created_at": "2026-09-18T15:13:37.135Z",
-      "image_url": "/images/race_action.jpg",
-      "is_active": true,
-      "link_url": "",
-      "order": 0,
       "title": "Bangalore Derby 2026",
-      "updatedAt": "2026-09-18T20:05:00.424Z"
+      "subtitle": "Official Live Wagering • Place Win & Place Bets with Live Odds",
+      "image_url": "/images/race_action.jpg",
+      "link": "#races",
+      "tag": "TURF TACTICS",
+      "is_active": true
     },
     {
-      "_id": "6aad5524fc02997cbe29c17f",
       "id": "bnr_02",
-      "__v": 0,
-      "createdAt": "2026-09-18T15:13:37.731Z",
-      "created_at": "2026-09-18T15:13:37.733Z",
-      "image_url": "/images/jockey_hero.jpg",
-      "is_active": true,
-      "link_url": "",
-      "order": 0,
       "title": "Live Racing In-Play",
-      "updatedAt": "2026-09-18T20:05:01.857Z"
+      "subtitle": "Real-time Odds, Fast UPI Deposits & Instant Verified Payouts",
+      "image_url": "/images/jockey_hero.jpg",
+      "link": "#races",
+      "tag": "LIVE ODDS",
+      "is_active": true
     }
   ],
-  "otps": {
-    "abinand720@gmail.com": {
-      "code": "471932",
-      "expires_at": 1789734871829
-    },
-    "6385633325": {
-      "code": "471932",
-      "expires_at": 1789734871829
-    }
-  },
   "system_settings": {
     "betting_enabled": true,
     "emergency_message": "",
     "announcement": "",
+    "max_bet_per_horse": 50000,
+    "max_win_per_race": 500000,
+    "min_bet_amount": 100,
     "sub_admins": []
-  }
+  },
+  "otps": {}
 }

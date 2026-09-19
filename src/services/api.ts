@@ -2538,10 +2538,28 @@ export const api = {
 
   async resetDemo(): Promise<void> {
     try {
+      await fetch(`${API_BASE}/admin/clean-reset`, { method: 'POST' });
+    } catch {}
+    try {
       await fetch(`${API_BASE}/admin/reset-demo`, { method: 'POST' });
     } catch {}
-    localStorage.removeItem('derby_custom_races');
-    localStorage.removeItem('derby_custom_bets');
-    localStorage.removeItem('derby_custom_banners');
+
+    const preservedAudio = localStorage.getItem('derby_audio_muted');
+
+    // Remove all cached local derby data
+    Object.keys(localStorage).forEach((k) => {
+      if (k.startsWith('derby_')) {
+        localStorage.removeItem(k);
+      }
+    });
+
+    if (preservedAudio) {
+      localStorage.setItem('derby_audio_muted', preservedAudio);
+    }
+
+    sessionStorage.removeItem('derby_admin_authenticated');
+    sessionStorage.removeItem('derby_admin_user');
+    sessionStorage.removeItem('derby_admin_role');
+    sessionStorage.removeItem('derby_admin_name');
   },
 };

@@ -216,7 +216,7 @@ var DepositRequestSchema = new import_mongoose.Schema(
   },
   { timestamps: true }
 );
-var DepositRequestModel = import_mongoose.default.models.DepositRequest || import_mongoose.default.model("DepositRequest", DepositRequestSchema, "deposit_requests");
+var DepositRequestModel2 = import_mongoose.default.models.DepositRequest || import_mongoose.default.model("DepositRequest", DepositRequestSchema, "deposit_requests");
 var WithdrawalRequestSchema = new import_mongoose.Schema(
   {
     id: { type: String, required: true, unique: true, index: true },
@@ -237,7 +237,7 @@ var WithdrawalRequestSchema = new import_mongoose.Schema(
   },
   { timestamps: true }
 );
-var WithdrawalRequestModel = import_mongoose.default.models.WithdrawalRequest || import_mongoose.default.model("WithdrawalRequest", WithdrawalRequestSchema, "withdrawal_requests");
+var WithdrawalRequestModel2 = import_mongoose.default.models.WithdrawalRequest || import_mongoose.default.model("WithdrawalRequest", WithdrawalRequestSchema, "withdrawal_requests");
 var OtpSchema = new import_mongoose.Schema(
   {
     id: { type: String, default: () => `otp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` },
@@ -446,12 +446,12 @@ async function syncMemoryToMongoDB(db2) {
     }
     if (db2.deposit_requests?.length) {
       for (const d of db2.deposit_requests) {
-        await DepositRequestModel.findOneAndUpdate({ id: d.id }, d, { upsert: true, new: true });
+        await DepositRequestModel2.findOneAndUpdate({ id: d.id }, d, { upsert: true, new: true });
       }
     }
     if (db2.withdrawal_requests?.length) {
       for (const w of db2.withdrawal_requests) {
-        await WithdrawalRequestModel.findOneAndUpdate({ id: w.id }, w, { upsert: true, new: true });
+        await WithdrawalRequestModel2.findOneAndUpdate({ id: w.id }, w, { upsert: true, new: true });
       }
     }
   } catch (err) {
@@ -468,8 +468,8 @@ async function loadDataFromMongoDB() {
     const banners = await BannerModel.find({}).lean();
     const race_centers = await RaceCenterModel.find({}).lean();
     const race_days = await RaceDayModel.find({}).lean();
-    const deposit_requests = await DepositRequestModel.find({}).lean();
-    const withdrawal_requests = await WithdrawalRequestModel.find({}).lean();
+    const deposit_requests = await DepositRequestModel2.find({}).lean();
+    const withdrawal_requests = await WithdrawalRequestModel2.find({}).lean();
     if (users.length > 0 || races.length > 0) {
       return {
         users,
@@ -2544,10 +2544,83 @@ app.delete("/api/admin/sub-admins/:id", (req, res) => {
   saveDatabase();
   return res.json({ success: true, message: "Sub-Admin removed successfully" });
 });
-app.post("/api/admin/reset-demo", (req, res) => {
-  db = JSON.parse(JSON.stringify(defaultData));
+app.post(["/api/admin/reset-demo", "/api/admin/reset-database", "/api/admin/clean-reset"], async (req, res) => {
+  try {
+    if (isMongoDBConnected()) {
+      await UserModel.deleteMany({});
+      await RaceModel.deleteMany({});
+      await BetModel.deleteMany({});
+      await TransactionModel.deleteMany({});
+      await DepositRequestModel.deleteMany({});
+      await WithdrawalRequestModel.deleteMany({});
+      await OtpModel.deleteMany({});
+      await RaceDayModel.deleteMany({});
+      await RaceCenterModel.deleteMany({});
+      await BannerModel.deleteMany({});
+      const cleanMasterAdmin2 = {
+        id: "usr_admin_master",
+        ref_id: "ADMIN-001",
+        full_name: "Master Administrator",
+        phone: "9999999999",
+        email: "admin@derbybet.com",
+        username: "admin",
+        password_hash: "admin123",
+        balance: 5e5,
+        exposure: 0,
+        role: "admin",
+        is_blocked: false,
+        profile_photo: "https://api.dicebear.com/7.x/bottts/svg?seed=admin",
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      await UserModel.create(cleanMasterAdmin2);
+      for (const center of defaultData.race_centers) {
+        await RaceCenterModel.create(center);
+      }
+      for (const banner of defaultData.banners) {
+        await BannerModel.create(banner);
+      }
+    }
+  } catch (err) {
+    console.error("MongoDB reset error:", err.message);
+  }
+  const cleanMasterAdmin = {
+    id: "usr_admin_master",
+    ref_id: "ADMIN-001",
+    full_name: "Master Administrator",
+    phone: "9999999999",
+    email: "admin@derbybet.com",
+    username: "admin",
+    password_hash: "admin123",
+    balance: 5e5,
+    exposure: 0,
+    role: "admin",
+    is_blocked: false,
+    profile_photo: "https://api.dicebear.com/7.x/bottts/svg?seed=admin",
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  db = {
+    users: [cleanMasterAdmin],
+    races: [],
+    bets: [],
+    transactions: [],
+    deposit_requests: [],
+    withdrawal_requests: [],
+    race_centers: defaultData.race_centers,
+    race_days: [],
+    banners: defaultData.banners,
+    system_settings: {
+      betting_enabled: true,
+      emergency_message: "",
+      announcement: "",
+      max_bet_per_horse: 5e4,
+      max_win_per_race: 5e5,
+      min_bet_amount: 100,
+      sub_admins: []
+    },
+    otps: {}
+  };
   saveDatabase();
-  return res.json({ success: true, message: "Platform demo data successfully reseeded!" });
+  return res.json({ success: true, message: "Platform database successfully wiped and reset to clean initial state!" });
 });
 app.post("/api/deposits", (req, res) => {
   const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;
