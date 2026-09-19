@@ -342,6 +342,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to adjust balance');
+    financialSync.broadcast();
     return data;
   },
 
@@ -1094,8 +1095,17 @@ export const api = {
           this.saveLocalDepositRequest(data.depositRequest);
         }
         if (data.user) {
-          localStorage.setItem('derby_user', JSON.stringify(data.user));
+          try {
+            const saved = localStorage.getItem('derby_user');
+            if (saved) {
+              const cur = JSON.parse(saved);
+              if (cur.id === data.user.id) {
+                localStorage.setItem('derby_user', JSON.stringify(data.user));
+              }
+            }
+          } catch {}
         }
+        financialSync.broadcast();
         return data;
       }
     } catch (e) {
@@ -1161,6 +1171,8 @@ export const api = {
       reference_id: req.id,
     });
 
+    financialSync.broadcast();
+
     return {
       success: true,
       message: `Deposit of ₹${req.amount.toLocaleString('en-IN')} approved! Balance credited automatically.`,
@@ -1180,6 +1192,7 @@ export const api = {
         if (data.depositRequest) {
           this.saveLocalDepositRequest(data.depositRequest);
         }
+        financialSync.broadcast();
         return data;
       }
     } catch (e) {
@@ -1392,6 +1405,7 @@ export const api = {
         if (data.withdrawalRequest) {
           this.saveLocalWithdrawalRequest(data.withdrawalRequest);
         }
+        financialSync.broadcast();
         return data;
       }
     } catch (e) {
@@ -1425,6 +1439,8 @@ export const api = {
       reference_id: req.id,
     });
 
+    financialSync.broadcast();
+
     return {
       success: true,
       message: `Withdrawal of ₹${req.amount.toLocaleString('en-IN')} marked as IN PROGRESS. 120-minute timer started.`,
@@ -1439,6 +1455,7 @@ export const api = {
         if (data.withdrawalRequest) {
           this.saveLocalWithdrawalRequest(data.withdrawalRequest);
         }
+        financialSync.broadcast();
         return data;
       }
     } catch (e) {
@@ -1471,6 +1488,8 @@ export const api = {
       reference_id: req.id,
     });
 
+    financialSync.broadcast();
+
     return {
       success: true,
       message: `Withdrawal of ₹${req.amount.toLocaleString('en-IN')} marked as SUCCESSFUL / TRANSFERRED!`,
@@ -1490,8 +1509,17 @@ export const api = {
           this.saveLocalWithdrawalRequest(data.withdrawalRequest);
         }
         if (data.user) {
-          localStorage.setItem('derby_user', JSON.stringify(data.user));
+          try {
+            const saved = localStorage.getItem('derby_user');
+            if (saved) {
+              const cur = JSON.parse(saved);
+              if (cur.id === data.user.id) {
+                localStorage.setItem('derby_user', JSON.stringify(data.user));
+              }
+            }
+          } catch {}
         }
+        financialSync.broadcast();
         return data;
       }
     } catch (e) {

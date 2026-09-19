@@ -25,6 +25,8 @@ import {
   OtpModel,
   RaceDayModel,
   RaceCenterModel,
+  DepositRequestModel,
+  WithdrawalRequestModel,
 } from './src/models/index';
 import { sendOtpEmail } from './src/utils/mailer';
 
@@ -796,17 +798,8 @@ app.post('/api/auth/signup', async (req, res) => {
 
 // Fetch single user by Unique ID (e.g. TURF-10001, usr_...) / username / phone
 app.get('/api/users/:identifier', async (req, res) => {
-  const query = req.params.identifier.toLowerCase().trim();
-  let user = db.users.find(
-    (u) =>
-      u.id.toLowerCase() === query ||
-      (u.ref_id && u.ref_id.toLowerCase() === query) ||
-      u.username.toLowerCase() === query ||
-      (u.email && u.email.toLowerCase() === query) ||
-      u.phone === query
-  );
-
-  if (!user) {
+  try {
+    const query = req.params.identifier.toLowerCase().trim();
     await ensureMongoConnected();
     const mongoUser = await UserModel.findOne({
       $or: [
@@ -817,18 +810,34 @@ app.get('/api/users/:identifier', async (req, res) => {
         { phone: query },
       ],
     }).lean();
+
     if (mongoUser) {
-      user = mongoUser as any;
-      if (!db.users.find((u) => u.id === user!.id)) db.users.push(user!);
+      const user = mongoUser as any;
+      const idx = db.users.findIndex((u) => u.id === user.id);
+      if (idx >= 0) db.users[idx] = user;
+      else db.users.push(user);
+      const { password_hash, ...userProfile } = user;
+      return res.json({ success: true, user: userProfile });
     }
-  }
 
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
+    const memUser = db.users.find(
+      (u) =>
+        u.id.toLowerCase() === query ||
+        (u.ref_id && u.ref_id.toLowerCase() === query) ||
+        u.username.toLowerCase() === query ||
+        (u.email && u.email.toLowerCase() === query) ||
+        u.phone === query
+    );
 
-  const { password_hash, ...userProfile } = user;
-  return res.json({ success: true, user: userProfile });
+    if (!memUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { password_hash, ...userProfile } = memUser;
+    return res.json({ success: true, user: userProfile });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to fetch user' });
+  }
 });
 
 // 3. Login: Username / Email / Phone + Password
@@ -1806,11 +1815,19 @@ app.post('/api/wallet/withdraw', (req, res) => {
 });
 
 // GET /api/wallet/transactions?user_id=...
-app.get('/api/wallet/transactions', (req, res) => {
+app.get('/api/wallet/transactions', async (req, res) => {
   const userId = req.query.user_id as string;
   if (!userId) {
     return res.status(400).json({ error: 'user_id is required' });
   }
+  try {
+    await ensureMongoConnected();
+    const mongoTxs = await TransactionModel.find({ user_id: userId }).sort({ created_at: -1 }).lean().catch(() => []);
+    if (mongoTxs && mongoTxs.length > 0) {
+      return res.json({ success: true, transactions: mongoTxs });
+    }
+  } catch {}
+
   const txs = db.transactions.filter((t) => t.user_id === userId);
   return res.json({ success: true, transactions: txs });
 });
@@ -2355,45 +2372,61 @@ app.get('/api/admin/bets', async (req, res) => {
 });
 
 // 8. Admin Adjust User Balance (Credit/Debit / Approve Transaction)
-app.post('/api/admin/users/:id/adjust-balance', (req, res) => {
-  const user = db.users.find((u) => u.id === req.params.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
+app.post('/api/admin/users/:id/adjust-balance', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    let user = db.users.find((u) => u.id === req.params.id);
+    if (!user) {
+      const mongoUser = await UserModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoUser) {
+        user = mongoUser as any;
+        db.users.push(user!);
+      }
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const { amount, type, description } = req.body;
-  const numAmount = Number(amount);
-  if (isNaN(numAmount) || numAmount <= 0) {
-    return res.status(400).json({ error: 'Invalid adjustment amount' });
+    const { amount, type, description } = req.body;
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid adjustment amount' });
+    }
+
+    if (type === 'DEBIT' && (user.balance || 0) < numAmount) {
+      return res.status(400).json({ error: 'Insufficient balance to debit' });
+    }
+
+    if (type === 'DEBIT') {
+      user.balance = Math.max(0, (user.balance || 0) - numAmount);
+    } else {
+      user.balance = (user.balance || 0) + numAmount;
+    }
+
+    const newTx: Transaction = {
+      id: `tx_adm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      user_id: user.id,
+      username: user.username,
+      type: type === 'DEBIT' ? 'WITHDRAW' : 'DEPOSIT',
+      amount: numAmount,
+      balance_after: user.balance,
+      description: description || `Admin Manual ${type === 'DEBIT' ? 'Debit' : 'Credit'} Adjustment`,
+      created_at: new Date().toISOString(),
+    };
+
+    db.transactions.unshift(newTx);
+    saveDatabase();
+
+    await UserModel.findOneAndUpdate({ id: user.id }, { balance: user.balance }, { new: true }).catch(() => {});
+    await TransactionModel.findOneAndUpdate({ id: newTx.id }, newTx, { upsert: true, new: true }).catch(() => {});
+
+    const { password_hash, ...userProfile } = user;
+    return res.json({
+      success: true,
+      message: `Successfully ${type === 'DEBIT' ? 'debited' : 'credited'} ₹${numAmount.toLocaleString('en-IN')} for @${user.username}`,
+      user: userProfile,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to adjust balance' });
   }
-
-  if (type === 'DEBIT' && user.balance < numAmount) {
-    return res.status(400).json({ error: 'Insufficient balance to debit' });
-  }
-
-  if (type === 'DEBIT') {
-    user.balance -= numAmount;
-  } else {
-    user.balance += numAmount;
-  }
-
-  const newTx: Transaction = {
-    id: `tx_adm_${Date.now()}`,
-    user_id: user.id,
-    username: user.username,
-    type: type === 'DEBIT' ? 'WITHDRAW' : 'DEPOSIT',
-    amount: numAmount,
-    balance_after: user.balance,
-    description: description || `Admin ${type === 'DEBIT' ? 'Debit' : 'Credit'} Adjustment`,
-    created_at: new Date().toISOString(),
-  };
-
-  db.transactions.unshift(newTx);
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    message: `Successfully ${type === 'DEBIT' ? 'debited' : 'credited'} ₹${numAmount} for @${user.username}`,
-    user,
-  });
 });
 
 // 9. Admin Declare Race ABANDONED / VOID (100% Full Bet Refund)
@@ -2707,257 +2740,398 @@ app.post(['/api/admin/reset-demo', '/api/admin/reset-database', '/api/admin/clea
 // ----------------------------------------------------
 // 10. DEPOSIT REQUESTS API
 // ----------------------------------------------------
-app.post('/api/deposits', (req, res) => {
-  const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;
-  const numAmount = Number(amount);
-  if (!userId || isNaN(numAmount) || numAmount < 100) {
-    return res.status(400).json({ error: 'Valid user ID and minimum deposit amount of ₹100 is required' });
+app.post('/api/deposits', async (req, res) => {
+  try {
+    const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;
+    const numAmount = Number(amount);
+    if (!userId || isNaN(numAmount) || numAmount < 100) {
+      return res.status(400).json({ error: 'Valid user ID and minimum deposit amount of ₹100 is required' });
+    }
+
+    await ensureMongoConnected();
+    let user = db.users.find((u) => u.id === userId);
+    if (!user) {
+      const mongoUser = await UserModel.findOne({ id: userId }).lean().catch(() => null);
+      if (mongoUser) {
+        user = mongoUser as any;
+        db.users.push(user!);
+      }
+    }
+    const username = user?.username || 'punter';
+
+    if (!db.deposit_requests) db.deposit_requests = [];
+
+    const newRequest: DepositRequest = {
+      id: `dep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      user_id: userId,
+      username,
+      amount: numAmount,
+      payment_method: paymentMethod || 'UPI',
+      utr_number: utrNumber || `UTR${Date.now().toString().slice(-6)}`,
+      screenshot_url: screenshotUrl,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+    };
+
+    db.deposit_requests.unshift(newRequest);
+    saveDatabase();
+
+    await DepositRequestModel.findOneAndUpdate({ id: newRequest.id }, newRequest, { upsert: true, new: true }).catch(() => {});
+
+    return res.json({
+      success: true,
+      depositRequest: newRequest,
+      message: `Deposit request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin verification.`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to submit deposit request' });
   }
-
-  const user = db.users.find((u) => u.id === userId);
-  const username = user?.username || 'arjun_punters';
-
-  if (!db.deposit_requests) db.deposit_requests = [];
-
-  const newRequest: DepositRequest = {
-    id: `dep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    user_id: userId,
-    username,
-    amount: numAmount,
-    payment_method: paymentMethod || 'UPI',
-    utr_number: utrNumber || `UTR${Date.now().toString().slice(-6)}`,
-    screenshot_url: screenshotUrl,
-    status: 'PENDING',
-    created_at: new Date().toISOString(),
-    reviewed_at: null,
-  };
-
-  db.deposit_requests.unshift(newRequest);
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    depositRequest: newRequest,
-    message: `Deposit request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin verification.`,
-  });
 });
 
-app.get('/api/deposits', (req, res) => {
-  const { user_id, status } = req.query;
-  if (!db.deposit_requests) db.deposit_requests = [];
+app.get('/api/deposits', async (req, res) => {
+  try {
+    const { user_id, status } = req.query;
+    await ensureMongoConnected();
+    const query: any = {};
+    if (user_id) query.user_id = user_id;
+    if (status && status !== 'ALL') query.status = status;
 
-  let list = db.deposit_requests;
-  if (user_id) {
-    list = list.filter((d) => d.user_id === user_id);
+    const mongoDeposits = await DepositRequestModel.find(query).sort({ created_at: -1 }).lean().catch(() => []);
+    if (mongoDeposits && mongoDeposits.length > 0) {
+      return res.json({ success: true, deposits: mongoDeposits });
+    }
+
+    if (!db.deposit_requests) db.deposit_requests = [];
+    let list = db.deposit_requests;
+    if (user_id) list = list.filter((d) => d.user_id === user_id);
+    if (status && status !== 'ALL') list = list.filter((d) => d.status === status);
+    return res.json({ success: true, deposits: list });
+  } catch (err: any) {
+    return res.json({ success: true, deposits: db.deposit_requests || [] });
   }
-  if (status && status !== 'ALL') {
-    list = list.filter((d) => d.status === status);
-  }
-  return res.json({ success: true, deposits: list });
 });
 
-app.post('/api/admin/deposits/:id/approve', (req, res) => {
-  if (!db.deposit_requests) db.deposit_requests = [];
-  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
-  if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
+app.post('/api/admin/deposits/:id/approve', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    if (!db.deposit_requests) db.deposit_requests = [];
+    let reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+    if (!reqItem) {
+      const mongoDep = await DepositRequestModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoDep) {
+        reqItem = mongoDep as any;
+        db.deposit_requests.unshift(reqItem!);
+      }
+    }
+    if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
 
-  if (reqItem.status === 'APPROVED') {
-    return res.json({ success: true, message: 'Deposit request is already approved' });
+    if (reqItem.status === 'APPROVED') {
+      return res.json({ success: true, message: 'Deposit request is already approved' });
+    }
+
+    const { adminNotes } = req.body;
+    reqItem.status = 'APPROVED';
+    reqItem.reviewed_at = new Date().toISOString();
+    if (adminNotes) reqItem.admin_notes = adminNotes;
+
+    let user = db.users.find((u) => u.id === reqItem!.user_id);
+    if (!user) {
+      const mongoUser = await UserModel.findOne({ id: reqItem.user_id }).lean().catch(() => null);
+      if (mongoUser) {
+        user = mongoUser as any;
+        db.users.push(user!);
+      }
+    }
+
+    if (user) {
+      user.balance = (user.balance || 0) + Number(reqItem.amount);
+      await UserModel.findOneAndUpdate({ id: user.id }, { balance: user.balance }, { new: true }).catch(() => {});
+    }
+
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}_dep`,
+      user_id: reqItem.user_id,
+      username: reqItem.username,
+      type: 'DEPOSIT',
+      amount: reqItem.amount,
+      balance_after: user ? user.balance : reqItem.amount,
+      description: `Deposit Approved via ${reqItem.payment_method} (UTR: ${reqItem.utr_number})`,
+      created_at: new Date().toISOString(),
+      reference_id: reqItem.id,
+    };
+    db.transactions.unshift(newTx);
+    saveDatabase();
+
+    await DepositRequestModel.findOneAndUpdate({ id: reqItem.id }, reqItem, { new: true }).catch(() => {});
+    await TransactionModel.findOneAndUpdate({ id: newTx.id }, newTx, { upsert: true, new: true }).catch(() => {});
+
+    const userProfile = user ? (({ password_hash, ...u }) => u)(user) : undefined;
+    return res.json({
+      success: true,
+      message: `Deposit of ₹${reqItem.amount.toLocaleString('en-IN')} approved! Balance credited automatically to @${reqItem.username}.`,
+      user: userProfile,
+      depositRequest: reqItem,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to approve deposit' });
   }
-
-  const { adminNotes } = req.body;
-  reqItem.status = 'APPROVED';
-  reqItem.reviewed_at = new Date().toISOString();
-  if (adminNotes) reqItem.admin_notes = adminNotes;
-
-  const user = db.users.find((u) => u.id === reqItem.user_id);
-  if (user) {
-    user.balance += reqItem.amount;
-  }
-
-  const newTx: Transaction = {
-    id: `tx_${Date.now()}_dep`,
-    user_id: reqItem.user_id,
-    username: reqItem.username,
-    type: 'DEPOSIT',
-    amount: reqItem.amount,
-    balance_after: user ? user.balance : reqItem.amount,
-    description: `Deposit Approved via ${reqItem.payment_method} (UTR: ${reqItem.utr_number})`,
-    created_at: new Date().toISOString(),
-    reference_id: reqItem.id,
-  };
-  db.transactions.unshift(newTx);
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    message: `Deposit of ₹${reqItem.amount.toLocaleString('en-IN')} approved! Balance credited automatically.`,
-    user,
-    depositRequest: reqItem,
-  });
 });
 
-app.post('/api/admin/deposits/:id/reject', (req, res) => {
-  if (!db.deposit_requests) db.deposit_requests = [];
-  const reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
-  if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
+app.post('/api/admin/deposits/:id/reject', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    if (!db.deposit_requests) db.deposit_requests = [];
+    let reqItem = db.deposit_requests.find((d) => d.id === req.params.id);
+    if (!reqItem) {
+      const mongoDep = await DepositRequestModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoDep) {
+        reqItem = mongoDep as any;
+        db.deposit_requests.unshift(reqItem!);
+      }
+    }
+    if (!reqItem) return res.status(404).json({ error: 'Deposit request not found' });
 
-  const { reason } = req.body;
-  reqItem.status = 'REJECTED';
-  reqItem.reviewed_at = new Date().toISOString();
-  reqItem.admin_notes = reason || 'UTR or proof could not be verified by Admin.';
-  saveDatabase();
+    const { reason } = req.body;
+    reqItem.status = 'REJECTED';
+    reqItem.reviewed_at = new Date().toISOString();
+    reqItem.admin_notes = reason || 'UTR or proof could not be verified by Admin.';
+    saveDatabase();
 
-  return res.json({
-    success: true,
-    message: 'Deposit request rejected.',
-    depositRequest: reqItem,
-  });
+    await DepositRequestModel.findOneAndUpdate({ id: reqItem.id }, reqItem, { new: true }).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'Deposit request rejected.',
+      depositRequest: reqItem,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to reject deposit' });
+  }
 });
 
 // ----------------------------------------------------
 // 11. WITHDRAWAL REQUESTS API
 // ----------------------------------------------------
-app.post('/api/withdrawals', (req, res) => {
-  const { userId, amount, details } = req.body;
-  const numAmount = Number(amount);
-  if (!userId || isNaN(numAmount) || numAmount < 100) {
-    return res.status(400).json({ error: 'Valid user ID and minimum withdrawal amount of ₹100 is required' });
+app.post('/api/withdrawals', async (req, res) => {
+  try {
+    const { userId, amount, details } = req.body;
+    const numAmount = Number(amount);
+    if (!userId || isNaN(numAmount) || numAmount < 100) {
+      return res.status(400).json({ error: 'Valid user ID and minimum withdrawal amount of ₹100 is required' });
+    }
+
+    await ensureMongoConnected();
+    let user = db.users.find((u) => u.id === userId);
+    if (!user) {
+      const mongoUser = await UserModel.findOne({ id: userId }).lean().catch(() => null);
+      if (mongoUser) {
+        user = mongoUser as any;
+        db.users.push(user!);
+      }
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const withdrawable = (user.balance ?? 0) - (user.exposure ?? 0);
+    if (withdrawable < numAmount) {
+      return res.status(400).json({ error: `Insufficient withdrawable balance. Available: ₹${Math.max(0, withdrawable)}` });
+    }
+
+    user.balance = Math.max(0, (user.balance || 0) - numAmount);
+    await UserModel.findOneAndUpdate({ id: user.id }, { balance: user.balance }, { new: true }).catch(() => {});
+
+    if (!db.withdrawal_requests) db.withdrawal_requests = [];
+
+    const newRequest: WithdrawalRequest = {
+      id: `wth_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      user_id: userId,
+      username: user.username,
+      amount: numAmount,
+      upi_id: details?.upi_id,
+      bank_account: details?.bank_account,
+      ifsc: details?.ifsc,
+      account_holder: details?.account_holder,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      approved_at: null,
+      completed_at: null,
+      estimated_minutes: 120,
+    };
+
+    db.withdrawal_requests.unshift(newRequest);
+
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}_wth`,
+      user_id: userId,
+      username: user.username,
+      type: 'WITHDRAW',
+      amount: -numAmount,
+      balance_after: user.balance,
+      description: `Withdrawal Request (Pending Verification) to ${details?.upi_id || details?.bank_account || 'Registered Bank'}`,
+      created_at: new Date().toISOString(),
+      reference_id: newRequest.id,
+    };
+    db.transactions.unshift(newTx);
+    saveDatabase();
+
+    await WithdrawalRequestModel.findOneAndUpdate({ id: newRequest.id }, newRequest, { upsert: true, new: true }).catch(() => {});
+    await TransactionModel.findOneAndUpdate({ id: newTx.id }, newTx, { upsert: true, new: true }).catch(() => {});
+
+    const { password_hash, ...userProfile } = user;
+    return res.json({
+      success: true,
+      withdrawalRequest: newRequest,
+      user: userProfile,
+      message: `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin review.`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to submit withdrawal request' });
   }
-
-  const user = db.users.find((u) => u.id === userId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  const withdrawable = (user.balance ?? 0) - (user.exposure ?? 0);
-  if (withdrawable < numAmount) {
-    return res.status(400).json({ error: `Insufficient withdrawable balance. Available: ₹${Math.max(0, withdrawable)}` });
-  }
-
-  user.balance -= numAmount;
-
-  if (!db.withdrawal_requests) db.withdrawal_requests = [];
-
-  const newRequest: WithdrawalRequest = {
-    id: `wth_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    user_id: userId,
-    username: user.username,
-    amount: numAmount,
-    upi_id: details?.upi_id,
-    bank_account: details?.bank_account,
-    ifsc: details?.ifsc,
-    account_holder: details?.account_holder,
-    status: 'PENDING',
-    created_at: new Date().toISOString(),
-    approved_at: null,
-    completed_at: null,
-    estimated_minutes: 120,
-  };
-
-  db.withdrawal_requests.unshift(newRequest);
-
-  const newTx: Transaction = {
-    id: `tx_${Date.now()}_wth`,
-    user_id: userId,
-    username: user.username,
-    type: 'WITHDRAW',
-    amount: -numAmount,
-    balance_after: user.balance,
-    description: `Withdrawal Request (Pending Verification) to ${details?.upi_id || details?.bank_account || 'Registered Bank'}`,
-    created_at: new Date().toISOString(),
-    reference_id: newRequest.id,
-  };
-  db.transactions.unshift(newTx);
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    withdrawalRequest: newRequest,
-    user,
-    message: `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted! Status: PENDING Admin review.`,
-  });
 });
 
-app.get('/api/withdrawals', (req, res) => {
-  const { user_id, status } = req.query;
-  if (!db.withdrawal_requests) db.withdrawal_requests = [];
+app.get('/api/withdrawals', async (req, res) => {
+  try {
+    const { user_id, status } = req.query;
+    await ensureMongoConnected();
+    const query: any = {};
+    if (user_id) query.user_id = user_id;
+    if (status && status !== 'ALL') query.status = status;
 
-  let list = db.withdrawal_requests;
-  if (user_id) {
-    list = list.filter((w) => w.user_id === user_id);
+    const mongoWithdrawals = await WithdrawalRequestModel.find(query).sort({ created_at: -1 }).lean().catch(() => []);
+    if (mongoWithdrawals && mongoWithdrawals.length > 0) {
+      return res.json({ success: true, withdrawals: mongoWithdrawals });
+    }
+
+    if (!db.withdrawal_requests) db.withdrawal_requests = [];
+    let list = db.withdrawal_requests;
+    if (user_id) list = list.filter((w) => w.user_id === user_id);
+    if (status && status !== 'ALL') list = list.filter((w) => w.status === status);
+    return res.json({ success: true, withdrawals: list });
+  } catch (err: any) {
+    return res.json({ success: true, withdrawals: db.withdrawal_requests || [] });
   }
-  if (status && status !== 'ALL') {
-    list = list.filter((w) => w.status === status);
-  }
-  return res.json({ success: true, withdrawals: list });
 });
 
-app.post('/api/admin/withdrawals/:id/approve', (req, res) => {
-  if (!db.withdrawal_requests) db.withdrawal_requests = [];
-  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
-  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
+app.post('/api/admin/withdrawals/:id/approve', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    if (!db.withdrawal_requests) db.withdrawal_requests = [];
+    let reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+    if (!reqItem) {
+      const mongoWth = await WithdrawalRequestModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoWth) {
+        reqItem = mongoWth as any;
+        db.withdrawal_requests.unshift(reqItem!);
+      }
+    }
+    if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
 
-  reqItem.status = 'IN_PROGRESS';
-  reqItem.approved_at = new Date().toISOString();
-  reqItem.estimated_minutes = 120;
-  saveDatabase();
+    reqItem.status = 'IN_PROGRESS';
+    reqItem.approved_at = new Date().toISOString();
+    reqItem.estimated_minutes = 120;
+    saveDatabase();
 
-  return res.json({
-    success: true,
-    message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as IN PROGRESS. 120-minute timer started.`,
-    withdrawalRequest: reqItem,
-  });
-});
+    await WithdrawalRequestModel.findOneAndUpdate({ id: reqItem.id }, reqItem, { new: true }).catch(() => {});
 
-app.post('/api/admin/withdrawals/:id/complete', (req, res) => {
-  if (!db.withdrawal_requests) db.withdrawal_requests = [];
-  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
-  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
-
-  reqItem.status = 'SUCCESSFUL';
-  reqItem.completed_at = new Date().toISOString();
-  saveDatabase();
-
-  return res.json({
-    success: true,
-    message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as SUCCESSFUL / DISBURSED!`,
-    withdrawalRequest: reqItem,
-  });
-});
-
-app.post('/api/admin/withdrawals/:id/reject', (req, res) => {
-  if (!db.withdrawal_requests) db.withdrawal_requests = [];
-  const reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
-  if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
-
-  const { reason } = req.body;
-  reqItem.status = 'REJECTED';
-  reqItem.admin_notes = reason || 'Rejected by Admin. Amount refunded back to wallet.';
-
-  const user = db.users.find((u) => u.id === reqItem.user_id);
-  if (user) {
-    user.balance += reqItem.amount;
+    return res.json({
+      success: true,
+      message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as IN PROGRESS. 120-minute timer started.`,
+      withdrawalRequest: reqItem,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to approve withdrawal' });
   }
+});
 
-  const newTx: Transaction = {
-    id: `tx_${Date.now()}_ref`,
-    user_id: reqItem.user_id,
-    username: reqItem.username,
-    type: 'REFUND',
-    amount: reqItem.amount,
-    balance_after: user ? user.balance : reqItem.amount,
-    description: `Refund for Rejected Withdrawal: ${reqItem.admin_notes}`,
-    created_at: new Date().toISOString(),
-    reference_id: reqItem.id,
-  };
-  db.transactions.unshift(newTx);
-  saveDatabase();
+app.post('/api/admin/withdrawals/:id/complete', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    if (!db.withdrawal_requests) db.withdrawal_requests = [];
+    let reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+    if (!reqItem) {
+      const mongoWth = await WithdrawalRequestModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoWth) {
+        reqItem = mongoWth as any;
+        db.withdrawal_requests.unshift(reqItem!);
+      }
+    }
+    if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
 
-  return res.json({
-    success: true,
-    message: `Withdrawal rejected and ₹${reqItem.amount.toLocaleString('en-IN')} refunded to user wallet.`,
-    user,
-    withdrawalRequest: reqItem,
-  });
+    reqItem.status = 'SUCCESSFUL';
+    reqItem.completed_at = new Date().toISOString();
+    saveDatabase();
+
+    await WithdrawalRequestModel.findOneAndUpdate({ id: reqItem.id }, reqItem, { new: true }).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Withdrawal of ₹${reqItem.amount.toLocaleString('en-IN')} marked as SUCCESSFUL / DISBURSED!`,
+      withdrawalRequest: reqItem,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to complete withdrawal' });
+  }
+});
+
+app.post('/api/admin/withdrawals/:id/reject', async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    if (!db.withdrawal_requests) db.withdrawal_requests = [];
+    let reqItem = db.withdrawal_requests.find((w) => w.id === req.params.id);
+    if (!reqItem) {
+      const mongoWth = await WithdrawalRequestModel.findOne({ id: req.params.id }).lean().catch(() => null);
+      if (mongoWth) {
+        reqItem = mongoWth as any;
+        db.withdrawal_requests.unshift(reqItem!);
+      }
+    }
+    if (!reqItem) return res.status(404).json({ error: 'Withdrawal request not found' });
+
+    const { reason } = req.body;
+    reqItem.status = 'REJECTED';
+    reqItem.admin_notes = reason || 'Rejected by Admin. Amount refunded back to wallet.';
+
+    let user = db.users.find((u) => u.id === reqItem!.user_id);
+    if (!user) {
+      const mongoUser = await UserModel.findOne({ id: reqItem.user_id }).lean().catch(() => null);
+      if (mongoUser) {
+        user = mongoUser as any;
+        db.users.push(user!);
+      }
+    }
+
+    if (user) {
+      user.balance = (user.balance || 0) + Number(reqItem.amount);
+      await UserModel.findOneAndUpdate({ id: user.id }, { balance: user.balance }, { new: true }).catch(() => {});
+    }
+
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}_ref`,
+      user_id: reqItem.user_id,
+      username: reqItem.username,
+      type: 'REFUND',
+      amount: reqItem.amount,
+      balance_after: user ? user.balance : reqItem.amount,
+      description: `Refund for Rejected Withdrawal: ${reqItem.admin_notes}`,
+      created_at: new Date().toISOString(),
+      reference_id: reqItem.id,
+    };
+    db.transactions.unshift(newTx);
+    saveDatabase();
+
+    await WithdrawalRequestModel.findOneAndUpdate({ id: reqItem.id }, reqItem, { new: true }).catch(() => {});
+    await TransactionModel.findOneAndUpdate({ id: newTx.id }, newTx, { upsert: true, new: true }).catch(() => {});
+
+    const userProfile = user ? (({ password_hash, ...u }) => u)(user) : undefined;
+    return res.json({
+      success: true,
+      message: `Withdrawal rejected and ₹${reqItem.amount.toLocaleString('en-IN')} refunded to user wallet.`,
+      user: userProfile,
+      withdrawalRequest: reqItem,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to reject withdrawal' });
+  }
 });
 
 // ----------------------------------------------------

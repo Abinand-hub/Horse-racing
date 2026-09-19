@@ -331,8 +331,14 @@ export default function App() {
         loadUserFinancials(true);
       });
 
+      // Background polling every 4s for instant multi-device / remote admin approval reflection
+      const pollInterval = setInterval(() => {
+        loadUserFinancials(true);
+      }, 4000);
+
       return () => {
         unsubscribe();
+        clearInterval(pollInterval);
       };
     }
   }, [user?.id]);
