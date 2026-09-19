@@ -1606,26 +1606,7 @@ export const api = {
 
     if (localTxs.length > 0) return localTxs;
 
-    return [
-      {
-        id: 'tx_01',
-        user_id: userId,
-        type: 'DEPOSIT',
-        amount: 5000,
-        balance_after: 5000,
-        description: 'Initial Wallet Deposit via UPI',
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        id: 'tx_02',
-        user_id: userId,
-        type: 'WIN',
-        amount: 1300,
-        balance_after: 6300,
-        description: 'Payout: Mystic Bay won Mysore 1000 Guineas (Odds 2.60)',
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-    ];
+    return [];
   },
 
   // Banners

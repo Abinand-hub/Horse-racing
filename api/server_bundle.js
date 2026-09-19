@@ -2717,6 +2717,27 @@ app.post(["/api/admin/reset-demo", "/api/admin/reset-database", "/api/admin/clea
   saveDatabase();
   return res.json({ success: true, message: "Platform database successfully wiped and reset to clean initial state!" });
 });
+app.get("/api/wallet/transactions", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    await ensureMongoConnected();
+    const query = {};
+    if (user_id) {
+      query.$or = [{ user_id: String(user_id) }, { username: String(user_id) }];
+    }
+    const mongoTxs = await TransactionModel.find(query).sort({ created_at: -1 }).lean().catch(() => []);
+    if (mongoTxs && mongoTxs.length > 0) {
+      return res.json({ success: true, transactions: mongoTxs });
+    }
+    let list = db.transactions || [];
+    if (user_id) {
+      list = list.filter((t) => t.user_id === user_id || t.username === user_id);
+    }
+    return res.json({ success: true, transactions: list });
+  } catch (err) {
+    return res.json({ success: true, transactions: [] });
+  }
+});
 app.post("/api/deposits", async (req, res) => {
   try {
     const { userId, amount, paymentMethod, utrNumber, screenshotUrl } = req.body;

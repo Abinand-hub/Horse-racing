@@ -758,53 +758,65 @@ export const PersonalDetails: React.FC<PersonalDetailsProps> = ({
         )}
 
         {/* ---------------- SUB-TAB 3: WALLET STATEMENT LEDGER ---------------- */}
-        {financialTab === 'transactions' && (
-          <div>
-            {transactions.length === 0 ? (
-              <p className="text-xs text-slate-500 py-6 text-center">No transactions recorded yet.</p>
-            ) : (
-              <div className="divide-y divide-emerald-950/60 overflow-hidden">
-                {transactions.map((tx) => (
-                  <div key={tx.id} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5 text-xs min-w-0">
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
-                        tx.type === 'DEPOSIT' || tx.type === 'WIN'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                      }`}>
-                        {tx.type === 'DEPOSIT' || tx.type === 'WIN' ? (
-                          <ArrowDownLeft className="w-3.5 h-3.5" />
-                        ) : (
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-white text-xs sm:text-sm truncate">{tx.description}</p>
-                        <p className="text-[10px] text-slate-500">
-                          {new Date(tx.created_at).toLocaleString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                    </div>
+        {financialTab === 'transactions' && (() => {
+          const userTransactions = (transactions || []).filter(
+            (tx) => tx && (tx.user_id === user.id || tx.username === user.username)
+          );
 
-                    <div className="text-right font-mono shrink-0">
-                      <p className={`font-black text-xs sm:text-sm ${
-                        tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'
-                      }`}>
-                        {tx.amount > 0 ? `+₹${tx.amount.toLocaleString('en-IN')}` : `-₹${Math.abs(tx.amount).toLocaleString('en-IN')}`}
-                      </p>
-                      <p className="text-[9px] text-slate-500">Bal: ₹{tx.balance_after.toLocaleString('en-IN')}</p>
-                    </div>
+          return (
+            <div>
+              {userTransactions.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                    <FileText className="w-5 h-5" />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                  <p className="text-xs text-slate-400 font-semibold">No transactions recorded yet.</p>
+                  <p className="text-[10px] text-slate-500">Your deposit approvals, placed bets, and win payouts will appear here in real-time.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-emerald-950/60 overflow-hidden">
+                  {userTransactions.map((tx) => (
+                    <div key={tx.id} className="py-2.5 sm:py-3 flex items-center justify-between gap-2.5 text-xs min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                          tx.type === 'DEPOSIT' || tx.type === 'WIN'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {tx.type === 'DEPOSIT' || tx.type === 'WIN' ? (
+                            <ArrowDownLeft className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-white text-xs sm:text-sm truncate">{tx.description}</p>
+                          <p className="text-[10px] text-slate-500">
+                            {new Date(tx.created_at).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right font-mono shrink-0">
+                        <p className={`font-black text-xs sm:text-sm ${
+                          tx.amount > 0 ? 'text-emerald-400' : 'text-slate-200'
+                        }`}>
+                          {tx.amount > 0 ? `+₹${tx.amount.toLocaleString('en-IN')}` : `-₹${Math.abs(tx.amount).toLocaleString('en-IN')}`}
+                        </p>
+                        <p className="text-[9px] text-slate-500">Bal: ₹{(tx.balance_after || 0).toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Proof Image Preview Modal */}
