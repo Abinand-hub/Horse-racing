@@ -45,7 +45,9 @@ import {
   Globe,
   CalendarCheck,
   Flag,
-  Lock
+  Lock,
+  KeyRound,
+  EyeOff
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -119,8 +121,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [quickAddHorseRace, setQuickAddHorseRace] = useState<Race | null>(null);
   const [quickHorseData, setQuickHorseData] = useState({ name: '', jockey: '', trainer: '', gate_no: '', horse_no: '', win_odds: '2.50', place_odds: '1.40' });
   const [subAdminModalOpen, setSubAdminModalOpen] = useState<boolean>(false);
-  const [newSubAdminData, setNewSubAdminData] = useState({ username: '', name: '', role: 'ODDS_MANAGER' });
+  const [newSubAdminData, setNewSubAdminData] = useState({ username: '', name: '', password: '', role: 'ODDS_MANAGER' });
   const [betsSearchQuery, setBetsSearchQuery] = useState<string>('');
+
+  // Master Admin Security / Password Change States
+  const [adminCurrentPassword, setAdminCurrentPassword] = useState<string>('');
+  const [adminNewPassword, setAdminNewPassword] = useState<string>('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState<string>('');
+  const [showAdminCurrentPass, setShowAdminCurrentPass] = useState<boolean>(false);
+  const [showAdminNewPass, setShowAdminNewPass] = useState<boolean>(false);
+  const [showAdminConfirmPass, setShowAdminConfirmPass] = useState<boolean>(false);
+  const [adminPassSuccess, setAdminPassSuccess] = useState<boolean>(false);
+  const [adminPassError, setAdminPassError] = useState<string | null>(null);
+  const [adminPassLoading, setAdminPassLoading] = useState<boolean>(false);
 
   // Helper: 24h (HH:mm) <-> 12h (h:mm A) for native clock picker
   const format24To12 = (time24: string): string => {
@@ -865,6 +878,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage('Failed to remove sub-admin');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleChangeAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPassError(null);
+    setAdminPassSuccess(false);
+
+    if (!adminCurrentPassword || !adminNewPassword) {
+      setAdminPassError('Please enter both current and new password');
+      return;
+    }
+    if (adminNewPassword !== adminConfirmPassword) {
+      setAdminPassError('New password and confirmation do not match');
+      return;
+    }
+    if (adminNewPassword.length < 4) {
+      setAdminPassError('New password must be at least 4 characters long');
+      return;
+    }
+
+    try {
+      setAdminPassLoading(true);
+      let userId = 'admin_1';
+      try {
+        const savedUserStr = localStorage.getItem('derby_user');
+        if (savedUserStr) {
+          const u = JSON.parse(savedUserStr);
+          if (u && u.id) userId = u.id;
+        }
+      } catch {}
+
+      await api.changePassword(userId, adminCurrentPassword, adminNewPassword);
+      soundManager.playWinPayout();
+      setAdminPassSuccess(true);
+      setAdminCurrentPassword('');
+      setAdminNewPassword('');
+      setAdminConfirmPassword('');
+      setActionMessage('🔐 Master Admin password changed successfully!');
+      setTimeout(() => {
+        setAdminPassSuccess(false);
+        setActionMessage(null);
+      }, 4000);
+    } catch (err: any) {
+      setAdminPassError(err.message || 'Failed to update admin password');
+    } finally {
+      setAdminPassLoading(false);
     }
   };
 
@@ -6661,6 +6721,112 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
+          {/* Section 4: Master Admin Security & Password Change */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Master Admin Security & Password Change</h2>
+                <p className="text-xs text-slate-400">
+                  Update the master administrator login password to keep administrative privileges and financial controls secure.
+                </p>
+              </div>
+            </div>
+
+            {adminPassSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-bold">Password updated successfully! Your new credentials are now active.</span>
+              </div>
+            )}
+
+            {adminPassError && (
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{adminPassError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangeAdminPassword} className="space-y-4 max-w-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold text-xs block mb-1">Current Password</label>
+                  <div className="relative">
+                    <input
+                      type={showAdminCurrentPass ? 'text' : 'password'}
+                      required
+                      value={adminCurrentPassword}
+                      onChange={(e) => setAdminCurrentPassword(e.target.value)}
+                      placeholder="Current password"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminCurrentPass(!showAdminCurrentPass)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showAdminCurrentPass ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold text-xs block mb-1">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showAdminNewPass ? 'text' : 'password'}
+                      required
+                      value={adminNewPassword}
+                      onChange={(e) => setAdminNewPassword(e.target.value)}
+                      placeholder="New password"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminNewPass(!showAdminNewPass)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showAdminNewPass ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold text-xs block mb-1">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showAdminConfirmPass ? 'text' : 'password'}
+                      required
+                      value={adminConfirmPassword}
+                      onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminConfirmPass(!showAdminConfirmPass)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showAdminConfirmPass ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={adminPassLoading || !adminCurrentPassword || !adminNewPassword}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg disabled:opacity-40"
+                >
+                  {adminPassLoading ? 'Updating Password...' : 'Update Admin Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+
           {/* ADD SUB-ADMIN MODAL */}
           {subAdminModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -6700,6 +6866,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => setNewSubAdminData({ ...newSubAdminData, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
                       placeholder="e.g. suresh_odds"
                       className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">Staff Password</label>
+                    <input
+                      type="password"
+                      value={newSubAdminData.password}
+                      onChange={(e) => setNewSubAdminData({ ...newSubAdminData, password: e.target.value })}
+                      placeholder="Initial login password"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
 

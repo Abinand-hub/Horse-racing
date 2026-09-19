@@ -2458,7 +2458,7 @@ export const api = {
     return { success: false };
   },
 
-  async addSubAdmin(data: { username: string; name: string; role?: string; permissions?: string[] }): Promise<{ success: boolean; message?: string; sub_admin?: any }> {
+  async addSubAdmin(data: { username: string; name: string; password?: string; role?: string; permissions?: string[] }): Promise<{ success: boolean; message?: string; sub_admin?: any }> {
     try {
       const res = await fetch(`${API_BASE}/admin/sub-admins`, {
         method: 'POST',
