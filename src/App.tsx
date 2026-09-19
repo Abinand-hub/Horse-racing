@@ -18,6 +18,7 @@ import { PersonalDetails } from './components/PersonalDetails';
 import { NotificationModal } from './components/NotificationModal';
 import { AuthModal } from './components/AuthModal';
 import { AdminPortal } from './components/AdminPortal';
+import { SubAdminPortal } from './components/SubAdminPortal';
 import { BottomNav } from './components/BottomNav';
 import { OddsFormat } from './utils/odds';
 import { soundManager } from './utils/audio';
@@ -57,7 +58,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
   // Navigation & View state - Default home is Home (Race Lobby)
-  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin'>('races');
+  const [activeTab, setActiveTab] = useState<'races' | 'rules' | 'mybets' | 'personal_details' | 'admin' | 'subadmin'>('races');
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [raceFilter, setRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('upcoming');
   const [isLoadingRaces, setIsLoadingRaces] = useState(false);
@@ -139,6 +140,9 @@ export default function App() {
       if (hash === '#/admin' || hash === '#admin') {
         setSelectedRaceId(null);
         setActiveTab('admin');
+      } else if (hash === '#/staff' || hash === '#staff' || hash === '#/subadmin' || hash === '#subadmin' || hash === '#/operator' || hash === '#operator') {
+        setSelectedRaceId(null);
+        setActiveTab('subadmin');
       } else if (hash.startsWith('#/race/') || hash.startsWith('#race/')) {
         const rId = rawHash.replace(/^#\/?race\//i, '');
         setSelectedRaceId(rId);
@@ -455,7 +459,34 @@ export default function App() {
         <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6">
           <AdminPortal
             onBack={() => {
-              window.location.hash = '#/rules';
+              window.location.hash = '#/lobby';
+            }}
+            races={races}
+            banners={banners}
+            onRefreshData={async () => {
+              await loadRacesAndBanners();
+              await loadUserFinancials();
+            }}
+            onImpersonateUser={(targetUser) => {
+              setUser(targetUser);
+              localStorage.setItem('derby_user', JSON.stringify(targetUser));
+              window.location.hash = '#/lobby';
+              showToast(`Logged in as @${targetUser.username}`, 'success');
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // ---------------- DEDICATED STANDALONE SUB-ADMIN / STAFF PORTAL (Different Page) ----------------
+  if (activeTab === 'subadmin') {
+    return (
+      <div className="min-h-screen bg-[#06070d] text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white relative">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6">
+          <SubAdminPortal
+            onBack={() => {
+              window.location.hash = '#/lobby';
             }}
             races={races}
             banners={banners}

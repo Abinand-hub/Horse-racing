@@ -272,8 +272,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
         </form>
 
-        {/* Back to Home Button */}
-        <div className="pt-2 border-t border-slate-800/80 text-center">
+        {/* Back to Home & Sub-Admin switch Button */}
+        <div className="pt-3 border-t border-slate-800/80 space-y-2 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              window.location.hash = '#/staff';
+            }}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition font-bold block mx-auto cursor-pointer"
+          >
+            Operating Staff Member? Go to Staff & Operator Login Portal →
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -281,7 +292,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               window.location.hash = '#/';
               onBack();
             }}
-            className="text-xs text-slate-400 hover:text-slate-200 transition font-bold flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+            className="text-xs text-slate-400 hover:text-slate-200 transition font-bold flex items-center justify-center gap-1.5 mx-auto cursor-pointer pt-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to Public Turf</span>
