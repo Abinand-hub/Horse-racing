@@ -99,7 +99,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [initialRaces]);
 
+  const currentAdminRole = (typeof window !== 'undefined' ? sessionStorage.getItem('derby_admin_role') : null) || 'SUPER_ADMIN';
+  const isOddsOnlyStaff = currentAdminRole === 'ODDS_MANAGER';
+
   const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'finished' | 'lifecycle' | 'odds' | 'masters' | 'add_race' | 'banners' | 'users' | 'bets' | 'financials' | 'system' | 'races'>('live');
+
+  useEffect(() => {
+    if (isOddsOnlyStaff && (activeTab === 'users' || activeTab === 'financials' || activeTab === 'system' || activeTab === 'bets' || activeTab === 'banners' || activeTab === 'masters')) {
+      setActiveTab('live');
+    }
+  }, [isOddsOnlyStaff, activeTab]);
+
   const [adminRaceFilter, setAdminRaceFilter] = useState<'all' | 'upcoming' | 'live' | 'resulted'>('all');
   const [selectedCenterFilter, setSelectedCenterFilter] = useState<string>('all');
   const [auditRace, setAuditRace] = useState<Race | null>(null);
@@ -2046,6 +2056,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
+      {isOddsOnlyStaff && (
+        <div className="p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span>Limited Staff Session: Odds & Suspensions Management Only (Financials, Users & Master Controls are restricted)</span>
+          </div>
+          <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] uppercase font-black shrink-0">
+            ODDS OPERATOR
+          </span>
+        </div>
+      )}
+
       {/* Admin Navigation Tabs */}
       <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none text-xs font-bold">
         {/* TAB 1: LIVE RACES ONLY */}
@@ -2093,18 +2115,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <span>🏆 Finished Races & Audit ({races.filter((r) => r.status === 'RESULTED' || r.status === 'CLOSED').length})</span>
         </button>
 
-        <button
-          id="admin-tab-masters"
-          onClick={() => setActiveTab('masters')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'masters'
-              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm font-black'
-              : 'text-indigo-400 hover:text-white hover:bg-slate-800'
-          }`}
-        >
-          <Globe className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Race Centers & Days ({(raceCenters || []).length})</span>
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-masters"
+            onClick={() => setActiveTab('masters')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'masters'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm font-black'
+                : 'text-indigo-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Race Centers & Days ({(raceCenters || []).length})</span>
+          </button>
+        )}
 
         <button
           id="admin-tab-odds"
@@ -2119,90 +2143,102 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <span>Live Odds Editor ({races.filter((r) => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING').length})</span>
         </button>
 
-        <button
-          id="admin-tab-add-race"
-          onClick={() => setActiveTab('add_race')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'add_race'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add New Race
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-add-race"
+            onClick={() => setActiveTab('add_race')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'add_race'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add New Race
+          </button>
+        )}
 
-        <button
-          id="admin-tab-banners"
-          onClick={() => setActiveTab('banners')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'banners'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-          Manage Banners ({banners.length})
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-banners"
+            onClick={() => setActiveTab('banners')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'banners'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Manage Banners ({banners.length})
+          </button>
+        )}
 
-        <button
-          id="admin-tab-users"
-          onClick={() => setActiveTab('users')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'users'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          All Users ({users.length})
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-users"
+            onClick={() => setActiveTab('users')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'users'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            All Users ({users.length})
+          </button>
+        )}
 
-        <button
-          id="admin-tab-financials"
-          onClick={() => setActiveTab('financials')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'financials'
-              ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
-              : 'text-amber-400 hover:text-white hover:bg-slate-800/80'
-          }`}
-        >
-          <Banknote className="w-3.5 h-3.5" />
-          <span>Financials & Reports</span>
-          {(depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length) > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-              activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
-            }`}>
-              {depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length}
-            </span>
-          )}
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-financials"
+            onClick={() => setActiveTab('financials')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'financials'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+                : 'text-amber-400 hover:text-white hover:bg-slate-800/80'
+            }`}
+          >
+            <Banknote className="w-3.5 h-3.5" />
+            <span>Financials & Reports</span>
+            {(depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length) > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'financials' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
+              }`}>
+                {depositRequests.filter(d => d.status === 'PENDING').length + withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length}
+              </span>
+            )}
+          </button>
+        )}
 
-        <button
-          id="admin-tab-bets"
-          onClick={() => setActiveTab('bets')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'bets'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Coins className="w-3.5 h-3.5" />
-          Global Bets Book ({allBets.length})
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-bets"
+            onClick={() => setActiveTab('bets')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'bets'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5" />
+            Global Bets Book ({allBets.length})
+          </button>
+        )}
 
-        <button
-          id="admin-tab-system"
-          onClick={() => setActiveTab('system')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'system'
-              ? 'bg-rose-700 text-white shadow-sm font-black'
-              : 'text-rose-400 hover:text-white hover:bg-slate-800'
-          }`}
-        >
-          <Shield className="w-3.5 h-3.5" />
-          <span>System Control & Staff</span>
-        </button>
+        {!isOddsOnlyStaff && (
+          <button
+            id="admin-tab-system"
+            onClick={() => setActiveTab('system')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'system'
+                ? 'bg-rose-700 text-white shadow-sm font-black'
+                : 'text-rose-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>System Control & Staff</span>
+          </button>
+        )}
       </div>
 
       {/* TAB 1: ONLY SHOW LIVE RACE LIFECYCLE */}

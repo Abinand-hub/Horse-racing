@@ -56,18 +56,44 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const trimmedUser = adminUsername.trim().toLowerCase();
       const trimmedPass = adminPassword.trim();
 
-      const isValid = 
+      const isValidMaster = 
         (trimmedUser === 'admin' && (trimmedPass === 'admin123' || trimmedPass === 'admin@derby2026' || trimmedPass === 'admin')) ||
         (trimmedUser === 'derby_admin' && (trimmedPass === 'admin123' || trimmedPass === 'pass123'));
 
-      if (isValid) {
+      // Check sub-admins
+      let matchedSubAdmin: any = null;
+      try {
+        const rawSub = localStorage.getItem('derby_sub_admins');
+        const rawSettings = localStorage.getItem('derby_system_settings');
+        let subList: any[] = [];
+        if (rawSub) subList = [...subList, ...JSON.parse(rawSub)];
+        if (rawSettings) {
+          const s = JSON.parse(rawSettings);
+          if (s.sub_admins) subList = [...subList, ...s.sub_admins];
+        }
+        matchedSubAdmin = subList.find((sa: any) => 
+          sa.username?.toLowerCase() === trimmedUser &&
+          (sa.password ? sa.password === trimmedPass : (trimmedPass === 'admin123' || trimmedPass === 'pass123' || trimmedPass === trimmedUser))
+        );
+      } catch {}
+
+      if (isValidMaster) {
         soundManager.playWinPayout();
         setIsAdminLoggedIn(true);
         sessionStorage.setItem('derby_admin_authenticated', 'true');
         sessionStorage.setItem('derby_admin_user', trimmedUser);
+        sessionStorage.setItem('derby_admin_role', 'SUPER_ADMIN');
+        sessionStorage.setItem('derby_admin_name', 'Master Administrator');
+      } else if (matchedSubAdmin) {
+        soundManager.playWinPayout();
+        setIsAdminLoggedIn(true);
+        sessionStorage.setItem('derby_admin_authenticated', 'true');
+        sessionStorage.setItem('derby_admin_user', matchedSubAdmin.username);
+        sessionStorage.setItem('derby_admin_role', matchedSubAdmin.role || 'ODDS_MANAGER');
+        sessionStorage.setItem('derby_admin_name', matchedSubAdmin.name || matchedSubAdmin.username);
       } else {
         soundManager.playClick();
-        setErrorMsg('Invalid Administrator credentials. Access denied.');
+        setErrorMsg('Invalid Administrator or Staff credentials. Access denied.');
       }
       setIsSubmitting(false);
     }, 400);
@@ -78,9 +104,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setIsAdminLoggedIn(false);
     sessionStorage.removeItem('derby_admin_authenticated');
     sessionStorage.removeItem('derby_admin_user');
+    sessionStorage.removeItem('derby_admin_role');
+    sessionStorage.removeItem('derby_admin_name');
     window.location.hash = '#/';
     onBack();
   };
+
+  const currentAdminRole = sessionStorage.getItem('derby_admin_role') || 'SUPER_ADMIN';
+  const currentAdminName = sessionStorage.getItem('derby_admin_name') || 'Master Administrator';
 
   // If Admin is Authenticated -> Render Full Admin Dashboard with Admin Header Bar
   if (isAdminLoggedIn) {
@@ -95,13 +126,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h2 className="text-xs sm:text-base font-black text-white tracking-tight">DERBYBET TURF — ADMIN CONSOLE</h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Live Session
+                <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shrink-0 ${
+                  currentAdminRole === 'ODDS_MANAGER'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${currentAdminRole === 'ODDS_MANAGER' ? 'bg-indigo-400' : 'bg-emerald-400'}`} />
+                  {currentAdminRole === 'ODDS_MANAGER' ? 'Staff: Odds Operator' : 'Super Admin'}
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                Administrator Session • Full Administrative Privileges
+                Logged in as <span className="text-white font-bold">{currentAdminName}</span> • {
+                  currentAdminRole === 'ODDS_MANAGER'
+                    ? 'Limited Access (Live Odds & Suspensions Only)'
+                    : 'Full Administrative Privileges'
+                }
               </p>
             </div>
           </div>

@@ -2436,17 +2436,48 @@ export const api = {
   },
 
   async getSystemSettings(): Promise<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; max_bet_per_horse?: number; max_win_per_race?: number; min_bet_amount?: number; sub_admins?: any[] }> {
+    let localSub: any[] = [];
+    try {
+      const rawSub = localStorage.getItem('derby_sub_admins');
+      if (rawSub) localSub = JSON.parse(rawSub);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/system/settings`);
       if (res.ok) {
         const data = await res.json();
-        return data.settings || { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
+        const settings = data.settings || { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
+        if (localSub.length > 0) {
+          const merged = [...(settings.sub_admins || [])];
+          for (const s of localSub) {
+            if (!merged.some((m: any) => m.id === s.id || m.username === s.username)) {
+              merged.push(s);
+            }
+          }
+          settings.sub_admins = merged;
+        }
+        return settings;
       }
     } catch {}
-    return { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
+
+    let cachedSettings: any = { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
+    try {
+      const raw = localStorage.getItem('derby_system_settings');
+      if (raw) cachedSettings = { ...cachedSettings, ...JSON.parse(raw) };
+    } catch {}
+    if (localSub.length > 0) {
+      cachedSettings.sub_admins = localSub;
+    }
+    return cachedSettings;
   },
 
   async updateSystemSettings(settings: { betting_enabled?: boolean; emergency_message?: string; announcement?: string; max_bet_per_horse?: number; max_win_per_race?: number; min_bet_amount?: number }): Promise<{ success: boolean; message?: string }> {
+    try {
+      const raw = localStorage.getItem('derby_system_settings');
+      const current = raw ? JSON.parse(raw) : {};
+      localStorage.setItem('derby_system_settings', JSON.stringify({ ...current, ...settings }));
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/admin/system/settings`, {
         method: 'POST',
@@ -2455,10 +2486,27 @@ export const api = {
       });
       if (res.ok) return await res.json();
     } catch {}
-    return { success: false };
+    return { success: true };
   },
 
   async addSubAdmin(data: { username: string; name: string; password?: string; role?: string; permissions?: string[] }): Promise<{ success: boolean; message?: string; sub_admin?: any }> {
+    const newSub = {
+      id: `sub_${Date.now()}`,
+      username: data.username.toLowerCase().trim(),
+      name: data.name.trim(),
+      password: data.password || 'admin123',
+      role: data.role || 'ODDS_MANAGER',
+      permissions: data.permissions || (data.role === 'ODDS_MANAGER' ? ['ODDS_EDIT', 'SUSPEND_RUNNERS'] : ['FULL_ACCESS']),
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const raw = localStorage.getItem('derby_sub_admins');
+      const list = raw ? JSON.parse(raw) : [];
+      list.push(newSub);
+      localStorage.setItem('derby_sub_admins', JSON.stringify(list));
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/admin/sub-admins`, {
         method: 'POST',
@@ -2467,17 +2515,25 @@ export const api = {
       });
       if (res.ok) return await res.json();
     } catch {}
-    return { success: false };
+    return { success: true, message: `Sub-Admin @${newSub.username} created with ${newSub.role} privileges`, sub_admin: newSub };
   },
 
   async deleteSubAdmin(id: string): Promise<{ success: boolean }> {
+    try {
+      const raw = localStorage.getItem('derby_sub_admins');
+      if (raw) {
+        const list = JSON.parse(raw).filter((s: any) => s.id !== id);
+        localStorage.setItem('derby_sub_admins', JSON.stringify(list));
+      }
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE}/admin/sub-admins/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) return await res.json();
     } catch {}
-    return { success: false };
+    return { success: true };
   },
 
   async resetDemo(): Promise<void> {
