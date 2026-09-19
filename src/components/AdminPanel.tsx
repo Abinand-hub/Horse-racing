@@ -361,7 +361,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bulkPasteTarget, setBulkPasteTarget] = useState<'new' | 'edit'>('new');
   const [bulkPasteText, setBulkPasteText] = useState('');
 
-  // Universal Bulk Runner Text Parser (supports: No-Gate-Name-Jockey-Trainer, tabs, CSV, pipes)
+  // Universal Bulk Runner Text Parser (supports: No-Gate-Name-Jockey-Trainer, tabs, CSV, pipes, WhatsApp text, odds)
   const parseBulkRunnersText = (rawText: string) => {
     let clean = rawText.trim();
     if (clean.startsWith('(') && clean.endsWith(')')) {
@@ -377,46 +377,103 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     ];
 
     lines.forEach((line, index) => {
-      let parts: string[] = [];
-      if (line.includes('\t')) {
-        parts = line.split('\t').map((p) => p.trim()).filter(Boolean);
-      } else if (line.includes('|')) {
-        parts = line.split('|').map((p) => p.trim()).filter(Boolean);
-      } else if (line.includes(',')) {
-        parts = line.split(',').map((p) => p.trim()).filter(Boolean);
-      } else if (line.includes('-')) {
-        parts = line.split('-').map((p) => p.trim()).filter(Boolean);
-      } else {
-        parts = line.split(/\s{2,}/).map((p) => p.trim()).filter(Boolean);
+      // 1. Remove leading bullets/indices like "1.", "1)", "#1", "R1:"
+      let lineText = line.replace(/^[#\d]+[\.\)\:\s\-]+/, '').trim();
+
+      // 2. Check if gate number is in parenthesis e.g. "1 (4) HORSE NAME" or "(4) HORSE NAME"
+      let extractedGate: number | null = null;
+      const parenMatch = line.match(/^\s*(\d+)?\s*\(([0-9]+)\)/);
+      if (parenMatch) {
+        if (parenMatch[2]) extractedGate = parseInt(parenMatch[2]);
+        lineText = line.replace(/^\s*(\d+)?\s*\(([0-9]+)\)/, '').trim();
       }
 
-      if (parts.length >= 3) {
-        let horseNo = index + 1;
-        let gateNo = index + 1;
-        let name = '';
-        let jockey = 'TBD';
-        let trainer = 'TBD';
+      // 3. Extract odds from end of line if present (e.g. "2.50 1.40" or "2.5, 1.4")
+      let extractedWin: number | null = null;
+      let extractedPlace: number | null = null;
+      const oddsEndMatch = lineText.match(/[\s,\|]+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)$/);
+      if (oddsEndMatch) {
+        extractedWin = parseFloat(oddsEndMatch[1]);
+        extractedPlace = parseFloat(oddsEndMatch[2]);
+        lineText = lineText.slice(0, oddsEndMatch.index).trim();
+      }
 
-        if (parts.length >= 5) {
-          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
-          gateNo = parseInt(parts[1].replace(/\D/g, '')) || horseNo;
+      // 4. Split by tabs, pipes, commas, hyphens, slashes or multi-spaces
+      let parts: string[] = [];
+      if (lineText.includes('\t')) {
+        parts = lineText.split('\t').map((p) => p.trim()).filter(Boolean);
+      } else if (lineText.includes('|')) {
+        parts = lineText.split('|').map((p) => p.trim()).filter(Boolean);
+      } else if (lineText.includes(',')) {
+        parts = lineText.split(',').map((p) => p.trim()).filter(Boolean);
+      } else if (lineText.includes(' - ')) {
+        parts = lineText.split(' - ').map((p) => p.trim()).filter(Boolean);
+      } else if (lineText.includes(' / ')) {
+        parts = lineText.split(' / ').map((p) => p.trim()).filter(Boolean);
+      } else {
+        parts = lineText.split(/\s{2,}/).map((p) => p.trim()).filter(Boolean);
+      }
+
+      let horseNo = index + 1;
+      let gateNo = extractedGate || (index + 1);
+      let name = '';
+      let jockey = 'TBD';
+      let trainer = 'TBD';
+
+      if (parts.length >= 4) {
+        const firstNum = parseInt(parts[0].replace(/\D/g, ''));
+        const secondNum = parseInt(parts[1].replace(/\D/g, ''));
+        if (!isNaN(firstNum) && !isNaN(secondNum) && parts[0].length <= 2 && parts[1].length <= 2) {
+          horseNo = firstNum || (index + 1);
+          gateNo = secondNum || horseNo;
           name = parts[2];
-          jockey = parts[3];
-          trainer = parts[4];
-        } else if (parts.length === 4) {
-          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
-          gateNo = parseInt(parts[1].replace(/\D/g, '')) || horseNo;
-          name = parts[2];
-          jockey = parts[3];
-        } else if (parts.length === 3) {
-          horseNo = parseInt(parts[0].replace(/\D/g, '')) || (index + 1);
-          gateNo = horseNo;
+          jockey = parts[3] || 'TBD';
+          trainer = parts[4] || 'TBD';
+        } else if (!isNaN(firstNum) && parts[0].length <= 2) {
+          horseNo = firstNum || (index + 1);
+          gateNo = extractedGate || horseNo;
           name = parts[1];
-          jockey = parts[2];
+          jockey = parts[2] || 'TBD';
+          trainer = parts[3] || 'TBD';
+        } else {
+          name = parts[0];
+          jockey = parts[1] || 'TBD';
+          trainer = parts[2] || 'TBD';
         }
+      } else if (parts.length === 3) {
+        const firstNum = parseInt(parts[0].replace(/\D/g, ''));
+        if (!isNaN(firstNum) && parts[0].length <= 2) {
+          horseNo = firstNum || (index + 1);
+          gateNo = extractedGate || horseNo;
+          name = parts[1];
+          jockey = parts[2] || 'TBD';
+        } else {
+          name = parts[0];
+          jockey = parts[1] || 'TBD';
+          trainer = parts[2] || 'TBD';
+        }
+      } else if (parts.length === 2) {
+        const firstNum = parseInt(parts[0].replace(/\D/g, ''));
+        if (!isNaN(firstNum) && parts[0].length <= 2) {
+          horseNo = firstNum || (index + 1);
+          gateNo = extractedGate || horseNo;
+          name = parts[1];
+        } else {
+          name = parts[0];
+          jockey = parts[1];
+        }
+      } else if (parts.length === 1) {
+        name = parts[0];
+      }
 
-        const initialWin = Number((2.20 + (index * 0.45) + (Math.random() * 0.4)).toFixed(2));
-        const initialPlace = Number(((initialWin * 0.35) + 0.55).toFixed(2));
+      // Clean prefix tags like "J:", "Jockey:", "T:", "Trainer:", "Drw:"
+      name = (name || '').replace(/^Horse:\s*/i, '').trim();
+      jockey = (jockey || '').replace(/^(Jockey|J|Jk):\s*/i, '').trim();
+      trainer = (trainer || '').replace(/^(Trainer|T|Tr):\s*/i, '').trim();
+
+      if (name) {
+        const initialWin = extractedWin || Number((2.20 + (index * 0.45) + (Math.random() * 0.4)).toFixed(2));
+        const initialPlace = extractedPlace || Number(((initialWin * 0.35) + 0.55).toFixed(2));
 
         parsedRunners.push({
           id: `h_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 4)}`,
@@ -424,8 +481,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           horse_no: horseNo,
           gate_no: gateNo,
           name: name.toUpperCase().trim(),
-          jockey: jockey.trim(),
-          trainer: trainer.trim(),
+          jockey: jockey.trim() || 'TBD',
+          trainer: trainer.trim() || 'TBD',
           win_odds: initialWin,
           place_odds: initialPlace,
           silk_color: silkColors[index % silkColors.length],
@@ -1190,6 +1247,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to publish race day');
       setTimeout(() => setActionMessage(null), 3500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ⚡ 1-Click Auto-Schedule Full Day Card (7 Races with 30-min intervals starting 1:00 PM)
+  const handleQuickScheduleDay = async (day: RaceDay) => {
+    const center = (raceCenters || []).find((c) => c.id === day.center_id);
+    const centerName = center?.name || 'Turf Club';
+    const venueName = `${centerName} Turf Club`;
+
+    const raceSchedule = [
+      { no: 1, time: '1:00 PM', distance: '1200m', name: `The ${centerName} Opening Stakes` },
+      { no: 2, time: '1:30 PM', distance: '1400m', name: `The Sprinters Championship Plate` },
+      { no: 3, time: '2:00 PM', distance: '1400m', name: `The Royal Challenge Trophy` },
+      { no: 4, time: '2:30 PM', distance: '1600m', name: `The Governor's Cup` },
+      { no: 5, time: '3:00 PM', distance: '1600m', name: `The ${centerName} Gold Cup (Grade 1)` },
+      { no: 6, time: '3:30 PM', distance: '1200m', name: `The Turf Classic Plate` },
+      { no: 7, time: '4:00 PM', distance: '1400m', name: `The Finale Handicap` },
+    ];
+
+    const confirmed = window.confirm(
+      `Generate full 7-Race Day Card for ${day.title}?\n\nSchedule:\n• Race 1: 1:00 PM\n• Race 2: 1:30 PM\n• Race 3: 2:00 PM\n• Race 4: 2:30 PM\n• Race 5: 3:00 PM\n• Race 6: 3:30 PM\n• Race 7: 4:00 PM\n\nAll races will be created in UPCOMING state and ready for you to bulk paste runners.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsLoading(true);
+      for (const item of raceSchedule) {
+        const defaultRunners = [
+          { serial_no: 1, gate_no: 1, name: 'SPEED PRINCESS', jockey: 'Suraj Narredu', trainer: 'S. Padmanabhan', win_odds: 2.50, place_odds: 1.40, silk_color: '#dc2626', is_suspended: false },
+          { serial_no: 2, gate_no: 2, name: 'ROYAL COMMANDER', jockey: 'P. Trevor', trainer: 'Prasanna Kumar', win_odds: 3.20, place_odds: 1.60, silk_color: '#2563eb', is_suspended: false },
+          { serial_no: 3, gate_no: 3, name: 'GOLDEN ARROW', jockey: 'A. Sandesh', trainer: 'Dallas Todywalla', win_odds: 4.50, place_odds: 1.80, silk_color: '#16a34a', is_suspended: false },
+          { serial_no: 4, gate_no: 4, name: 'THUNDER BOLT', jockey: 'Neeraj Rawal', trainer: 'Imtiaz Sait', win_odds: 6.00, place_odds: 2.10, silk_color: '#d97706', is_suspended: false },
+          { serial_no: 5, gate_no: 5, name: 'MYSTIC STAR', jockey: 'C. S. Jodha', trainer: 'P. Shroff', win_odds: 8.50, place_odds: 2.60, silk_color: '#7c3aed', is_suspended: false },
+          { serial_no: 6, gate_no: 6, name: 'FIRE BLADE', jockey: 'Imran Chisty', trainer: 'Narendra Lagad', win_odds: 12.00, place_odds: 3.50, silk_color: '#e11d48', is_suspended: false },
+        ];
+
+        await api.createRace({
+          name: item.name,
+          race_no: item.no,
+          center_id: day.center_id,
+          race_day_id: day.id,
+          venue: venueName,
+          race_time: item.time,
+          date_str: day.race_date,
+          distance: item.distance,
+          going: 'Good',
+          class_grade: 'Grade 1 • Terms',
+          status: 'UPCOMING',
+          image_url: '/images/race_action.jpg',
+          horses: defaultRunners as any,
+        });
+      }
+
+      soundManager.playWinPayout();
+      notify(`✅ Generated 7 Races (1:00 PM to 4:00 PM) for ${day.title}!`, 'success');
+      await onRefreshData();
+      await loadAdminData();
+    } catch (err: any) {
+      notify(err.message || 'Failed to auto-schedule races', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -3850,6 +3968,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               Publish
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleQuickScheduleDay(day)}
+                            className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-sm"
+                            title="1-Click Auto Generate 7 Races (1:00 PM, 1:30 PM, 2:00 PM, 2:30 PM, 3:00 PM, 3:30 PM, 4:00 PM)"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span>⚡ Auto 7 Races (30m gap)</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
