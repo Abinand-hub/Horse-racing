@@ -436,6 +436,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('derby_is_impersonating');
     api.logout();
     setUser(null);
     setMyBets([]);
@@ -469,6 +470,7 @@ export default function App() {
             }}
             onImpersonateUser={(targetUser) => {
               setUser(targetUser);
+              sessionStorage.setItem('derby_is_impersonating', 'true');
               localStorage.setItem('derby_user', JSON.stringify(targetUser));
               window.location.hash = '#/lobby';
               showToast(`Logged in as @${targetUser.username}`, 'success');
@@ -496,6 +498,7 @@ export default function App() {
             }}
             onImpersonateUser={(targetUser) => {
               setUser(targetUser);
+              sessionStorage.setItem('derby_is_impersonating', 'true');
               localStorage.setItem('derby_user', JSON.stringify(targetUser));
               window.location.hash = '#/lobby';
               showToast(`Logged in as @${targetUser.username}`, 'success');
@@ -510,7 +513,7 @@ export default function App() {
     <div className="min-h-screen bg-[#070c09] text-slate-100 flex flex-col font-sans selection:bg-[#e5b869] selection:text-black relative">
       
       {/* Admin Impersonation Active Banner */}
-      {typeof window !== 'undefined' && sessionStorage.getItem('derby_admin_authenticated') === 'true' && user && (
+      {typeof window !== 'undefined' && sessionStorage.getItem('derby_is_impersonating') === 'true' && user && (
         <div className="bg-gradient-to-r from-red-950 via-slate-900 to-red-950 border-b-2 border-red-500/60 py-2 px-3 sm:px-6 flex items-center justify-between text-xs z-50 sticky top-0 shadow-2xl">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
@@ -521,6 +524,7 @@ export default function App() {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => {
+                sessionStorage.removeItem('derby_is_impersonating');
                 window.location.hash = '#/admin';
               }}
               className="px-3 py-1 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-md active:scale-95"

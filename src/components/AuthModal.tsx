@@ -210,6 +210,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         password: password.trim(),
       });
 
+      sessionStorage.removeItem('derby_is_impersonating');
       onSuccess(res.user);
       onClose();
     } catch (err: any) {
@@ -231,6 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsLoading(true);
       setError(null);
       const res = await api.login(loginIdentifier.trim(), loginPassword.trim());
+      sessionStorage.removeItem('derby_is_impersonating');
       onSuccess(res.user);
       onClose();
     } catch (err: any) {
