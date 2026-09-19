@@ -1944,6 +1944,48 @@ export const api = {
     return race;
   },
 
+  async addHorseToRace(raceId: string, horseData: Partial<Horse>): Promise<Race | null> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/horses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(horseData),
+      });
+      const data = await res.json();
+      if (data.race) {
+        this.saveLocalRace(data.race);
+        realtimeOdds.broadcast({
+          event: 'RACE_STATUS_CHANGED',
+          race_id: raceId,
+          race: data.race,
+          timestamp: Date.now(),
+        });
+        return data.race;
+      }
+    } catch {}
+    return null;
+  },
+
+  async deleteHorseFromRace(raceId: string, horseId: string): Promise<Race | null> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/races/${raceId}/horses/${horseId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.race) {
+        this.saveLocalRace(data.race);
+        realtimeOdds.broadcast({
+          event: 'RACE_STATUS_CHANGED',
+          race_id: raceId,
+          race: data.race,
+          timestamp: Date.now(),
+        });
+        return data.race;
+      }
+    } catch {}
+    return null;
+  },
+
   async suspendAll(raceId: string): Promise<Race | null> {
     try {
       await fetch(`${API_BASE}/admin/races/${raceId}/suspend`, { method: 'POST' });

@@ -46,7 +46,11 @@ export interface User {
 export interface OddsLog {
   win_odds: number;
   place_odds: number;
-  updated_at: string;
+  old_win?: number;
+  old_place?: number;
+  updated_at?: string;
+  timestamp?: string;
+  changed_by?: string;
 }
 
 export interface Horse {

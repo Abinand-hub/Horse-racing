@@ -112,6 +112,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newUserData, setNewUserData] = useState({ full_name: '', username: '', phone: '', email: '', password: '', initial_balance: '0' });
   const [viewBetsUser, setViewBetsUser] = useState<User | null>(null);
   const [oddsHistoryModalHorse, setOddsHistoryModalHorse] = useState<{ horse: Horse; race: Race } | null>(null);
+  const [quickAddHorseRace, setQuickAddHorseRace] = useState<Race | null>(null);
+  const [quickHorseData, setQuickHorseData] = useState({ name: '', jockey: '', trainer: '', gate_no: '', horse_no: '', win_odds: '2.50', place_odds: '1.40' });
   const [subAdminModalOpen, setSubAdminModalOpen] = useState<boolean>(false);
   const [newSubAdminData, setNewSubAdminData] = useState({ username: '', name: '', role: 'ODDS_MANAGER' });
   const [betsSearchQuery, setBetsSearchQuery] = useState<string>('');
@@ -1137,16 +1139,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleUpdateOdds = async (horseId: string, winOdds: number, placeOdds: number) => {
     try {
       soundManager.playChip();
-      // 0ms instant local update
+      const nowIso = new Date().toISOString();
+      // 0ms instant local update + record odds history log
       setRaces((prev) =>
         prev.map((r) => ({
           ...r,
-          horses: r.horses.map((h) =>
-            h.id === horseId ? { ...h, win_odds: winOdds, place_odds: placeOdds } : h
-          ),
+          horses: r.horses.map((h) => {
+            if (h.id === horseId) {
+              const prevWin = h.win_odds;
+              const prevPlace = h.place_odds;
+              const historyLog = {
+                timestamp: nowIso,
+                updated_at: nowIso,
+                win_odds: winOdds,
+                place_odds: placeOdds,
+                old_win: prevWin,
+                old_place: prevPlace,
+                changed_by: 'Master Admin'
+              };
+              const newHist = [historyLog, ...(h.odds_history || [])].slice(0, 30);
+              return {
+                ...h,
+                win_odds: winOdds,
+                place_odds: placeOdds,
+                odds_history: newHist,
+              };
+            }
+            return h;
+          }),
         }))
       );
-      notify('Odds updated live!', 'success');
+      notify(`Odds updated: WIN ${winOdds.toFixed(2)}x / PLACE ${placeOdds.toFixed(2)}x`, 'success');
       api.updateHorseOdds(horseId, winOdds, placeOdds).then(() => {
         onRefreshData();
       }).catch((err) => {
@@ -1295,6 +1318,87 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await handleSuspendAll(raceId);
     } else {
       await handleResumeAll(raceId);
+    }
+  };
+
+  const handleQuickAddHorse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddHorseRace || !quickHorseData.name.trim()) return;
+    try {
+      soundManager.playChip();
+      const sNo = parseInt(quickHorseData.horse_no) || (quickAddHorseRace.horses.length + 1);
+      const gateNo = quickHorseData.gate_no ? (parseInt(quickHorseData.gate_no) || sNo) : sNo;
+      const winOdds = parseFloat(quickHorseData.win_odds) || 2.50;
+      const placeOdds = parseFloat(quickHorseData.place_odds) || 1.40;
+      
+      const newHorse: Horse = {
+        id: `h_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        race_id: quickAddHorseRace.id,
+        horse_no: sNo,
+        serial_no: sNo,
+        gate_no: gateNo,
+        name: quickHorseData.name.trim().toUpperCase(),
+        jockey: (quickHorseData.jockey || 'TBD').trim(),
+        trainer: (quickHorseData.trainer || 'TBD').trim(),
+        win_odds: winOdds,
+        place_odds: placeOdds,
+        silk_color: '#3b82f6',
+        is_suspended: false,
+        odds_history: [
+          {
+            win_odds: winOdds,
+            place_odds: placeOdds,
+            timestamp: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            changed_by: 'Master Admin'
+          }
+        ]
+      };
+
+      // 0ms instant local update
+      setRaces((prev) =>
+        prev.map((r) =>
+          r.id === quickAddHorseRace.id
+            ? { ...r, horses: [...r.horses, newHorse] }
+            : r
+        )
+      );
+      notify(`✅ Runner "${newHorse.name}" (#${newHorse.horse_no}) added to ${quickAddHorseRace.name}!`, 'success');
+      const raceToUpdate = quickAddHorseRace;
+      setQuickAddHorseRace(null);
+      setQuickHorseData({ name: '', jockey: '', trainer: '', gate_no: '', horse_no: '', win_odds: '2.50', place_odds: '1.40' });
+
+      api.addHorseToRace(raceToUpdate.id, newHorse).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to save new horse on server', 'error');
+      });
+    } catch (err: any) {
+      notify(err.message || 'Failed to add horse', 'error');
+    }
+  };
+
+  const handleDeleteHorseFromRace = async (raceId: string, horseId: string, horseName: string) => {
+    if (!window.confirm(`Are you sure you want to remove "${horseName}" from this race card?`)) return;
+    try {
+      soundManager.playClick();
+      // 0ms local update
+      setRaces((prev) =>
+        prev.map((r) =>
+          r.id === raceId
+            ? { ...r, horses: r.horses.filter((h) => h.id !== horseId) }
+            : r
+        )
+      );
+      notify(`🗑️ Runner "${horseName}" removed from race.`, 'info');
+
+      api.deleteHorseFromRace(raceId, horseId).then(() => {
+        onRefreshData();
+      }).catch((err) => {
+        notify(err.message || 'Failed to remove runner on server', 'error');
+      });
+    } catch (err: any) {
+      notify(err.message || 'Failed to remove runner', 'error');
     }
   };
 
@@ -2115,6 +2219,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     title={horse.is_suspended ? 'Resume Runner' : 'Suspend Runner'}
                                   >
                                     {horse.is_suspended ? 'RESUME' : 'SUSP'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      soundManager.playClick();
+                                      setOddsHistoryModalHorse({ horse, race: liveRace });
+                                    }}
+                                    className="p-1 rounded-lg text-[10px] font-bold border border-slate-700 bg-slate-900 text-amber-400 hover:text-amber-300 hover:bg-slate-800 transition cursor-pointer"
+                                    title="View Odds History Log"
+                                  >
+                                    <Clock className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
@@ -2948,6 +3063,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <button
                         type="button"
+                        onClick={() => {
+                          const nextSNo = activeRace.horses.length + 1;
+                          setQuickHorseData({
+                            name: '',
+                            jockey: '',
+                            trainer: '',
+                            horse_no: String(nextSNo),
+                            gate_no: String(nextSNo),
+                            win_odds: '2.50',
+                            place_odds: '1.40'
+                          });
+                          setQuickAddHorseRace(activeRace);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-indigo-500/40"
+                        title="Add a horse inside this race"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Horse</span>
+                      </button>
+
+                      <button
+                        type="button"
                         id={`master-susp-all-btn-${activeRace.id}`}
                         onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
                         className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
@@ -3015,9 +3152,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE Odds</span>
                             <span className="text-[9px] text-slate-400 font-normal">Editable Input (₹100)</span>
                           </th>
-                          <th className="py-3 px-4 w-40 text-center">
-                            <span className="block text-xs font-black">Action</span>
-                            <span className="text-[9px] text-slate-400 font-normal">[SUSPEND / RESUME]</span>
+                          <th className="py-3 px-4 w-52 text-center">
+                            <span className="block text-xs font-black">Action Controls</span>
+                            <span className="text-[9px] text-slate-400 font-normal">[SUSPEND / ODDS HISTORY]</span>
                           </th>
                         </tr>
                       </thead>
@@ -3184,21 +3321,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                               </td>
 
-                              {/* Action: SUSPEND / RESUME button per runner */}
+                              {/* Action: SUSPEND / RESUME & ODDS HISTORY button per runner */}
                               <td className="py-2.5 px-3 text-center">
-                                <button
-                                  type="button"
-                                  id={`action-runner-btn-${horse.id}`}
-                                  onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
-                                  className={`w-full max-w-[120px] py-1.5 px-3 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
-                                    isSuspended
-                                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60'
-                                      : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border-rose-500/50'
-                                  }`}
-                                  title={isSuspended ? 'Click RESUME to publish new odds live and enable betting' : 'Click SUSPEND to stop betting while changing odds'}
-                                >
-                                  {isSuspended ? 'RESUME' : 'SUSPEND'}
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                  {/* Single Horse Suspend Button */}
+                                  <button
+                                    type="button"
+                                    id={`action-runner-btn-${horse.id}`}
+                                    onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
+                                    className={`py-1.5 px-3 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
+                                      isSuspended
+                                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60'
+                                        : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border-rose-500/50'
+                                    }`}
+                                    title={isSuspended ? 'Click RESUME to publish new odds live and enable betting' : 'Click SUSPEND to stop betting on this single horse'}
+                                  >
+                                    {isSuspended ? 'RESUME' : 'SUSPEND'}
+                                  </button>
+
+                                  {/* Odds History Audit Modal Trigger Button */}
+                                  <button
+                                    type="button"
+                                    id={`odds-history-btn-${horse.id}`}
+                                    onClick={() => {
+                                      soundManager.playClick();
+                                      setOddsHistoryModalHorse({ horse, race: activeRace });
+                                    }}
+                                    className="p-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-slate-700/80 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                    title="View Odds History (see what odds were given 5 mins ago)"
+                                  >
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] hidden xl:inline">History</span>
+                                  </button>
+
+                                  {/* Delete Runner from Race */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteHorseFromRace(activeRace.id, horse.id, horse.name)}
+                                    className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition cursor-pointer"
+                                    title="Remove runner from race card"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -3208,11 +3373,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All at bottom right) */}
-                  <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-slate-400 font-mono">
                         Race Card: <strong className="text-white">{activeRace.horses.length} Runners</strong>
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextSNo = activeRace.horses.length + 1;
+                          setQuickHorseData({
+                            name: '',
+                            jockey: '',
+                            trainer: '',
+                            horse_no: String(nextSNo),
+                            gate_no: String(nextSNo),
+                            win_odds: '2.50',
+                            place_odds: '1.40'
+                          });
+                          setQuickAddHorseRace(activeRace);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Horse to Race</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(activeRace)}
@@ -6921,6 +7106,156 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Close Log
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK ADD HORSE TO RACE MODAL */}
+      {quickAddHorseRace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Add Runner to Race: {quickAddHorseRace.name}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {quickAddHorseRace.venue} • Currently {quickAddHorseRace.horses.length} runners
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickAddHorseRace(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickAddHorse} className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Horse # (Serial No)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={quickHorseData.horse_no}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, horse_no: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    placeholder="e.g. 1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Draw / Gate #
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={quickHorseData.gate_no}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, gate_no: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-amber-400 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    placeholder="e.g. 5"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Horse Name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={quickHorseData.name}
+                  onChange={(e) => setQuickHorseData({ ...quickHorseData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-bold uppercase focus:outline-none focus:border-emerald-500"
+                  placeholder="e.g. SPEED PRINCESS"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Jockey Name
+                  </label>
+                  <input
+                    type="text"
+                    value={quickHorseData.jockey}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, jockey: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                    placeholder="e.g. Suraj Narredu"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Trainer Name
+                  </label>
+                  <input
+                    type="text"
+                    value={quickHorseData.trainer}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, trainer: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                    placeholder="e.g. S. Padmanabhan"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-400 mb-1">
+                    Initial WIN Odds
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="1.05"
+                    required
+                    value={quickHorseData.win_odds}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, win_odds: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-amber-500/50 rounded-xl text-amber-400 text-xs font-mono font-bold focus:outline-none focus:border-amber-400 text-center"
+                    placeholder="2.50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-400 mb-1">
+                    Initial PLACE Odds
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="1.02"
+                    required
+                    value={quickHorseData.place_odds}
+                    onChange={(e) => setQuickHorseData({ ...quickHorseData, place_odds: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-emerald-500/50 rounded-xl text-emerald-400 text-xs font-mono font-bold focus:outline-none focus:border-emerald-400 text-center"
+                    placeholder="1.40"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setQuickAddHorseRace(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Save Runner to Card</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

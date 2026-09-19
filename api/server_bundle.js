@@ -2086,21 +2086,30 @@ app.put("/api/admin/races/:id/status", (req, res) => {
   return res.json({ success: true, race, races: db.races });
 });
 app.put("/api/admin/horses/:id/odds", (req, res) => {
-  const { win_odds, place_odds } = req.body;
+  const { win_odds, place_odds, changed_by } = req.body;
   let foundHorse = null;
+  let foundRace = null;
   for (const race of db.races) {
     const horse = race.horses.find((h) => h.id === req.params.id);
     if (horse) {
-      if (win_odds !== void 0) horse.win_odds = Number(win_odds);
-      if (place_odds !== void 0) horse.place_odds = Number(place_odds);
+      const prevWin = horse.win_odds;
+      const prevPlace = horse.place_odds;
+      const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+      if (win_odds !== void 0 && !isNaN(Number(win_odds))) horse.win_odds = Number(win_odds);
+      if (place_odds !== void 0 && !isNaN(Number(place_odds))) horse.place_odds = Number(place_odds);
       horse.odds_history = horse.odds_history || [];
       horse.odds_history.unshift({
         win_odds: horse.win_odds,
         place_odds: horse.place_odds,
-        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        old_win: prevWin,
+        old_place: prevPlace,
+        updated_at: nowIso,
+        timestamp: nowIso,
+        changed_by: changed_by || req.user?.username || "Master Admin"
       });
-      if (horse.odds_history.length > 10) horse.odds_history = horse.odds_history.slice(0, 10);
+      if (horse.odds_history.length > 30) horse.odds_history = horse.odds_history.slice(0, 30);
       foundHorse = horse;
+      foundRace = race;
       break;
     }
   }
@@ -2108,7 +2117,7 @@ app.put("/api/admin/horses/:id/odds", (req, res) => {
     return res.status(404).json({ error: "Horse not found" });
   }
   saveDatabase();
-  return res.json({ success: true, horse: foundHorse });
+  return res.json({ success: true, horse: foundHorse, race: foundRace });
 });
 app.post("/api/admin/races/:id/settle", (req, res) => {
   const { position_1, position_2, position_3, winner_horse_id, place_horses_ids } = req.body;
@@ -2767,6 +2776,54 @@ app.post("/api/admin/races/:raceId/horses/:horseId/resume", (req, res) => {
   if (place_odds && !isNaN(Number(place_odds))) horse.place_odds = Number(place_odds);
   saveDatabase();
   return res.json({ success: true, message: `Runner ${horse.name} resumed`, race, horse });
+});
+app.post("/api/admin/races/:id/horses", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.id);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  const { name, jockey, trainer, horse_no, serial_no, gate_no, win_odds, place_odds, silk_color } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Horse name is required" });
+  }
+  const nextSerial = (race.horses?.length || 0) + 1;
+  const sNo = Number(serial_no || horse_no) || nextSerial;
+  const newHorse = {
+    id: `h_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    race_id: race.id,
+    horse_no: sNo,
+    serial_no: sNo,
+    gate_no: gate_no || sNo,
+    name: name.trim().toUpperCase(),
+    jockey: (jockey || "TBD").trim(),
+    trainer: (trainer || "TBD").trim(),
+    win_odds: Number(win_odds) || 2.5,
+    place_odds: Number(place_odds) || 1.4,
+    silk_color: silk_color || "#3b82f6",
+    is_suspended: false,
+    odds_history: [
+      {
+        win_odds: Number(win_odds) || 2.5,
+        place_odds: Number(place_odds) || 1.4,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString(),
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        changed_by: "Master Admin"
+      }
+    ]
+  };
+  race.horses = race.horses || [];
+  race.horses.push(newHorse);
+  saveDatabase();
+  return res.json({ success: true, message: `Added ${newHorse.name} to ${race.name}`, horse: newHorse, race });
+});
+app.delete("/api/admin/races/:raceId/horses/:horseId", (req, res) => {
+  const race = db.races.find((r) => r.id === req.params.raceId);
+  if (!race) return res.status(404).json({ error: "Race not found" });
+  const initialCount = race.horses.length;
+  race.horses = race.horses.filter((h) => h.id !== req.params.horseId);
+  if (race.horses.length === initialCount) {
+    return res.status(404).json({ error: "Horse not found in this race" });
+  }
+  saveDatabase();
+  return res.json({ success: true, message: "Runner removed from race", race });
 });
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
