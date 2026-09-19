@@ -1415,12 +1415,21 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
     return res.status(500).json({ error: err.message || "Failed to reset password" });
   }
 });
-app.get("/api/race-centers", (req, res) => {
+app.get("/api/race-centers", async (req, res) => {
   const showAll = req.query.all === "true";
+  try {
+    await ensureMongoConnected();
+    const mongoCenters = await RaceCenterModel.find({}).sort({ order: 1, created_at: 1 }).lean();
+    if (mongoCenters && mongoCenters.length > 0) {
+      db.race_centers = mongoCenters;
+    }
+  } catch (err) {
+    console.warn("Mongo fetch race-centers fallback to in-memory:", err);
+  }
   const centers = showAll ? db.race_centers : db.race_centers.filter((c) => c.is_active);
   return res.json({ success: true, centers });
 });
-app.post("/api/admin/race-centers", (req, res) => {
+app.post("/api/admin/race-centers", async (req, res) => {
   const { name, code, city, is_active } = req.body;
   if (!name || !code) {
     return res.status(400).json({ error: "Center Name and Code are required" });
@@ -1442,9 +1451,14 @@ app.post("/api/admin/race-centers", (req, res) => {
   };
   db.race_centers.push(newCenter);
   saveDatabase();
+  try {
+    await ensureMongoConnected();
+    await RaceCenterModel.findOneAndUpdate({ id: newCenter.id }, newCenter, { upsert: true, new: true });
+  } catch {
+  }
   return res.json({ success: true, message: `Race Center "${newCenter.name}" added successfully!`, center: newCenter });
 });
-app.put("/api/admin/race-centers/:id", (req, res) => {
+app.put("/api/admin/race-centers/:id", async (req, res) => {
   const center = db.race_centers.find((c) => c.id === req.params.id);
   if (!center) return res.status(404).json({ error: "Race Center not found" });
   if (req.body.name) center.name = String(req.body.name).trim().toUpperCase();
@@ -1453,38 +1467,51 @@ app.put("/api/admin/race-centers/:id", (req, res) => {
   if (req.body.is_active !== void 0) center.is_active = Boolean(req.body.is_active);
   if (req.body.order !== void 0) center.order = Number(req.body.order);
   saveDatabase();
-  ensureMongoConnected().then(() => {
-    RaceCenterModel.findOneAndUpdate({ id: center.id }, center, { upsert: true, new: true }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  try {
+    await ensureMongoConnected();
+    await RaceCenterModel.findOneAndUpdate({ id: center.id }, center, { upsert: true, new: true });
+  } catch {
+  }
   return res.json({ success: true, message: `Race Center "${center.name}" updated!`, center });
 });
-app.delete("/api/admin/race-centers/:id", (req, res) => {
+app.delete("/api/admin/race-centers/:id", async (req, res) => {
   const { id } = req.params;
   const center = db.race_centers.find((c) => c.id === id);
   if (!center) return res.status(404).json({ error: "Race Center not found" });
   db.race_centers = db.race_centers.filter((c) => c.id !== id);
   saveDatabase();
-  ensureMongoConnected().then(() => {
-    RaceCenterModel.deleteOne({ id }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  try {
+    await ensureMongoConnected();
+    await RaceCenterModel.deleteOne({ id });
+  } catch {
+  }
   return res.json({ success: true, message: `Race Center "${center.name}" deleted successfully!` });
 });
-app.get("/api/race-days", (req, res) => {
+app.get("/api/race-days", async (req, res) => {
   const centerQuery = (req.query.center || "").toLowerCase().trim();
   const centerIdQuery = req.query.center_id;
   const dateQuery = (req.query.date || "").toLowerCase().trim();
+  try {
+    await ensureMongoConnected();
+    const mongoDays = await RaceDayModel.find({}).sort({ race_date: -1, created_at: -1 }).lean();
+    if (mongoDays && mongoDays.length > 0) {
+      db.race_days = mongoDays;
+    }
+    const mongoRaces = await RaceModel.find({}).lean();
+    if (mongoRaces && mongoRaces.length > 0) {
+      db.races = mongoRaces;
+    }
+  } catch (err) {
+    console.warn("Mongo fetch race-days fallback to in-memory:", err);
+  }
   const seenKeys = /* @__PURE__ */ new Set();
-  db.race_days = db.race_days.filter((d) => {
+  const uniqueDays = (db.race_days || []).filter((d) => {
     const key = `${d.center_id}_${d.race_date}`;
     if (seenKeys.has(key)) return false;
     seenKeys.add(key);
     return true;
   });
-  let days = [...db.race_days];
+  let days = [...uniqueDays];
   if (centerIdQuery) {
     days = days.filter((d) => d.center_id === centerIdQuery);
   } else if (centerQuery && centerQuery !== "all") {
@@ -1494,30 +1521,41 @@ app.get("/api/race-days", (req, res) => {
     if (center) {
       days = days.filter((d) => d.center_id === center.id);
     } else {
-      days = days.filter((d) => d.center_name.toLowerCase().includes(centerQuery));
+      days = days.filter((d) => (d.center_name || "").toLowerCase().includes(centerQuery));
     }
   }
+  days.sort((a, b) => (b.race_date || "").localeCompare(a.race_date || ""));
   days = days.map((d) => ({
     ...d,
-    races_count: db.races.filter((r) => r.race_day_id === d.id || r.center_id === d.center_id).length
+    races_count: (db.races || []).filter((r) => r.race_day_id === d.id || r.center_id === d.center_id).length
   }));
   return res.json({ success: true, race_days: days });
 });
-app.get("/api/race-day", (req, res) => {
+app.get("/api/race-day", async (req, res) => {
   const centerQuery = (req.query.center || "").toLowerCase().trim();
   const centerIdQuery = req.query.center_id;
+  try {
+    await ensureMongoConnected();
+    const mongoDays = await RaceDayModel.find({}).sort({ race_date: -1 }).lean();
+    if (mongoDays && mongoDays.length > 0) db.race_days = mongoDays;
+    const mongoRaces = await RaceModel.find({}).lean();
+    if (mongoRaces && mongoRaces.length > 0) db.races = mongoRaces;
+    const mongoCenters = await RaceCenterModel.find({}).lean();
+    if (mongoCenters && mongoCenters.length > 0) db.race_centers = mongoCenters;
+  } catch {
+  }
   let center = centerIdQuery ? db.race_centers.find((c) => c.id === centerIdQuery) : null;
   if (!center && centerQuery) {
     center = db.race_centers.find(
       (c) => c.name.toLowerCase() === centerQuery || c.code.toLowerCase() === centerQuery || c.id.toLowerCase() === centerQuery
     );
   }
-  const raceDay = db.race_days.find(
-    (d) => center && d.center_id === center.id || centerQuery && d.center_name.toLowerCase().includes(centerQuery)
-  ) || db.race_days[0];
-  const targetCenter = center || db.race_centers.find((c) => c.id === raceDay?.center_id) || db.race_centers[0];
-  const races = db.races.filter(
-    (r) => raceDay && r.race_day_id === raceDay.id || targetCenter && r.center_id === targetCenter.id || targetCenter && r.venue.toLowerCase().includes(targetCenter.name.toLowerCase())
+  const raceDay = (db.race_days || []).find(
+    (d) => center && d.center_id === center.id || centerQuery && (d.center_name || "").toLowerCase().includes(centerQuery)
+  ) || db.race_days && db.race_days[0];
+  const targetCenter = center || (db.race_centers || []).find((c) => c.id === raceDay?.center_id) || db.race_centers && db.race_centers[0];
+  const races = (db.races || []).filter(
+    (r) => raceDay && r.race_day_id === raceDay.id || targetCenter && r.center_id === targetCenter.id || targetCenter && (r.venue || "").toLowerCase().includes(targetCenter.name.toLowerCase())
   );
   return res.json({
     success: true,
@@ -1526,22 +1564,22 @@ app.get("/api/race-day", (req, res) => {
     races
   });
 });
-app.post("/api/admin/race-days", (req, res) => {
+app.post("/api/admin/race-days", async (req, res) => {
   const { center_id, race_date, title, status } = req.body;
-  const center = db.race_centers.find((c) => c.id === center_id);
+  const center = (db.race_centers || []).find((c) => c.id === center_id);
   if (!center) return res.status(404).json({ error: "Selected Race Center not found" });
   const cleanDate = race_date ? String(race_date).trim() : (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const cleanTitle = title ? String(title).trim() : `${center.name} - ${cleanDate}`;
-  let existingDay = db.race_days.find((d) => d.center_id === center.id && d.race_date === cleanDate);
+  let existingDay = (db.race_days || []).find((d) => d.center_id === center.id && d.race_date === cleanDate);
   if (existingDay) {
     existingDay.title = cleanTitle;
     existingDay.status = status || "PUBLISHED";
     saveDatabase();
-    ensureMongoConnected().then(() => {
-      RaceDayModel.findOneAndUpdate({ id: existingDay.id }, existingDay, { upsert: true, new: true }).catch(() => {
-      });
-    }).catch(() => {
-    });
+    try {
+      await ensureMongoConnected();
+      await RaceDayModel.findOneAndUpdate({ id: existingDay.id }, existingDay, { upsert: true, new: true });
+    } catch {
+    }
     return res.json({
       success: true,
       message: `Race Card "${existingDay.title}" updated & published!`,
@@ -1560,59 +1598,59 @@ app.post("/api/admin/race-days", (req, res) => {
   };
   db.race_days.unshift(newRaceDay);
   saveDatabase();
-  ensureMongoConnected().then(() => {
-    RaceDayModel.findOneAndUpdate({ id: newRaceDay.id }, newRaceDay, { upsert: true, new: true }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  try {
+    await ensureMongoConnected();
+    await RaceDayModel.findOneAndUpdate({ id: newRaceDay.id }, newRaceDay, { upsert: true, new: true });
+  } catch {
+  }
   return res.json({
     success: true,
     message: `Race Card "${newRaceDay.title}" created successfully!`,
     race_day: newRaceDay
   });
 });
-app.post("/api/admin/race-days/:id/publish", (req, res) => {
-  const raceDay = db.race_days.find((d) => d.id === req.params.id);
+app.post("/api/admin/race-days/:id/publish", async (req, res) => {
+  const raceDay = (db.race_days || []).find((d) => d.id === req.params.id);
   if (!raceDay) return res.status(404).json({ error: "Race Day not found" });
   raceDay.status = "PUBLISHED";
   saveDatabase();
-  ensureMongoConnected().then(() => {
-    RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  try {
+    await ensureMongoConnected();
+    await RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true });
+  } catch {
+  }
   return res.json({ success: true, message: `Race Day "${raceDay.title}" is now PUBLISHED!`, race_day: raceDay });
 });
-app.put("/api/admin/race-days/:id", (req, res) => {
-  const raceDay = db.race_days.find((d) => d.id === req.params.id);
+app.put("/api/admin/race-days/:id", async (req, res) => {
+  const raceDay = (db.race_days || []).find((d) => d.id === req.params.id);
   if (!raceDay) return res.status(404).json({ error: "Race Day not found" });
   if (req.body.title !== void 0) raceDay.title = String(req.body.title).trim();
   if (req.body.race_date !== void 0) raceDay.race_date = String(req.body.race_date).trim();
   if (req.body.status !== void 0) raceDay.status = req.body.status;
   if (req.body.center_id !== void 0) {
-    const center = db.race_centers.find((c) => c.id === req.body.center_id);
+    const center = (db.race_centers || []).find((c) => c.id === req.body.center_id);
     if (center) {
       raceDay.center_id = center.id;
       raceDay.center_name = center.name;
     }
   }
   saveDatabase();
-  ensureMongoConnected().then(() => {
-    RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  try {
+    await ensureMongoConnected();
+    await RaceDayModel.findOneAndUpdate({ id: raceDay.id }, raceDay, { upsert: true, new: true });
+  } catch {
+  }
   return res.json({ success: true, message: `Race Day "${raceDay.title}" updated!`, race_day: raceDay });
 });
-app.delete("/api/admin/race-days/:id", (req, res) => {
+app.delete("/api/admin/race-days/:id", async (req, res) => {
   const { id } = req.params;
-  db.race_days = db.race_days.filter((d) => d.id !== id);
-  ensureMongoConnected().then(() => {
-    RaceDayModel.deleteOne({ id }).catch(() => {
-    });
-  }).catch(() => {
-  });
+  db.race_days = (db.race_days || []).filter((d) => d.id !== id);
   saveDatabase();
+  try {
+    await ensureMongoConnected();
+    await RaceDayModel.deleteOne({ id });
+  } catch {
+  }
   return res.json({ success: true, message: "Race Day deleted successfully!" });
 });
 app.get("/api/admin/overview", async (req, res) => {

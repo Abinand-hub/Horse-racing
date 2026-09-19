@@ -544,7 +544,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Load Admin Data
   const loadAdminData = async (isBackground = false) => {
     try {
-      if (!isBackground) setIsLoading(true);
+      if (!isBackground && !stats) setIsLoading(true);
       const [statsData, usersData, betsData, depositsData, withdrawalsData, centersData, daysData, sysSettings] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
@@ -1163,8 +1163,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
     try {
-      setIsLoading(true);
       const title = newDayTitle.trim() || `${center.name} - ${newDayDate}`;
+      soundManager.playClick();
+
       const res = await api.createRaceDay({
         center_id: center.id,
         center_name: center.name,
@@ -1172,27 +1173,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         title,
         status: 'PUBLISHED',
       });
-      soundManager.playClick();
-      setNewDayTitle('');
-      await loadAdminData();
 
-      // Automatically preselect center and race day and transition directly to "+ Add New Race"
       if (res.race_day) {
+        setRaceDays((prev) => {
+          const filtered = prev.filter((d) => d.id !== res.race_day.id);
+          return [res.race_day, ...filtered];
+        });
         setNewRaceCenterId(res.race_day.center_id);
         setNewRaceDayId(res.race_day.id);
         setNewVenue(`${center.name} Turf Club`);
-      } else {
-        setNewRaceCenterId(center.id);
-        setNewVenue(`${center.name} Turf Club`);
       }
-      setActiveTab('add_race');
-      notify(`✅ Race Day "${title}" Created & Published! You can now add races below.`, 'success');
-      setActionMessage(`✅ Race Day "${title}" Created & Published! Add races below.`);
-      setTimeout(() => setActionMessage(null), 4000);
+
+      setNewDayTitle('');
+      notify(`✅ Race Day Card "${title}" Created & Published!`, 'success');
+      loadAdminData(true);
     } catch (err: any) {
       notify(err.message || 'Failed to create race day', 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -1231,9 +1227,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       setIsLoading(true);
       await api.deleteRaceDay(dayId);
+      setRaceDays((prev) => prev.filter((d) => d.id !== dayId));
       soundManager.playClick();
       setActionMessage('🗑️ Race day card deleted successfully');
-      await loadAdminData();
+      await loadAdminData(true);
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to delete race day');
@@ -1300,7 +1297,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           race_time: item.time,
           date_str: day.race_date,
           distance: item.distance,
-          going: 'Good',
           class_grade: 'Grade 1 • Terms',
           status: 'UPCOMING',
           image_url: '/images/race_action.jpg',
@@ -1311,7 +1307,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       soundManager.playWinPayout();
       notify(`✅ Generated 7 Races (1:00 PM to 4:00 PM) for ${day.title}!`, 'success');
       await onRefreshData();
-      await loadAdminData();
+      await loadAdminData(true);
     } catch (err: any) {
       notify(err.message || 'Failed to auto-schedule races', 'error');
     } finally {
