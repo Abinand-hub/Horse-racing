@@ -2,7 +2,7 @@
   "users": [
     {
       "id": "usr_admin_master",
-      "ref_id": "ADMIN-001",
+      "ref_id": "ADM-001",
       "full_name": "Master Administrator",
       "phone": "9999999999",
       "email": "admin@derbybet.com",

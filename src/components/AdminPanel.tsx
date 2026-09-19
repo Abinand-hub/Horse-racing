@@ -47,7 +47,9 @@ import {
   Flag,
   Lock,
   KeyRound,
-  EyeOff
+  EyeOff,
+  ShieldCheck,
+  Minus
 } from 'lucide-react';
 
 interface AdminPanelProps {
