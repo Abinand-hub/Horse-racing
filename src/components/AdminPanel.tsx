@@ -278,16 +278,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.target.value = '';
   };
 
-  // Financial requests state
+  // Section 6: Financial requests & P/L state
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
-  const [financialSubTab, setFinancialSubTab] = useState<'DEPOSITS' | 'WITHDRAWALS'>('DEPOSITS');
+  const [financialSubTab, setFinancialSubTab] = useState<'OVERVIEW' | 'DEPOSITS' | 'WITHDRAWALS' | 'PNL_REPORT' | 'CREDIT_DEBIT'>('OVERVIEW');
   const [depositStatusFilter, setDepositStatusFilter] = useState<DepositStatus | 'ALL'>('ALL');
   const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<WithdrawalStatus | 'ALL'>('ALL');
   const [previewScreenshot, setPreviewScreenshot] = useState<string | null>(null);
   const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   const [selectedOddsRaceId, setSelectedOddsRaceId] = useState<string>('');
+  const [pnlDateFilter, setPnlDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST7' | 'ALL' | 'CUSTOM'>('TODAY');
+  const [pnlCustomDate, setPnlCustomDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [quickAdjustUserId, setQuickAdjustUserId] = useState<string>('');
+  const [quickAdjustAmount, setQuickAdjustAmount] = useState<string>('1000');
+  const [quickAdjustType, setQuickAdjustType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [quickAdjustDesc, setQuickAdjustDesc] = useState<string>('');
 
   // Settlement dialog state (Dead Heat Enabled, 1st/2nd/3rd/4th Dropdowns)
   const [settlingRace, setSettlingRace] = useState<Race | null>(null);
@@ -606,6 +612,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await loadAdminData();
     } catch (err: any) {
       setActionMessage(err.message || 'Failed to adjust user balance');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickAdjustBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAdjustUserId) {
+      setActionMessage('⚠️ Please select a user first');
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
+    const amount = Number(quickAdjustAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setActionMessage('⚠️ Please enter a valid amount');
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const res = await api.adjustUserBalance(quickAdjustUserId, amount, quickAdjustType, quickAdjustDesc || `Manual Admin ${quickAdjustType}`);
+      soundManager.playClick();
+      setActionMessage(`💳 ${res.message}`);
+      setQuickAdjustAmount('1000');
+      setQuickAdjustDesc('');
+      await loadAdminData();
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to adjust user balance');
+      setTimeout(() => setActionMessage(null), 3500);
     } finally {
       setIsLoading(false);
     }
@@ -5321,549 +5357,1132 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 7: Financial Requests (Deposit Approvals & Withdrawal 120m Timer Workflow) */}
-      {activeTab === 'financials' && (
-        <div className="space-y-4">
-          {/* Sub-navigation & Header */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Banknote className="w-5 h-5 text-amber-400" />
-                  <span>Financial Requests & Verification Desk</span>
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Verify deposit UTR numbers & proof screenshots, approve auto-credits, manage withdrawal 120-min processing SLA and payout completion.
-                </p>
-              </div>
-              <button
-                onClick={loadAdminData}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer self-start sm:self-auto"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Refresh Requests</span>
-              </button>
-            </div>
+      {/* TAB 7: SECTION 6 - FINANCE & MASTER P/L OPERATIONS */}
+      {activeTab === 'financials' && (() => {
+        // Compute Master Financial Totals
+        const totalUserBalances = (users || []).reduce((acc, u) => acc + (u.balance || 0), 0);
+        const totalUserExposure = (users || []).reduce((acc, u) => acc + (u.exposure || 0), 0);
+        const totalPlatformLiability = totalUserBalances + totalUserExposure;
+        const usersWithPositiveBalance = (users || []).filter((u) => (u.balance || 0) > 0);
 
-            {/* Sub-Tabs: Deposits vs Withdrawals */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
-              <button
-                id="admin-financial-subtab-deposits"
-                onClick={() => setFinancialSubTab('DEPOSITS')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-                  financialSubTab === 'DEPOSITS'
-                    ? 'bg-amber-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ArrowDownLeft className="w-3.5 h-3.5" />
-                <span>Deposit Requests</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  financialSubTab === 'DEPOSITS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
-                }`}>
-                  {depositRequests.filter(d => d.status === 'PENDING').length} Pending
-                </span>
-              </button>
+        // Date calculation for Day-wise P/L
+        const todayStr = new Date().toISOString().split('T')[0];
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        const sevenDaysAgoStr = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
-              <button
-                id="admin-financial-subtab-withdrawals"
-                onClick={() => setFinancialSubTab('WITHDRAWALS')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-                  financialSubTab === 'WITHDRAWALS'
-                    ? 'bg-amber-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                <span>Withdrawal Requests</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  financialSubTab === 'WITHDRAWALS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
-                }`}>
-                  {withdrawalRequests.filter(w => w.status === 'PENDING' || w.status === 'IN_PROGRESS').length} Active
-                </span>
-              </button>
-            </div>
-          </div>
+        // Filter bets for P/L based on selected date
+        const pnlFilteredBets = (allBets || []).filter((b) => {
+          const bDate = (b.placed_at || b.created_at || todayStr).split('T')[0];
+          if (pnlDateFilter === 'TODAY') return bDate === todayStr;
+          if (pnlDateFilter === 'YESTERDAY') return bDate === yesterdayStr;
+          if (pnlDateFilter === 'LAST7') return bDate >= sevenDaysAgoStr;
+          if (pnlDateFilter === 'CUSTOM') return bDate === pnlCustomDate;
+          return true; // 'ALL'
+        });
 
-          {/* SUB-PANEL 1: DEPOSIT REQUESTS */}
-          {financialSubTab === 'DEPOSITS' && (
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-              {/* Filter Tabs */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                  {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((st) => (
-                    <button
-                      key={st}
-                      onClick={() => setDepositStatusFilter(st)}
-                      className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
-                        depositStatusFilter === st
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {st} ({st === 'ALL' ? depositRequests.length : depositRequests.filter(d => d.status === st).length})
-                    </button>
-                  ))}
-                </div>
-                <span className="text-xs text-slate-400">
-                  Showing {depositRequests.filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).length} deposits
-                </span>
-              </div>
+        const pnlTurnover = pnlFilteredBets.reduce((acc, b) => acc + (b.stake || (b as any).amount || 0), 0);
+        const pnlPayouts = pnlFilteredBets
+          .filter((b) => b.status === 'WON')
+          .reduce((acc, b) => acc + (b.payout || (b as any).payout_amount || 0), 0);
+        const pnlNetProfit = pnlTurnover - pnlPayouts;
+        const pnlMarginPct = pnlTurnover > 0 ? ((pnlNetProfit / pnlTurnover) * 100).toFixed(1) : '0.0';
 
-              {/* Deposit List Cards */}
-              <div className="space-y-3">
-                {depositRequests
-                  .filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter)
-                  .map((dep) => (
-                    <div
-                      key={dep.id}
-                      className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-                            <ArrowDownLeft className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg font-black text-white">
-                                ₹{dep.amount.toLocaleString('en-IN')}
-                              </span>
-                              <span className="text-[11px] text-slate-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                                {dep.payment_method}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-400">
-                              Bettor: <strong className="text-white">@{dep.username}</strong> <span className="text-slate-500">({dep.user_id})</span>
-                            </p>
-                          </div>
-                        </div>
+        // Center-wise grouping
+        const centerPnLMap: Record<
+          string,
+          { name: string; code: string; turnover: number; payouts: number; betCount: number; raceCount: number }
+        > = {};
 
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-2 self-start sm:self-auto">
-                          {dep.status === 'PENDING' && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>PENDING REVIEW</span>
-                            </span>
-                          )}
-                          {dep.status === 'APPROVED' && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>APPROVED & CREDITED</span>
-                            </span>
-                          )}
-                          {dep.status === 'REJECTED' && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              <span>REJECTED</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
+        // Seed centers
+        (raceCenters || []).forEach((c) => {
+          centerPnLMap[c.id] = {
+            name: c.name,
+            code: c.code,
+            turnover: 0,
+            payouts: 0,
+            betCount: 0,
+            raceCount: (races || []).filter((r) => r.center_id === c.id || r.venue?.toLowerCase().includes(c.name.toLowerCase())).length,
+          };
+        });
 
-                      {/* Details Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                        {/* UTR Number */}
-                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                          <span className="text-slate-400 block text-[11px] mb-1">12-Digit UTR / Transaction Ref:</span>
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-mono font-bold text-amber-400 text-sm tracking-wider select-all">
-                              {dep.utr_number}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyUtr(dep.utr_number)}
-                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1 text-[10px] font-semibold transition cursor-pointer"
-                              title="Copy UTR"
-                            >
-                              {copiedUtr === dep.utr_number ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-400" />
-                                  <span className="text-emerald-400">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3 h-3" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
+        // Group bets into centers
+        pnlFilteredBets.forEach((b) => {
+          const race = (races || []).find((r) => r.id === b.race_id || r.name === b.race_name);
+          let matchedCenterId = race?.center_id;
 
-                        {/* Payment Screenshot Proof */}
-                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
-                          <div>
-                            <span className="text-slate-400 block text-[11px]">Payment Proof Screenshot:</span>
-                            <span className="text-[11px] text-slate-300 font-medium">
-                              {dep.screenshot_url ? 'Screenshot Proof Attached' : 'No Screenshot Attached'}
-                            </span>
-                          </div>
-                          {dep.screenshot_url ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewScreenshot(dep.screenshot_url || null)}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 text-xs font-semibold transition cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View Proof</span>
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 italic">UTR Only</span>
-                          )}
-                        </div>
+          if (!matchedCenterId && (race?.venue || b.venue)) {
+            const venueStr = (race?.venue || b.venue || '').toLowerCase();
+            const foundCenter = (raceCenters || []).find(
+              (c) => venueStr.includes(c.name.toLowerCase()) || venueStr.includes((c.city || '').toLowerCase())
+            );
+            if (foundCenter) matchedCenterId = foundCenter.id;
+          }
 
-                        {/* Timestamps */}
-                        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-0.5">
-                          <p>Submitted: <span className="text-slate-200">{new Date(dep.created_at).toLocaleString('en-IN')}</span></p>
-                          {dep.reviewed_at && (
-                            <p>Reviewed: <span className="text-slate-200">{new Date(dep.reviewed_at).toLocaleString('en-IN')}</span></p>
-                          )}
-                          {dep.admin_notes && (
-                            <p className="text-rose-400">Notes: {dep.admin_notes}</p>
-                          )}
-                        </div>
-                      </div>
+          const targetKey = matchedCenterId || 'general_center';
+          if (!centerPnLMap[targetKey]) {
+            centerPnLMap[targetKey] = {
+              name: race?.venue || b.venue || 'General Book',
+              code: 'GEN',
+              turnover: 0,
+              payouts: 0,
+              betCount: 0,
+              raceCount: 1,
+            };
+          }
 
-                      {/* Action Controls for Pending Deposit */}
-                      {dep.status === 'PENDING' && (
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
-                          <button
-                            type="button"
-                            onClick={() => handleRejectDeposit(dep.id)}
-                            className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            <span>Reject</span>
-                          </button>
+          const betStake = b.stake || (b as any).amount || 0;
+          const betPayout = b.status === 'WON' ? b.payout || (b as any).payout_amount || 0 : 0;
+          centerPnLMap[targetKey].turnover += betStake;
+          centerPnLMap[targetKey].payouts += betPayout;
+          centerPnLMap[targetKey].betCount += 1;
+        });
 
-                          <button
-                            type="button"
-                            onClick={() => handleApproveDeposit(dep.id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
-                          >
-                            <Check className="w-4 h-4 stroke-[3]" />
-                            <span>Approve & Credit ₹{dep.amount.toLocaleString('en-IN')}</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+        const centerPnLRows = Object.values(centerPnLMap).sort((a, b) => b.turnover - a.turnover);
 
-                {depositRequests.filter(d => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).length === 0 && (
-                  <div className="p-8 text-center bg-slate-950 rounded-xl border border-slate-800 text-slate-400 text-xs">
-                    No deposit requests found under "{depositStatusFilter}".
+        const pendingDeposits = depositRequests.filter((d) => d.status === 'PENDING');
+        const activeWithdrawals = withdrawalRequests.filter((w) => w.status === 'PENDING' || w.status === 'IN_PROGRESS');
+
+        return (
+          <div className="space-y-6">
+            {/* Header & Sub-Nav */}
+            <div className="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <Banknote className="w-6 h-6" />
                   </div>
-                )}
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <span>6. FINANCE & BOOKMAKER OPERATIONS</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase">
+                        Most Sensitive
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Manage deposits & withdrawals, manual credit/debit balances, live day-wise center P/L, and total outstanding liabilities.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => loadAdminData()}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition cursor-pointer self-start sm:self-auto shadow"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh Financials</span>
+                </button>
+              </div>
+
+              {/* Sub-Navigation Tabs */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs">
+                <button
+                  id="fin-subtab-overview"
+                  onClick={() => setFinancialSubTab('OVERVIEW')}
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    financialSubTab === 'OVERVIEW'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>Overview & Outstanding</span>
+                </button>
+
+                <button
+                  id="fin-subtab-deposits"
+                  onClick={() => setFinancialSubTab('DEPOSITS')}
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    financialSubTab === 'DEPOSITS'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Deposits</span>
+                  {pendingDeposits.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                      {pendingDeposits.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  id="fin-subtab-withdrawals"
+                  onClick={() => setFinancialSubTab('WITHDRAWALS')}
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    financialSubTab === 'WITHDRAWALS'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Withdrawals</span>
+                  {activeWithdrawals.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-blue-500 text-white">
+                      {activeWithdrawals.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  id="fin-subtab-pnl"
+                  onClick={() => setFinancialSubTab('PNL_REPORT')}
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    financialSubTab === 'PNL_REPORT'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Day-Wise Center P/L</span>
+                </button>
+
+                <button
+                  id="fin-subtab-credit-debit"
+                  onClick={() => setFinancialSubTab('CREDIT_DEBIT')}
+                  className={`py-2 px-3 rounded-xl font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    financialSubTab === 'CREDIT_DEBIT'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Manual Credit / Debit</span>
+                </button>
               </div>
             </div>
-          )}
 
-          {/* SUB-PANEL 2: WITHDRAWAL REQUESTS (120-MIN SLA WORKFLOW) */}
-          {financialSubTab === 'WITHDRAWALS' && (
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-              {/* Filter Tabs */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                  {(['ALL', 'PENDING', 'IN_PROGRESS', 'SUCCESSFUL', 'REJECTED'] as const).map((st) => (
-                    <button
-                      key={st}
-                      onClick={() => setWithdrawalStatusFilter(st)}
-                      className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer ${
-                        withdrawalStatusFilter === st
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {st} ({st === 'ALL' ? withdrawalRequests.length : withdrawalRequests.filter(w => w.status === st).length})
-                    </button>
-                  ))}
+            {/* SUB-PANEL 1: MASTER OVERVIEW & TOTAL OUTSTANDING */}
+            {financialSubTab === 'OVERVIEW' && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Outstanding Liabilities Master Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Outstanding Balances */}
+                  <div className="bg-slate-900/90 rounded-3xl p-5 border-2 border-amber-500/40 shadow-xl space-y-2 relative overflow-hidden">
+                    <div className="absolute -right-4 -bottom-4 opacity-10">
+                      <Coins className="w-24 h-24 text-amber-400" />
+                    </div>
+                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
+                      Total Outstanding Balances
+                    </span>
+                    <div className="text-2xl sm:text-3xl font-black text-white font-mono">
+                      ₹{totalUserBalances.toLocaleString('en-IN')}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Live liquid wallet balances held across {users.length} punters ({usersWithPositiveBalance.length} active wallets)
+                    </p>
+                  </div>
+
+                  {/* Total Live Exposure */}
+                  <div className="bg-slate-900/90 rounded-3xl p-5 border border-slate-800 shadow-xl space-y-2 relative overflow-hidden">
+                    <div className="absolute -right-4 -bottom-4 opacity-10">
+                      <TrendingUp className="w-24 h-24 text-blue-400" />
+                    </div>
+                    <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider block">
+                      Total Active Bets Exposure
+                    </span>
+                    <div className="text-2xl sm:text-3xl font-black text-blue-400 font-mono">
+                      ₹{totalUserExposure.toLocaleString('en-IN')}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Locked stake on ongoing/unsettled race bets
+                    </p>
+                  </div>
+
+                  {/* Total Platform Liability */}
+                  <div className="bg-slate-900/90 rounded-3xl p-5 border border-slate-800 shadow-xl space-y-2 relative overflow-hidden">
+                    <div className="absolute -right-4 -bottom-4 opacity-10">
+                      <ShieldCheck className="w-24 h-24 text-purple-400" />
+                    </div>
+                    <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block">
+                      Total Bookmaker Reserve Liability
+                    </span>
+                    <div className="text-2xl sm:text-3xl font-black text-purple-300 font-mono">
+                      ₹{totalPlatformLiability.toLocaleString('en-IN')}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Sum of wallet holdings + active wager exposure
+                    </p>
+                  </div>
+
+                  {/* Today's Net Bookmaker P/L */}
+                  <div className={`rounded-3xl p-5 border shadow-xl space-y-2 relative overflow-hidden ${
+                    pnlNetProfit >= 0
+                      ? 'bg-emerald-950/40 border-emerald-500/50'
+                      : 'bg-rose-950/40 border-rose-500/50'
+                  }`}>
+                    <span className="text-[11px] font-bold uppercase tracking-wider block text-slate-300">
+                      Today's Bookmaker P/L
+                    </span>
+                    <div className={`text-2xl sm:text-3xl font-black font-mono ${
+                      pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {pnlNetProfit >= 0 ? `+₹${pnlNetProfit.toLocaleString('en-IN')}` : `-₹${Math.abs(pnlNetProfit).toLocaleString('en-IN')}`}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Turnover: ₹{pnlTurnover.toLocaleString('en-IN')} • Margin: {pnlMarginPct}%
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs text-slate-400">
-                  Showing {withdrawalRequests.filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).length} withdrawals
-                </span>
+
+                {/* Quick Action Banner & Top Balance Holders */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Quick Action Card */}
+                  <div className="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-white text-sm">Quick Financial Operations</h3>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Manually credit offline deposits, debit user withdrawals, or review pending UTR payment proofs.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setFinancialSubTab('CREDIT_DEBIT')}
+                        className="w-full py-2.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Manual Credit / Debit Balance</span>
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFinancialSubTab('DEPOSITS')}
+                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+                        >
+                          <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{pendingDeposits.length} Deposits</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFinancialSubTab('WITHDRAWALS')}
+                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5 text-blue-400" />
+                          <span>{activeWithdrawals.length} Withdrawals</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top User Balances Holding Funds */}
+                  <div className="lg:col-span-2 bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-emerald-400" />
+                        <h3 className="font-bold text-white text-sm">Top User Balances (Outstanding Holdings)</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('users')}
+                        className="text-xs text-amber-400 hover:underline font-bold"
+                      >
+                        View All {users.length} Users →
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-slate-400 uppercase font-bold text-[10px] border-b border-slate-800">
+                            <th className="py-2 px-3">User</th>
+                            <th className="py-2 px-3 text-right">Balance</th>
+                            <th className="py-2 px-3 text-right">Exposure</th>
+                            <th className="py-2 px-3 text-center">Status</th>
+                            <th className="py-2 px-3 text-right">Quick Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono">
+                          {[...(users || [])]
+                            .sort((a, b) => (b.balance || 0) - (a.balance || 0))
+                            .slice(0, 6)
+                            .map((u) => (
+                              <tr key={u.id} className="hover:bg-slate-900/40">
+                                <td className="py-2 px-3 font-bold text-white font-sans">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                    <span>@{u.username}</span>
+                                    {u.full_name && <span className="text-[10px] text-slate-400">({u.full_name})</span>}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 text-right font-black text-amber-400">
+                                  ₹{(u.balance || 0).toLocaleString('en-IN')}
+                                </td>
+                                <td className="py-2 px-3 text-right text-blue-400">
+                                  ₹{(u.exposure || 0).toLocaleString('en-IN')}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {u.is_blocked ? (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-bold">
+                                      BLOCKED
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">
+                                      ACTIVE
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuickAdjustUserId(u.id);
+                                      setFinancialSubTab('CREDIT_DEBIT');
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-sans font-bold text-[11px] transition cursor-pointer border border-slate-700"
+                                  >
+                                    Adjust ₹
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
+            )}
 
-              {/* Withdrawal List Cards */}
-              <div className="space-y-3">
-                {withdrawalRequests
-                  .filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter)
-                  .map((wth) => {
-                    const startTime = new Date(wth.approved_at || wth.created_at).getTime();
-                    const elapsedMins = Math.floor((currentTime - startTime) / 60000);
-                    const remainingMins = Math.max(0, (wth.estimated_minutes || 120) - elapsedMins);
-                    const hrs = Math.floor(remainingMins / 60);
-                    const mins = remainingMins % 60;
+            {/* SUB-PANEL 2: DEPOSIT REQUESTS (APPROVE / REJECT) */}
+            {financialSubTab === 'DEPOSITS' && (
+              <div className="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4 animate-in fade-in duration-200">
+                {/* Filter Tabs */}
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                    {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setDepositStatusFilter(st)}
+                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          depositStatusFilter === st
+                            ? 'bg-amber-500 text-slate-950 font-black shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {st} ({st === 'ALL' ? depositRequests.length : depositRequests.filter((d) => d.status === st).length})
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Total: ₹{depositRequests.filter((d) => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).reduce((acc, d) => acc + d.amount, 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
 
-                    return (
+                {/* Deposit List Cards */}
+                <div className="space-y-3">
+                  {depositRequests
+                    .filter((d) => depositStatusFilter === 'ALL' || d.status === depositStatusFilter)
+                    .map((dep) => (
                       <div
-                        key={wth.id}
-                        className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
+                        key={dep.id}
+                        className="bg-slate-950 rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
-                              <ArrowUpRight className="w-5 h-5" />
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                              <ArrowDownLeft className="w-5 h-5" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-lg font-black text-white">
-                                  ₹{wth.amount.toLocaleString('en-IN')}
+                                <span className="text-lg font-black text-white font-mono">
+                                  ₹{dep.amount.toLocaleString('en-IN')}
                                 </span>
                                 <span className="text-[11px] text-slate-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                                  {wth.upi_id ? 'UPI Fast Rail' : 'Bank IMPS'}
+                                  {dep.payment_method || 'UPI Fast'}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-400">
-                                Bettor: <strong className="text-white">@{wth.username}</strong> <span className="text-slate-500">({wth.user_id})</span>
+                                Bettor: <strong className="text-white">@{dep.username}</strong> <span className="text-slate-500 font-mono">({dep.user_id})</span>
                               </p>
                             </div>
                           </div>
 
                           {/* Status Badge */}
                           <div className="flex items-center gap-2 self-start sm:self-auto">
-                            {wth.status === 'PENDING' && (
+                            {dep.status === 'PENDING' && (
                               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5" />
-                                <span>PENDING ADMIN APPROVAL</span>
+                                <span>PENDING APPROVAL</span>
                               </span>
                             )}
-                            {wth.status === 'IN_PROGRESS' && (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1">
-                                <Timer className="w-3.5 h-3.5" />
-                                <span>IN PROGRESS (120m SLA)</span>
-                              </span>
-                            )}
-                            {wth.status === 'SUCCESSFUL' && (
+                            {dep.status === 'APPROVED' && (
                               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>SUCCESSFUL & PAID</span>
+                                <span>APPROVED & CREDITED</span>
                               </span>
                             )}
-                            {wth.status === 'REJECTED' && (
+                            {dep.status === 'REJECTED' && (
                               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
                                 <AlertCircle className="w-3.5 h-3.5" />
-                                <span>REJECTED (REFUNDED)</span>
+                                <span>REJECTED</span>
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Payout Destination Card */}
+                        {/* Details Grid */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                            <span className="text-slate-400 block text-[11px] mb-0.5">Payout Destination:</span>
-                            {wth.upi_id ? (
-                              <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-                                <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                                <span className="font-mono">{wth.upi_id}</span>
-                              </div>
-                            ) : (
-                              <div className="space-y-0.5 text-slate-200">
-                                <p className="font-bold flex items-center gap-1">
-                                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{wth.bank_account}</span>
-                                </p>
-                                <p className="text-[11px] text-slate-400">
-                                  IFSC: <span className="font-mono text-white">{wth.ifsc}</span> | Holder: <span className="text-white">{wth.account_holder || wth.username}</span>
-                                </p>
-                              </div>
-                            )}
+                          {/* UTR Number */}
+                          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                            <span className="text-slate-400 block text-[11px] mb-1">12-Digit UTR Reference:</span>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-mono font-bold text-amber-400 text-sm tracking-wider select-all">
+                                {dep.utr_number}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyUtr(dep.utr_number)}
+                                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1 text-[10px] font-semibold transition cursor-pointer"
+                              >
+                                {copiedUtr === dep.utr_number ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-emerald-400">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Copy</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
 
-                          {/* 120-minute SLA Bar for In Progress */}
-                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-1.5">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-400">120-Minute Payout SLA:</span>
-                              {wth.status === 'IN_PROGRESS' ? (
-                                <span className="font-bold text-blue-300">
-                                  {hrs > 0 ? `${hrs}h ${mins}m left` : `${mins}m left`}
-                                </span>
-                              ) : (
-                                <span className="text-slate-500">{wth.status}</span>
-                              )}
+                          {/* Screenshot Proof */}
+                          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Payment Proof:</span>
+                              <span className="text-[11px] text-slate-300 font-medium">
+                                {dep.screenshot_url ? 'Screenshot Attached' : 'No Screenshot Attached'}
+                              </span>
                             </div>
-                            {wth.status === 'IN_PROGRESS' && (
-                              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
-                                <div 
-                                  className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                                  style={{ width: `${Math.min(100, Math.max(5, ((120 - remainingMins) / 120) * 100))}%` }}
-                                />
-                              </div>
+                            {dep.screenshot_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewScreenshot(dep.screenshot_url || null)}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 flex items-center gap-1 text-xs font-semibold transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View Proof</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">UTR Only</span>
                             )}
                           </div>
 
                           {/* Timestamps */}
-                          <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-0.5">
-                            <p>Requested: <span className="text-slate-200">{new Date(wth.created_at).toLocaleString('en-IN')}</span></p>
-                            {wth.approved_at && (
-                              <p>Approved: <span className="text-slate-200">{new Date(wth.approved_at).toLocaleString('en-IN')}</span></p>
-                            )}
-                            {wth.completed_at && (
-                              <p>Paid: <span className="text-emerald-400">{new Date(wth.completed_at).toLocaleString('en-IN')}</span></p>
+                          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-0.5 font-mono">
+                            <p>Submitted: <span className="text-slate-200">{new Date(dep.created_at).toLocaleString('en-IN')}</span></p>
+                            {dep.reviewed_at && (
+                              <p>Reviewed: <span className="text-slate-200">{new Date(dep.reviewed_at).toLocaleString('en-IN')}</span></p>
                             )}
                           </div>
                         </div>
 
-                        {/* Action Controls for Withdrawal Status Transitions */}
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
-                          {wth.status === 'PENDING' && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectWithdrawal(wth.id)}
-                                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                <span>Reject & Refund</span>
-                              </button>
+                        {/* Action Controls for Pending Deposit */}
+                        {dep.status === 'PENDING' && (
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => handleRejectDeposit(dep.id)}
+                              className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleApproveWithdrawalToInProgress(wth.id)}
-                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md"
-                              >
-                                <Timer className="w-4 h-4" />
-                                <span>Approve (Start 120m Timer)</span>
-                              </button>
-                            </>
-                          )}
-
-                          {wth.status === 'IN_PROGRESS' && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectWithdrawal(wth.id)}
-                                className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                <span>Reject & Refund</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleCompleteWithdrawalToSuccessful(wth.id)}
-                                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
-                              >
-                                <CheckCircle2 className="w-4 h-4 stroke-[3]" />
-                                <span>Mark Successful (Transferred)</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => handleApproveDeposit(dep.id)}
+                              className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
+                            >
+                              <Check className="w-4 h-4 stroke-[3]" />
+                              <span>Approve & Credit ₹{dep.amount.toLocaleString('en-IN')}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
+                    ))}
 
-                {withdrawalRequests.filter(w => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).length === 0 && (
-                  <div className="p-8 text-center bg-slate-950 rounded-xl border border-slate-800 text-slate-400 text-xs">
-                    No withdrawal requests found under "{withdrawalStatusFilter}".
+                  {depositRequests.filter((d) => depositStatusFilter === 'ALL' || d.status === depositStatusFilter).length === 0 && (
+                    <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 text-slate-400 text-xs">
+                      No deposit requests found under "{depositStatusFilter}".
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-PANEL 3: WITHDRAWAL REQUESTS (APPROVE / REJECT & 120M SLA) */}
+            {financialSubTab === 'WITHDRAWALS' && (
+              <div className="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-4 animate-in fade-in duration-200">
+                {/* Filter Tabs */}
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                    {(['ALL', 'PENDING', 'IN_PROGRESS', 'SUCCESSFUL', 'REJECTED'] as const).map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setWithdrawalStatusFilter(st)}
+                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          withdrawalStatusFilter === st
+                            ? 'bg-amber-500 text-slate-950 font-black shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {st} ({st === 'ALL' ? withdrawalRequests.length : withdrawalRequests.filter((w) => w.status === st).length})
+                      </button>
+                    ))}
                   </div>
-                )}
+                  <span className="text-xs text-slate-400 font-mono">
+                    Total: ₹{withdrawalRequests.filter((w) => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).reduce((acc, w) => acc + w.amount, 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {/* Withdrawal List Cards */}
+                <div className="space-y-3">
+                  {withdrawalRequests
+                    .filter((w) => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter)
+                    .map((wth) => {
+                      const startTime = new Date(wth.approved_at || wth.created_at).getTime();
+                      const elapsedMins = Math.floor((currentTime - startTime) / 60000);
+                      const remainingMins = Math.max(0, (wth.estimated_minutes || 120) - elapsedMins);
+                      const hrs = Math.floor(remainingMins / 60);
+                      const mins = remainingMins % 60;
+
+                      return (
+                        <div
+                          key={wth.id}
+                          className="bg-slate-950 rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-slate-700 transition"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                                <ArrowUpRight className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-black text-white font-mono">
+                                    ₹{wth.amount.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-[11px] text-slate-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                    {wth.upi_id ? 'UPI Fast Rail' : 'Bank IMPS'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400">
+                                  Bettor: <strong className="text-white">@{wth.username}</strong> <span className="text-slate-500 font-mono">({wth.user_id})</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                              {wth.status === 'PENDING' && (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>PENDING APPROVAL</span>
+                                </span>
+                              )}
+                              {wth.status === 'IN_PROGRESS' && (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1">
+                                  <Timer className="w-3.5 h-3.5" />
+                                  <span>IN PROGRESS (120m SLA)</span>
+                                </span>
+                              )}
+                              {wth.status === 'SUCCESSFUL' && (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>SUCCESSFUL & PAID</span>
+                                </span>
+                              )}
+                              {wth.status === 'REJECTED' && (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span>REJECTED (REFUNDED)</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Payout Destination */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                              <span className="text-slate-400 block text-[11px] mb-0.5">Payout Destination:</span>
+                              {wth.upi_id ? (
+                                <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                                  <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                                  <span className="font-mono">{wth.upi_id}</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-0.5 text-slate-200">
+                                  <p className="font-bold flex items-center gap-1">
+                                    <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{wth.bank_account}</span>
+                                  </p>
+                                  <p className="text-[11px] text-slate-400">
+                                    IFSC: <span className="font-mono text-white">{wth.ifsc}</span> | Holder: <span className="text-white">{wth.account_holder || wth.username}</span>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 120-minute SLA Bar */}
+                            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">120-Minute Payout SLA:</span>
+                                {wth.status === 'IN_PROGRESS' ? (
+                                  <span className="font-bold text-blue-300">
+                                    {hrs > 0 ? `${hrs}h ${mins}m left` : `${mins}m left`}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500">{wth.status}</span>
+                                )}
+                              </div>
+                              {wth.status === 'IN_PROGRESS' && (
+                                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.min(100, Math.max(5, ((120 - remainingMins) / 120) * 100))}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Timestamps */}
+                            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-0.5 font-mono">
+                              <p>Requested: <span className="text-slate-200">{new Date(wth.created_at).toLocaleString('en-IN')}</span></p>
+                              {wth.approved_at && (
+                                <p>Approved: <span className="text-slate-200">{new Date(wth.approved_at).toLocaleString('en-IN')}</span></p>
+                              )}
+                              {wth.completed_at && (
+                                <p>Paid: <span className="text-emerald-400">{new Date(wth.completed_at).toLocaleString('en-IN')}</span></p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Controls */}
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900">
+                            {wth.status === 'PENDING' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectWithdrawal(wth.id)}
+                                  className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject & Refund</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveWithdrawalToInProgress(wth.id)}
+                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                                >
+                                  <Timer className="w-4 h-4" />
+                                  <span>Approve (Start 120m SLA)</span>
+                                </button>
+                              </>
+                            )}
+
+                            {wth.status === 'IN_PROGRESS' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectWithdrawal(wth.id)}
+                                  className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject & Refund</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCompleteWithdrawalToSuccessful(wth.id)}
+                                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 stroke-[3]" />
+                                  <span>Mark Successful (Paid Out)</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {withdrawalRequests.filter((w) => withdrawalStatusFilter === 'ALL' || w.status === withdrawalStatusFilter).length === 0 && (
+                    <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 text-slate-400 text-xs">
+                      No withdrawal requests found under "{withdrawalStatusFilter}".
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* SUB-PANEL 3: DAY-WISE CENTER PROFIT & LOSS REPORT */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span>Day-Wise Center Profit & Loss (P/L) Summary</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Daily financial performance breakdown aggregated by Race Center venue and race day turnover vs payout liabilities.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold">
-                Platform-Wide Margin
-              </span>
-            </div>
+            {/* SUB-PANEL 4: DAY-WISE & CENTER-WISE P/L REPORT */}
+            {financialSubTab === 'PNL_REPORT' && (
+              <div className="bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-5 animate-in fade-in duration-200">
+                {/* Date Filter Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <span>Day-Wise & Center-Wise Profit & Loss (P/L) Report</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      View gross bet turnover, winnings paid out, net bookmaker P/L, and hold margins per race center.
+                    </p>
+                  </div>
 
-            {(() => {
-              // Group bets by race center / venue
-              const centerMap: Record<string, { venue: string; centerCode: string; turnover: number; payouts: number; betCount: number }> = {};
+                  <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs flex-wrap">
+                    {(['TODAY', 'YESTERDAY', 'LAST7', 'ALL', 'CUSTOM'] as const).map((df) => (
+                      <button
+                        key={df}
+                        onClick={() => setPnlDateFilter(df)}
+                        className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                          pnlDateFilter === df
+                            ? 'bg-amber-500 text-slate-950 font-black shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {df === 'TODAY' ? "Today's P/L" : df === 'YESTERDAY' ? 'Yesterday' : df === 'LAST7' ? 'Last 7 Days' : df === 'ALL' ? 'All Time' : 'Pick Date'}
+                      </button>
+                    ))}
+                    {pnlDateFilter === 'CUSTOM' && (
+                      <input
+                        type="date"
+                        value={pnlCustomDate}
+                        onChange={(e) => setPnlCustomDate(e.target.value)}
+                        className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                      />
+                    )}
+                  </div>
+                </div>
 
-              (races || []).forEach(r => {
-                const centerKey = r.venue || 'Unknown Center';
-                if (!centerMap[centerKey]) {
-                  centerMap[centerKey] = {
-                    venue: centerKey,
-                    centerCode: r.venue.split(' ')[0].toUpperCase(),
-                    turnover: 0,
-                    payouts: 0,
-                    betCount: 0
-                  };
-                }
-              });
+                {/* Performance Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">Gross Turnover (Stakes)</span>
+                    <div className="text-xl font-black text-white font-mono">
+                      ₹{pnlTurnover.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[10px] text-slate-500">{pnlFilteredBets.length} Bets Placed</span>
+                  </div>
 
-              (allBets || []).forEach(b => {
-                const race = (races || []).find(r => r.id === b.race_id);
-                const centerKey = race?.venue || 'General Book';
-                if (!centerMap[centerKey]) {
-                  centerMap[centerKey] = {
-                    venue: centerKey,
-                    centerCode: centerKey.split(' ')[0].toUpperCase(),
-                    turnover: 0,
-                    payouts: 0,
-                    betCount: 0
-                  };
-                }
-                centerMap[centerKey].turnover += (b.amount || 0);
-                centerMap[centerKey].payouts += (b.payout_amount || 0);
-                centerMap[centerKey].betCount += 1;
-              });
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase">Winnings Paid Out</span>
+                    <div className="text-xl font-black text-amber-400 font-mono">
+                      ₹{pnlPayouts.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[10px] text-slate-500">
+                      {pnlFilteredBets.filter((b) => b.status === 'WON').length} Winning Bets
+                    </span>
+                  </div>
 
-              const centerRows = Object.values(centerMap);
+                  <div className={`p-4 rounded-2xl border space-y-1 ${
+                    pnlNetProfit >= 0
+                      ? 'bg-emerald-950/40 border-emerald-500/50'
+                      : 'bg-rose-950/40 border-rose-500/50'
+                  }`}>
+                    <span className="text-[11px] font-bold uppercase text-slate-300">Net Bookmaker P/L</span>
+                    <div className={`text-xl font-black font-mono ${
+                      pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {pnlNetProfit >= 0 ? `+₹${pnlNetProfit.toLocaleString('en-IN')}` : `-₹${Math.abs(pnlNetProfit).toLocaleString('en-IN')}`}
+                    </div>
+                    <span className={`text-[10px] font-bold ${pnlNetProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {pnlNetProfit >= 0 ? 'Bookmaker Profit' : 'Bookmaker Loss'}
+                    </span>
+                  </div>
 
-              return (
-                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-indigo-400 uppercase">Hold Margin %</span>
+                    <div className="text-xl font-black text-indigo-300 font-mono">
+                      {pnlMarginPct}%
+                    </div>
+                    <span className="text-[10px] text-slate-500">Net Retained Stake %</span>
+                  </div>
+                </div>
+
+                {/* Center-Wise Breakdown Table */}
+                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
-                        <th className="py-2.5 px-3.5">Center / Venue</th>
-                        <th className="py-2.5 px-3 text-center">Total Bets</th>
-                        <th className="py-2.5 px-3 text-right">Turnover Pool</th>
-                        <th className="py-2.5 px-3 text-right">Payouts Paid</th>
-                        <th className="py-2.5 px-3 text-right">Net Bookmaker P/L</th>
-                        <th className="py-2.5 px-3.5 text-right">Hold Margin %</th>
+                      <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-bold text-[10px]">
+                        <th className="py-3 px-3.5">Center / Venue</th>
+                        <th className="py-3 px-3 text-center">Races</th>
+                        <th className="py-3 px-3 text-center">Bets</th>
+                        <th className="py-3 px-3 text-right">Turnover Pool</th>
+                        <th className="py-3 px-3 text-right">Payouts Paid</th>
+                        <th className="py-3 px-3 text-right">Net Bookmaker P/L</th>
+                        <th className="py-3 px-3.5 text-right">Margin %</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono">
-                      {centerRows.map((c, i) => {
+                      {centerPnLRows.map((c, i) => {
                         const netPl = c.turnover - c.payouts;
                         const margin = c.turnover > 0 ? ((netPl / c.turnover) * 100).toFixed(1) : '0.0';
                         return (
                           <tr key={i} className="hover:bg-slate-900/40">
-                            <td className="py-2.5 px-3.5 font-bold text-white font-sans flex items-center gap-2">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                              <span>{c.venue}</span>
+                            <td className="py-3 px-3.5 font-bold text-white font-sans">
+                              <div className="flex items-center gap-2">
+                                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-amber-400 font-mono text-[10px] font-bold">
+                                  {c.code}
+                                </span>
+                                <span>{c.name}</span>
+                              </div>
                             </td>
-                            <td className="py-2.5 px-3 text-center text-slate-300 font-bold">{c.betCount}</td>
-                            <td className="py-2.5 px-3 text-right text-emerald-400 font-bold">₹{c.turnover.toLocaleString('en-IN')}</td>
-                            <td className="py-2.5 px-3 text-right text-amber-400 font-bold">₹{c.payouts.toLocaleString('en-IN')}</td>
-                            <td className={`py-2.5 px-3 text-right font-black ${netPl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            <td className="py-3 px-3 text-center text-slate-300">{c.raceCount}</td>
+                            <td className="py-3 px-3 text-center text-slate-300 font-bold">{c.betCount}</td>
+                            <td className="py-3 px-3 text-right text-emerald-400 font-bold">
+                              ₹{c.turnover.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-3 text-right text-amber-400 font-bold">
+                              ₹{c.payouts.toLocaleString('en-IN')}
+                            </td>
+                            <td className={`py-3 px-3 text-right font-black ${netPl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {netPl >= 0 ? `+₹${netPl.toLocaleString('en-IN')}` : `-₹${Math.abs(netPl).toLocaleString('en-IN')}`}
                             </td>
-                            <td className="py-2.5 px-3.5 text-right font-bold text-indigo-300">{margin}%</td>
+                            <td className={`py-3 px-3.5 text-right font-bold ${netPl >= 0 ? 'text-indigo-300' : 'text-rose-400'}`}>
+                              {margin}%
+                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                  {centerRows.length === 0 && (
-                    <div className="p-6 text-center text-slate-500 text-xs">
-                      No center betting data recorded yet.
+                  {centerPnLRows.length === 0 && (
+                    <div className="p-8 text-center text-slate-500 text-xs">
+                      No center betting data recorded for this date selection.
                     </div>
                   )}
                 </div>
-              );
-            })()}
+              </div>
+            )}
+
+            {/* SUB-PANEL 5: MANUAL CREDIT / DEBIT (ADD / DEDUCT BALANCE) */}
+            {financialSubTab === 'CREDIT_DEBIT' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
+                {/* Form Card */}
+                <div className="bg-slate-900 rounded-3xl border-2 border-amber-500/40 p-5 space-y-4 shadow-xl">
+                  <div className="flex items-center gap-2.5 border-b border-slate-800 pb-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-sm">Manual Balance Adjustment</h3>
+                      <p className="text-xs text-slate-400">Add or deduct punter funds with instant audit</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleQuickAdjustBalance} className="space-y-4 text-xs">
+                    {/* User Dropdown Selector */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">
+                        Select Target User <span className="text-rose-400">*</span>
+                      </label>
+                      <select
+                        required
+                        value={quickAdjustUserId}
+                        onChange={(e) => setQuickAdjustUserId(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-amber-500 cursor-pointer"
+                      >
+                        <option value="">-- Choose User Account --</option>
+                        {(users || []).map((u) => (
+                          <option key={u.id} value={u.id}>
+                            @{u.username} • Balance: ₹{(u.balance || 0).toLocaleString('en-IN')} {u.full_name ? `(${u.full_name})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Selected User Info Banner */}
+                    {quickAdjustUserId && (() => {
+                      const selUser = (users || []).find((u) => u.id === quickAdjustUserId);
+                      if (!selUser) return null;
+                      return (
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs font-mono">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-sans">Username:</span>
+                            <span className="text-white font-bold">@{selUser.username}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-sans">Current Balance:</span>
+                            <span className="text-amber-400 font-bold">₹{(selUser.balance || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-sans">Current Exposure:</span>
+                            <span className="text-blue-400">₹{(selUser.exposure || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Adjustment Type (Credit / Debit) */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Action Type</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setQuickAdjustType('CREDIT')}
+                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                            quickAdjustType === 'CREDIT'
+                              ? 'bg-emerald-600 text-white shadow-md'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>CREDIT (Add Funds)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setQuickAdjustType('DEBIT')}
+                          className={`py-2 px-3 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                            quickAdjustType === 'DEBIT'
+                              ? 'bg-rose-600 text-white shadow-md'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                          <span>DEBIT (Deduct Funds)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Amount Input & Preset Chips */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Amount (₹) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={quickAdjustAmount}
+                        onChange={(e) => setQuickAdjustAmount(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-black text-sm focus:outline-none focus:border-amber-500"
+                        placeholder="1000"
+                      />
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {['500', '1000', '5000', '10000', '50000'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setQuickAdjustAmount(chip)}
+                            className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono font-bold transition cursor-pointer border border-slate-700"
+                          >
+                            ₹{Number(chip).toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Reason / Reference */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Reason / Statement Note</label>
+                      <input
+                        type="text"
+                        value={quickAdjustDesc}
+                        onChange={(e) => setQuickAdjustDesc(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
+                        placeholder="e.g. Offline Cash Deposit / Adjustment"
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={isLoading || !quickAdjustUserId}
+                      className={`w-full py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-lg ${
+                        quickAdjustType === 'CREDIT'
+                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                          : 'bg-rose-600 hover:bg-rose-500 text-white'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      <Coins className="w-4 h-4" />
+                      <span>Execute {quickAdjustType === 'CREDIT' ? 'Credit (+)' : 'Debit (-)'} ₹{Number(quickAdjustAmount || 0).toLocaleString('en-IN')}</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* User List with Quick Adjust Buttons */}
+                <div className="lg:col-span-2 bg-slate-900 rounded-3xl border border-slate-800 p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-amber-400" />
+                      <h3 className="font-bold text-white text-sm">All User Wallets ({users.length} Users)</h3>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">
+                      Total Balances: ₹{totalUserBalances.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+
+                  <div className="max-h-[520px] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-900 sticky top-0 text-slate-400 uppercase font-bold text-[10px] border-b border-slate-800">
+                        <tr>
+                          <th className="py-2.5 px-3">Bettor</th>
+                          <th className="py-2.5 px-3 text-right">Balance</th>
+                          <th className="py-2.5 px-3 text-right">Exposure</th>
+                          <th className="py-2.5 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                        {(users || []).map((u) => (
+                          <tr key={u.id} className="hover:bg-slate-900/40">
+                            <td className="py-2.5 px-3 font-bold text-white font-sans">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${u.is_blocked ? 'bg-rose-500' : 'bg-emerald-400'}`} />
+                                <span>@{u.username}</span>
+                                {u.full_name && <span className="text-[10px] text-slate-400">({u.full_name})</span>}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-black text-amber-400">
+                              ₹{(u.balance || 0).toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-blue-400">
+                              ₹{(u.exposure || 0).toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1 font-sans">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setQuickAdjustUserId(u.id);
+                                    setQuickAdjustType('CREDIT');
+                                  }}
+                                  className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] transition cursor-pointer border border-emerald-500/30"
+                                >
+                                  + Credit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setQuickAdjustUserId(u.id);
+                                    setQuickAdjustType('DEBIT');
+                                  }}
+                                  className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px] transition cursor-pointer border border-rose-500/30"
+                                >
+                                  - Debit
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 8: System Control & Staff Management (Master Privileges Item #5) */}
       {activeTab === 'system' && (
