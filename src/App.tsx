@@ -185,7 +185,7 @@ export default function App() {
     };
   }, []);
 
-  // Fetch races & banners
+  // Fetch races & banners (100% flicker-free with deep equality check)
   const loadRacesAndBanners = async (isBackground = false) => {
     try {
       if (!isBackground && races.length === 0) {
@@ -196,23 +196,30 @@ export default function App() {
         api.getRaces('all'),
         api.getBanners(),
       ]);
-      if (racesData) {
-        setRaces(racesData);
+      if (racesData && Array.isArray(racesData)) {
+        setRaces((prev) => (JSON.stringify(prev) === JSON.stringify(racesData) ? prev : racesData));
         try { localStorage.setItem('derby_races', JSON.stringify(racesData)); } catch {}
       }
-      if (bannersData) {
-        setBanners(bannersData);
+      if (bannersData && Array.isArray(bannersData)) {
+        setBanners((prev) => (JSON.stringify(prev) === JSON.stringify(bannersData) ? prev : bannersData));
         try { localStorage.setItem('derby_banners', JSON.stringify(bannersData)); } catch {}
       }
     } catch (err: any) {
       console.error('Error fetching races:', err);
     } finally {
-      setIsLoadingRaces(false);
+      if (!isBackground) {
+        setIsLoadingRaces(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadRacesAndBanners();
+    loadRacesAndBanners(false);
+
+    // Auto-load polling every 3.5s so data updates in real-time without manual page refresh
+    const autoPoll = setInterval(() => {
+      loadRacesAndBanners(true);
+    }, 3500);
 
     // Subscribe to realtime odds changes and suspension updates
     const unsubscribe = realtimeOdds.subscribe((payload) => {
@@ -266,7 +273,10 @@ export default function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearInterval(autoPoll);
+      unsubscribe();
+    };
   }, []);
 
   const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);

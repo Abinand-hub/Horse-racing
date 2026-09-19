@@ -98,8 +98,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [races, setRaces] = useState<Race[]>(initialRaces || []);
 
   useEffect(() => {
-    if (initialRaces) {
-      setRaces(initialRaces);
+    if (initialRaces && Array.isArray(initialRaces)) {
+      setRaces((prev) => (JSON.stringify(prev) === JSON.stringify(initialRaces) ? prev : initialRaces));
     }
   }, [initialRaces]);
 
