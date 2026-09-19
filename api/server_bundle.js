@@ -1112,12 +1112,13 @@ app.post("/api/auth/signup", async (req, res) => {
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     };
     db.transactions.unshift(welcomeTx);
-    ensureMongoConnected().then(async () => {
+    try {
+      await ensureMongoConnected();
       await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true });
       await TransactionModel.findOneAndUpdate({ id: welcomeTx.id }, welcomeTx, { upsert: true, new: true });
-    }).catch((err) => {
-      console.warn("Async Mongo save note:", err?.message || err);
-    });
+    } catch (err) {
+      console.warn("MongoDB Atlas write note:", err?.message || err);
+    }
     deletePersistentOtp(primaryKey).catch(() => {
     });
     if (cleanPhone) deletePersistentOtp(cleanPhone).catch(() => {
@@ -2288,32 +2289,39 @@ app.post("/api/admin/races/:id/settle", (req, res) => {
   });
 });
 app.get("/api/admin/users", async (req, res) => {
-  if (isMongoDBConnected()) {
-    try {
-      const mongoUsers = await UserModel.find({ role: { $ne: "admin" } }).sort({ created_at: 1 }).lean();
-      if (mongoUsers && mongoUsers.length > 0) {
-        const seenRefs2 = /* @__PURE__ */ new Set();
-        const uniqueUsers = mongoUsers.map((u, idx) => {
-          const userObj = { ...u };
-          delete userObj.password_hash;
-          if (!userObj.ref_id || seenRefs2.has(userObj.ref_id) || userObj.ref_id === "TURF-10001" && idx > 0) {
-            userObj.ref_id = `TURF-${10001 + idx}`;
-            UserModel.updateOne({ id: userObj.id }, { $set: { ref_id: userObj.ref_id } }).catch(() => {
-            });
-          }
-          seenRefs2.add(userObj.ref_id);
-          return userObj;
-        });
-        return res.json({ success: true, users: uniqueUsers });
-      }
-    } catch (err) {
-      console.error("Mongo load users error:", err);
+  try {
+    await ensureMongoConnected();
+    const mongoUsers = await UserModel.find({
+      role: { $ne: "admin" },
+      id: { $ne: "usr_admin_master" },
+      username: { $ne: "admin" }
+    }).sort({ created_at: -1 }).lean();
+    if (mongoUsers && mongoUsers.length > 0) {
+      const seenRefs2 = /* @__PURE__ */ new Set();
+      const uniqueUsers = mongoUsers.map((u, idx) => {
+        const userObj = { ...u };
+        delete userObj.password_hash;
+        if (!userObj.ref_id || seenRefs2.has(userObj.ref_id)) {
+          userObj.ref_id = `TURF-${10001 + idx}`;
+          UserModel.updateOne({ id: userObj.id }, { $set: { ref_id: userObj.ref_id } }).catch(() => {
+          });
+        }
+        seenRefs2.add(userObj.ref_id);
+        return userObj;
+      });
+      db.users = [
+        ...db.users.filter((u) => u.role === "admin" || u.username === "admin"),
+        ...mongoUsers.map((u) => u)
+      ];
+      return res.json({ success: true, users: uniqueUsers });
     }
+  } catch (err) {
+    console.error("Mongo load users error:", err);
   }
   const seenRefs = /* @__PURE__ */ new Set();
-  const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin").map(({ password_hash, ...u }, idx) => {
+  const usersList = db.users.filter((u) => u.role !== "admin" && u.id !== "usr_admin" && u.id !== "usr_admin_master" && u.username !== "admin").map(({ password_hash, ...u }, idx) => {
     const userObj = { ...u };
-    if (!userObj.ref_id || seenRefs.has(userObj.ref_id) || userObj.ref_id === "TURF-10001" && idx > 0) {
+    if (!userObj.ref_id || seenRefs.has(userObj.ref_id)) {
       userObj.ref_id = `TURF-${10001 + idx}`;
     }
     seenRefs.add(userObj.ref_id);
@@ -2321,14 +2329,49 @@ app.get("/api/admin/users", async (req, res) => {
   });
   return res.json({ success: true, users: usersList });
 });
+app.get("/api/admin/overview", async (req, res) => {
+  try {
+    await ensureMongoConnected();
+    const totalUsers = await UserModel.countDocuments({ role: { $ne: "admin" }, id: { $ne: "usr_admin_master" }, username: { $ne: "admin" } });
+    const totalBets = await BetModel.countDocuments();
+    const bets = await BetModel.find().lean();
+    const totalVolume = bets.reduce((s, b) => s + (b.stake || 0), 0);
+    const pendingBetsCount = bets.filter((b) => b.status === "PENDING").length;
+    const openRaces = await RaceModel.countDocuments({ status: { $in: ["OPEN", "LIVE", "OPEN_FOR_BETTING"] } });
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        totalBets,
+        totalVolume,
+        openRaces,
+        pendingBetsCount
+      }
+    });
+  } catch (err) {
+    const realUsers = db.users.filter((u) => u.role !== "admin" && u.username !== "admin");
+    return res.json({
+      success: true,
+      stats: {
+        totalUsers: realUsers.length,
+        totalBets: db.bets.length,
+        totalVolume: db.bets.reduce((s, b) => s + (b.stake || 0), 0),
+        openRaces: db.races.filter((r) => r.status === "OPEN" || r.status === "LIVE" || r.status === "OPEN_FOR_BETTING").length,
+        pendingBetsCount: db.bets.filter((b) => b.status === "PENDING").length
+      }
+    });
+  }
+});
 app.get("/api/admin/bets", async (req, res) => {
-  if (isMongoDBConnected()) {
-    try {
-      const bets = await BetModel.find().sort({ placed_at: -1 }).lean();
+  try {
+    await ensureMongoConnected();
+    const bets = await BetModel.find().sort({ placed_at: -1 }).lean();
+    if (bets && bets.length > 0) {
+      db.bets = bets;
       return res.json({ success: true, bets });
-    } catch (err) {
-      return res.json({ success: true, bets: db.bets });
     }
+  } catch (err) {
+    console.error("Mongo load bets error:", err);
   }
   return res.json({ success: true, bets: db.bets });
 });
@@ -2440,20 +2483,25 @@ app.post("/api/admin/bets/:id/cancel", (req, res) => {
     bet
   });
 });
-app.post("/api/admin/users/create", (req, res) => {
+app.post("/api/admin/users/create", async (req, res) => {
   const { full_name, username, phone, email, password, initial_balance } = req.body;
   if (!username || !phone || !password) {
     return res.status(400).json({ error: "Username, Phone, and Password are required" });
   }
   const cleanUsername = String(username).trim().toLowerCase();
-  const existing = db.users.find((u) => u.username.toLowerCase() === cleanUsername || u.phone === String(phone).trim());
+  await ensureMongoConnected();
+  const existingMongo = await UserModel.findOne({
+    $or: [{ username: cleanUsername }, { phone: String(phone).trim() }]
+  }).lean().catch(() => null);
+  const existing = existingMongo || db.users.find((u) => u.username.toLowerCase() === cleanUsername || u.phone === String(phone).trim());
   if (existing) {
     return res.status(400).json({ error: "A user with this username or phone number already exists" });
   }
   const initBal = Math.max(0, Number(initial_balance) || 0);
+  const userCount = await UserModel.countDocuments({ role: { $ne: "admin" } }).catch(() => db.users.length);
   const newUser = {
     id: generateId("usr"),
-    ref_id: `TURF-${10001 + db.users.length}`,
+    ref_id: `TURF-${10001 + userCount}`,
     full_name: full_name ? String(full_name).trim() : cleanUsername,
     phone: String(phone).trim(),
     email: email ? String(email).trim().toLowerCase() : void 0,
@@ -2463,12 +2511,14 @@ app.post("/api/admin/users/create", (req, res) => {
     exposure: 0,
     role: "user",
     is_blocked: false,
-    profile_photo: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+    profile_photo: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
     created_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   db.users.push(newUser);
+  await UserModel.findOneAndUpdate({ id: newUser.id }, newUser, { upsert: true, new: true }).catch(() => {
+  });
   if (initBal > 0) {
-    db.transactions.unshift({
+    const initTx = {
       id: generateId("tx"),
       user_id: newUser.id,
       username: newUser.username,
@@ -2477,16 +2527,29 @@ app.post("/api/admin/users/create", (req, res) => {
       balance_after: initBal,
       description: "Initial balance credited by Admin on account creation",
       created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    db.transactions.unshift(initTx);
+    await TransactionModel.findOneAndUpdate({ id: initTx.id }, initTx, { upsert: true, new: true }).catch(() => {
     });
   }
   saveDatabase();
   const { password_hash, ...profile } = newUser;
   return res.json({ success: true, message: `User @${newUser.username} created successfully!`, user: profile });
 });
-app.post("/api/admin/users/:id/toggle-block", (req, res) => {
-  const user = db.users.find((u) => u.id === req.params.id);
+app.post("/api/admin/users/:id/toggle-block", async (req, res) => {
+  await ensureMongoConnected();
+  let user = db.users.find((u) => u.id === req.params.id);
+  if (!user) {
+    const mongoUser = await UserModel.findOne({ id: req.params.id }).lean().catch(() => null);
+    if (mongoUser) {
+      user = mongoUser;
+      db.users.push(user);
+    }
+  }
   if (!user) return res.status(404).json({ error: "User not found" });
   user.is_blocked = !user.is_blocked;
+  await UserModel.findOneAndUpdate({ id: user.id }, { is_blocked: user.is_blocked }).catch(() => {
+  });
   saveDatabase();
   return res.json({
     success: true,
