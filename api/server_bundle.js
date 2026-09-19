@@ -729,6 +729,9 @@ var defaultData = {
     betting_enabled: true,
     emergency_message: "",
     announcement: "",
+    max_bet_per_horse: 5e4,
+    max_win_per_race: 5e5,
+    min_bet_amount: 100,
     sub_admins: []
   },
   banners: [
@@ -1776,7 +1779,25 @@ app.post("/api/bets/place", async (req, res) => {
       error: `Insufficient balance! Your current balance is \u20B9${user.balance.toLocaleString()}, but stake is \u20B9${numStake.toLocaleString()}.`
     });
   }
+  const minBet = db.system_settings?.min_bet_amount || 10;
+  if (numStake < minBet) {
+    return res.status(400).json({
+      error: `Minimum bet stake allowed is \u20B9${minBet.toLocaleString()}.`
+    });
+  }
+  const maxBetPerHorse = db.system_settings?.max_bet_per_horse || 5e4;
+  if (numStake > maxBetPerHorse) {
+    return res.status(400).json({
+      error: `Stake exceeds the maximum allowed bet limit of \u20B9${maxBetPerHorse.toLocaleString()} per horse.`
+    });
+  }
   const potentialWin = Math.round(numStake * numOdds);
+  const maxWinPerRace = db.system_settings?.max_win_per_race || 5e5;
+  if (potentialWin > maxWinPerRace) {
+    return res.status(400).json({
+      error: `Potential payout (\u20B9${potentialWin.toLocaleString()}) exceeds the maximum allowed win limit of \u20B9${maxWinPerRace.toLocaleString()} per race.`
+    });
+  }
   user.balance -= numStake;
   user.exposure += numStake;
   const newBet = {
@@ -2485,13 +2506,16 @@ app.get("/api/system/settings", (req, res) => {
   return res.json({ success: true, settings: db.system_settings });
 });
 app.post("/api/admin/system/settings", (req, res) => {
-  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
-  const { betting_enabled, emergency_message, announcement } = req.body;
+  db.system_settings = db.system_settings || { betting_enabled: true, max_bet_per_horse: 5e4, max_win_per_race: 5e5, min_bet_amount: 100, sub_admins: [] };
+  const { betting_enabled, emergency_message, announcement, max_bet_per_horse, max_win_per_race, min_bet_amount } = req.body;
   if (betting_enabled !== void 0) db.system_settings.betting_enabled = Boolean(betting_enabled);
   if (emergency_message !== void 0) db.system_settings.emergency_message = String(emergency_message);
   if (announcement !== void 0) db.system_settings.announcement = String(announcement);
+  if (max_bet_per_horse !== void 0 && !isNaN(Number(max_bet_per_horse))) db.system_settings.max_bet_per_horse = Number(max_bet_per_horse);
+  if (max_win_per_race !== void 0 && !isNaN(Number(max_win_per_race))) db.system_settings.max_win_per_race = Number(max_win_per_race);
+  if (min_bet_amount !== void 0 && !isNaN(Number(min_bet_amount))) db.system_settings.min_bet_amount = Number(min_bet_amount);
   saveDatabase();
-  return res.json({ success: true, message: "System settings updated successfully", settings: db.system_settings });
+  return res.json({ success: true, message: "System risk & limits settings updated successfully", settings: db.system_settings });
 });
 app.post("/api/admin/sub-admins", (req, res) => {
   db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };

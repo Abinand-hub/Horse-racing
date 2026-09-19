@@ -2367,18 +2367,18 @@ export const api = {
     }
   },
 
-  async getSystemSettings(): Promise<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; sub_admins?: any[] }> {
+  async getSystemSettings(): Promise<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; max_bet_per_horse?: number; max_win_per_race?: number; min_bet_amount?: number; sub_admins?: any[] }> {
     try {
       const res = await fetch(`${API_BASE}/system/settings`);
       if (res.ok) {
         const data = await res.json();
-        return data.settings || { betting_enabled: true, sub_admins: [] };
+        return data.settings || { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
       }
     } catch {}
-    return { betting_enabled: true, sub_admins: [] };
+    return { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
   },
 
-  async updateSystemSettings(settings: { betting_enabled?: boolean; emergency_message?: string; announcement?: string }): Promise<{ success: boolean; message?: string }> {
+  async updateSystemSettings(settings: { betting_enabled?: boolean; emergency_message?: string; announcement?: string; max_bet_per_horse?: number; max_win_per_race?: number; min_bet_amount?: number }): Promise<{ success: boolean; message?: string }> {
     try {
       const res = await fetch(`${API_BASE}/admin/system/settings`, {
         method: 'POST',

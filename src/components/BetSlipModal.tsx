@@ -88,6 +88,14 @@ export const BetSlipModal: React.FC<BetSlipModalProps> = ({
       setError(`Insufficient balance. Current balance is ₹${userBalance.toLocaleString()}`);
       return;
     }
+    if (stake > 50000) {
+      setError('Stake exceeds maximum allowed bet limit of ₹50,000 per horse.');
+      return;
+    }
+    if (potentialPayout > 500000) {
+      setError(`Potential win (₹${potentialPayout.toLocaleString()}) exceeds maximum allowed win limit of ₹5,00,000 per race.`);
+      return;
+    }
     if (betSlip.race.status === 'CLOSED') {
       setError('This race is currently closed / running.');
       return;

@@ -261,6 +261,9 @@ interface SystemSettings {
   betting_enabled: boolean;
   emergency_message?: string;
   announcement?: string;
+  max_bet_per_horse?: number;
+  max_win_per_race?: number;
+  min_bet_amount?: number;
   sub_admins?: SubAdmin[];
 }
 
@@ -301,6 +304,9 @@ const defaultData: DBData = {
     betting_enabled: true,
     emergency_message: '',
     announcement: '',
+    max_bet_per_horse: 50000,
+    max_win_per_race: 500000,
+    min_bet_amount: 100,
     sub_admins: [],
   },
   banners: [
@@ -1614,8 +1620,29 @@ app.post('/api/bets/place', async (req, res) => {
     });
   }
 
+  // ⚡ Check Risk Limit Settings (Min Bet, Max Bet per Horse & Max Win per Race)
+  const minBet = db.system_settings?.min_bet_amount || 10;
+  if (numStake < minBet) {
+    return res.status(400).json({
+      error: `Minimum bet stake allowed is ₹${minBet.toLocaleString()}.`,
+    });
+  }
+
+  const maxBetPerHorse = db.system_settings?.max_bet_per_horse || 50000;
+  if (numStake > maxBetPerHorse) {
+    return res.status(400).json({
+      error: `Stake exceeds the maximum allowed bet limit of ₹${maxBetPerHorse.toLocaleString()} per horse.`,
+    });
+  }
+
   // Calculate potential win
   const potentialWin = Math.round(numStake * numOdds);
+  const maxWinPerRace = db.system_settings?.max_win_per_race || 500000;
+  if (potentialWin > maxWinPerRace) {
+    return res.status(400).json({
+      error: `Potential payout (₹${potentialWin.toLocaleString()}) exceeds the maximum allowed win limit of ₹${maxWinPerRace.toLocaleString()} per race.`,
+    });
+  }
 
   // Deduct from balance, Add to exposure
   user.balance -= numStake;
@@ -2480,13 +2507,16 @@ app.get('/api/system/settings', (req, res) => {
 
 // 15. System Control: Update Global Settings & Emergency Switch
 app.post('/api/admin/system/settings', (req, res) => {
-  db.system_settings = db.system_settings || { betting_enabled: true, sub_admins: [] };
-  const { betting_enabled, emergency_message, announcement } = req.body;
+  db.system_settings = db.system_settings || { betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] };
+  const { betting_enabled, emergency_message, announcement, max_bet_per_horse, max_win_per_race, min_bet_amount } = req.body;
   if (betting_enabled !== undefined) db.system_settings.betting_enabled = Boolean(betting_enabled);
   if (emergency_message !== undefined) db.system_settings.emergency_message = String(emergency_message);
   if (announcement !== undefined) db.system_settings.announcement = String(announcement);
+  if (max_bet_per_horse !== undefined && !isNaN(Number(max_bet_per_horse))) db.system_settings.max_bet_per_horse = Number(max_bet_per_horse);
+  if (max_win_per_race !== undefined && !isNaN(Number(max_win_per_race))) db.system_settings.max_win_per_race = Number(max_win_per_race);
+  if (min_bet_amount !== undefined && !isNaN(Number(min_bet_amount))) db.system_settings.min_bet_amount = Number(min_bet_amount);
   saveDatabase();
-  return res.json({ success: true, message: 'System settings updated successfully', settings: db.system_settings });
+  return res.json({ success: true, message: 'System risk & limits settings updated successfully', settings: db.system_settings });
 });
 
 // 16. System Control: Add Sub-Admin

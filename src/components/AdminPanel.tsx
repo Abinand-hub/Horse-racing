@@ -106,7 +106,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   // New Checklist State additions
-  const [systemSettings, setSystemSettings] = useState<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; sub_admins?: any[] }>({ betting_enabled: true, sub_admins: [] });
+  const [systemSettings, setSystemSettings] = useState<{ betting_enabled: boolean; emergency_message?: string; announcement?: string; max_bet_per_horse?: number; max_win_per_race?: number; min_bet_amount?: number; sub_admins?: any[] }>({ betting_enabled: true, max_bet_per_horse: 50000, max_win_per_race: 500000, min_bet_amount: 100, sub_admins: [] });
+  const [selectedRiskRaceId, setSelectedRiskRaceId] = useState<string>('');
+  const [limitMaxBet, setLimitMaxBet] = useState<string>('50000');
+  const [limitMaxWin, setLimitMaxWin] = useState<string>('500000');
+  const [limitMinBet, setLimitMinBet] = useState<string>('100');
   const [announcementText, setAnnouncementText] = useState<string>('');
   const [addUserModalOpen, setAddUserModalOpen] = useState<boolean>(false);
   const [newUserData, setNewUserData] = useState({ full_name: '', username: '', phone: '', email: '', password: '', initial_balance: '0' });
@@ -463,7 +467,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setWithdrawalRequests((prev) => (JSON.stringify(prev) === JSON.stringify(withdrawalsData) ? prev : withdrawalsData));
       setRaceCenters((prev) => (JSON.stringify(prev) === JSON.stringify(centersData) ? prev : centersData));
       setRaceDays((prev) => (JSON.stringify(prev) === JSON.stringify(daysData) ? prev : daysData));
-      if (sysSettings) setSystemSettings(sysSettings);
+      if (sysSettings) {
+        setSystemSettings(sysSettings);
+        if (sysSettings.max_bet_per_horse !== undefined) setLimitMaxBet(String(sysSettings.max_bet_per_horse));
+        if (sysSettings.max_win_per_race !== undefined) setLimitMaxWin(String(sysSettings.max_win_per_race));
+        if (sysSettings.min_bet_amount !== undefined) setLimitMinBet(String(sysSettings.min_bet_amount));
+      }
       if (!newDayCenterId && centersData.length > 0) {
         setNewDayCenterId(centersData[0].id);
       }
@@ -705,6 +714,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActionMessage(err.message || 'Failed to login as user');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveRiskLimits = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      soundManager.playChip();
+      const maxBet = Number(limitMaxBet) || 50000;
+      const maxWin = Number(limitMaxWin) || 500000;
+      const minBet = Number(limitMinBet) || 100;
+
+      setSystemSettings(prev => ({
+        ...prev,
+        max_bet_per_horse: maxBet,
+        max_win_per_race: maxWin,
+        min_bet_amount: minBet
+      }));
+
+      notify(`✅ Risk Limits Saved! Max Bet: ₹${maxBet.toLocaleString()}, Max Win: ₹${maxWin.toLocaleString()}`, 'success');
+
+      api.updateSystemSettings({
+        max_bet_per_horse: maxBet,
+        max_win_per_race: maxWin,
+        min_bet_amount: minBet
+      }).then(() => {
+        loadAdminData(true);
+      }).catch((err) => {
+        notify(err.message || 'Failed to save risk limits on server', 'error');
+      });
+    } catch (err: any) {
+      notify(err.message || 'Failed to save risk limits', 'error');
     }
   };
 
@@ -4872,128 +4912,406 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 6: Global Bets Book & Single Bet Cancellation */}
+      {/* TAB 6: BETS & RISK MANAGEMENT COCKPIT */}
       {activeTab === 'bets' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Coins className="w-5 h-5 text-amber-400" />
-                <span>Global Platform Bets Ledger (Audit Trail)</span>
-              </h2>
-              <p className="text-xs text-slate-400">
-                Live audit trail of all wagers placed across the platform. Single bets can be cancelled and 100% refunded.
-              </p>
+        <div className="space-y-6">
+          {/* Header & Race Selector */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-amber-400" />
+                  <span>Bets & Risk Management Cockpit</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+                    Live Risk Meter
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Live bookmaker liability breakdown per runner, real-time bet volumes, single bet cancellations, and risk limit controls.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={loadAdminData}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh Risk</span>
+                </button>
+                <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold">
+                  {allBets.length} Total Bets Recorded
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold">
-                {allBets.length} Bets Recorded
+
+            {/* Quick Race Filter for Risk Meter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Flame className="w-4 h-4 text-rose-400" />
+                  <span>Select Race for Live Risk Meter:</span>
+                </span>
+                <select
+                  value={selectedRiskRaceId || (races.find(r => r.status === 'LIVE' || r.status === 'OPEN_FOR_BETTING')?.id || races[0]?.id || '')}
+                  onChange={(e) => setSelectedRiskRaceId(e.target.value)}
+                  className="bg-slate-900 border border-amber-500/40 text-xs font-bold text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-amber-400"
+                >
+                  {races.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.race_no ? `R#${r.race_no} - ` : ''}{r.name} ({r.venue} • {r.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {(() => {
+                const activeRiskRace = races.find(r => r.id === (selectedRiskRaceId || races.find(r2 => r2.status === 'LIVE' || r2.status === 'OPEN_FOR_BETTING')?.id || races[0]?.id));
+                if (!activeRiskRace) return null;
+                const raceBets = (allBets || []).filter(b => b.race_id === activeRiskRace.id);
+                const racePool = raceBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+                return (
+                  <div className="text-xs text-slate-400 font-mono flex items-center gap-3">
+                    <span>Pool: <strong className="text-emerald-400 font-black">₹{racePool.toLocaleString('en-IN')}</strong></span>
+                    <span>•</span>
+                    <span>Bets: <strong className="text-white font-bold">{raceBets.length}</strong></span>
+                    <span>•</span>
+                    <span>Bettors: <strong className="text-amber-400 font-bold">{new Set(raceBets.map(b => b.user_id)).size}</strong></span>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* 1. LIVE BETS & LIABILITY RISK METER GRID PER HORSE */}
+          {(() => {
+            const activeRiskRace = races.find(r => r.id === (selectedRiskRaceId || races.find(r2 => r2.status === 'LIVE' || r2.status === 'OPEN_FOR_BETTING')?.id || races[0]?.id));
+            if (!activeRiskRace) return null;
+
+            const raceBets = (allBets || []).filter(b => b.race_id === activeRiskRace.id);
+            const raceTurnover = raceBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+
+            return (
+              <div className="bg-[#050907] rounded-2xl border-2 border-emerald-900/60 p-4 sm:p-5 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-900/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-amber-400" />
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-white tracking-wide uppercase">
+                        Live Bets View & Bookmaker Risk Meter — {activeRiskRace.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Real-time live wager volume on each runner and bookmaker payout liability if that runner wins.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold">
+                    Total Race Pool: ₹{raceTurnover.toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {activeRiskRace.horses.map((horse) => {
+                    const runnerWinBets = raceBets.filter((b) => b.horse_id === horse.id && b.bet_type === 'WIN');
+                    const runnerPlaceBets = raceBets.filter((b) => b.horse_id === horse.id && b.bet_type === 'PLACE');
+                    const winStake = runnerWinBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+                    const placeStake = runnerPlaceBets.reduce((s, b) => s + (b.stake || b.amount || 0), 0);
+                    const totalRunnerStake = winStake + placeStake;
+                    const totalRunnerBetsCount = runnerWinBets.length + runnerPlaceBets.length;
+
+                    // Liability: If this horse wins 1st place, bookmaker must pay WIN odds
+                    const winPayoutLiability = runnerWinBets.reduce((s, b) => s + ((b.stake || b.amount || 0) * b.odds), 0);
+                    const netWinExposure = winPayoutLiability - raceTurnover;
+                    const isHighRisk = netWinExposure > 0;
+
+                    return (
+                      <div
+                        key={horse.id}
+                        className={`p-3.5 rounded-2xl border transition-all ${
+                          isHighRisk && totalRunnerStake > 0
+                            ? 'bg-[#1a080d] border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                            : totalRunnerStake > 0
+                            ? 'bg-[#0a150d] border-emerald-500/40'
+                            : 'bg-slate-950 border-slate-800/80'
+                        }`}
+                      >
+                        {/* Header: Horse No, Name & Odds */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-lg font-black text-xs bg-slate-900 border border-slate-700 text-[#e5b869] flex items-center justify-center shrink-0">
+                              {horse.serial_no || horse.horse_no}
+                            </span>
+                            <div className="truncate">
+                              <span className="text-xs font-black text-white truncate block">
+                                {horse.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400 truncate block">
+                                Draw {horse.gate_no} • {horse.jockey}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-mono text-xs font-bold text-amber-400 block">
+                              W: {horse.win_odds.toFixed(2)}x
+                            </span>
+                            <span className="font-mono text-[10px] text-emerald-400 block">
+                              P: {horse.place_odds.toFixed(2)}x
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Live Total Bet Amount on this Horse */}
+                        <div className="space-y-1.5 text-xs font-mono bg-black/40 p-2.5 rounded-xl border border-slate-800/80">
+                          <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-[11px] text-slate-400">Total Bet Volume:</span>
+                            <strong className="text-white font-black text-sm">
+                              ₹{totalRunnerStake.toLocaleString('en-IN')}
+                            </strong>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Wagers Placed:</span>
+                            <span className="text-slate-200">{totalRunnerBetsCount} Bets ({runnerWinBets.length} Win / {runnerPlaceBets.length} Place)</span>
+                          </div>
+
+                          {/* Liability / Risk Meter: If this horse wins */}
+                          <div className="flex items-center justify-between text-slate-300 pt-1 border-t border-slate-800">
+                            <span className="text-[11px] text-slate-400">If Horse Wins (Payout):</span>
+                            <strong className={isHighRisk ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                              ₹{Math.round(winPayoutLiability).toLocaleString('en-IN')}
+                            </strong>
+                          </div>
+
+                          {/* Net Admin Exposure */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-sans font-bold">Risk Status:</span>
+                            <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                              netWinExposure > 0
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            }`}>
+                              {netWinExposure > 0
+                                ? `-₹${Math.round(netWinExposure).toLocaleString('en-IN')} (HIGH RISK)`
+                                : `+₹${Math.round(Math.abs(netWinExposure)).toLocaleString('en-IN')} (PROFIT)`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 2. RISK & LIMIT SETTING CONTROLS */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">
+                    Platform Risk & Limit Settings
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Control maximum bet per horse and maximum allowable win per user per race.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold uppercase">
+                Active Policy
               </span>
             </div>
+
+            <form onSubmit={handleSaveRiskLimits} className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Max Bet per Horse */}
+              <div className="space-y-1.5 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <label className="text-xs font-bold text-slate-200 block">
+                  Max Bet Per Horse (₹)
+                </label>
+                <input
+                  type="number"
+                  min="100"
+                  step="500"
+                  required
+                  value={limitMaxBet}
+                  onChange={(e) => setLimitMaxBet(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono font-bold text-sm focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. 50000"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Caps maximum wager stake a punter can place on a single runner.
+                </p>
+              </div>
+
+              {/* Max Win per User per Race */}
+              <div className="space-y-1.5 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <label className="text-xs font-bold text-amber-400 block">
+                  Max Win Per User Per Race (₹)
+                </label>
+                <input
+                  type="number"
+                  min="1000"
+                  step="5000"
+                  required
+                  value={limitMaxWin}
+                  onChange={(e) => setLimitMaxWin(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-mono font-bold text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="e.g. 500000"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Caps maximum payout liability a user can win on a single race.
+                </p>
+              </div>
+
+              {/* Min Bet Amount */}
+              <div className="space-y-1.5 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <label className="text-xs font-bold text-emerald-400 block">
+                  Minimum Bet Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  step="10"
+                  required
+                  value={limitMinBet}
+                  onChange={(e) => setLimitMinBet(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                  placeholder="e.g. 100"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Minimum stake required to place a bet ticket on any market.
+                </p>
+              </div>
+
+              <div className="sm:col-span-3 flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-950/50 active:scale-95 flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save Risk & Limit Settings</span>
+                </button>
+              </div>
+            </form>
           </div>
 
-          {/* Search & Filter Bar */}
-          <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={betsSearchQuery}
-                onChange={(e) => setBetsSearchQuery(e.target.value)}
-                placeholder="Filter by Bettor username, race name, or horse name..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
-              />
+          {/* 3. LIVE BETS STREAM & SINGLE BET CANCELLATION */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-amber-400" />
+                  <span>Live Bets Stream & Cancellation Desk</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Inspect all wagers placed by punters. Cancel and 100% refund single suspicious bets manually.
+                </p>
+              </div>
             </div>
-            {betsSearchQuery && (
-              <button
-                type="button"
-                onClick={() => setBetsSearchQuery('')}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
-              >
-                Clear
-              </button>
-            )}
-          </div>
 
-          <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
-            <table className="w-full min-w-[850px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
-                  <th className="py-2.5 px-3">Time</th>
-                  <th className="py-2.5 px-3">Bettor</th>
-                  <th className="py-2.5 px-3">Race</th>
-                  <th className="py-2.5 px-3">Runner</th>
-                  <th className="py-2.5 px-3">Type</th>
-                  <th className="py-2.5 px-3">Odds</th>
-                  <th className="py-2.5 px-3">Stake</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Payout</th>
-                  <th className="py-2.5 px-3 text-right">Emergency Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {allBets
-                  .filter((b) => {
-                    if (!betsSearchQuery) return true;
-                    const q = betsSearchQuery.toLowerCase();
-                    return (
-                      (b.username && b.username.toLowerCase().includes(q)) ||
-                      (b.race_name && b.race_name.toLowerCase().includes(q)) ||
-                      (b.horse_name && b.horse_name.toLowerCase().includes(q)) ||
-                      (b.user_id && b.user_id.toLowerCase().includes(q))
-                    );
-                  })
-                  .map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-850/50">
-                      <td className="py-2.5 px-3 text-slate-400 text-[10px]">
-                        {new Date(b.placed_at || b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-2.5 px-3 font-semibold text-white font-sans">@{b.username || b.user_id}</td>
-                      <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate font-sans">{b.race_name}</td>
-                      <td className="py-2.5 px-3 font-bold text-white font-sans">#{b.horse_no} {b.horse_name}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
-                          {b.bet_type}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}x</td>
-                      <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            b.status === 'WON'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : b.status === 'LOST'
-                              ? 'bg-rose-500/20 text-rose-400'
-                              : b.status === 'CANCELLED' || b.status === 'REFUNDED'
-                              ? 'bg-slate-700 text-slate-300'
-                              : 'bg-amber-500/20 text-amber-400'
-                          }`}
-                        >
-                          {b.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                        {b.payout_amount ? `+₹${b.payout_amount.toLocaleString()}` : '-'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {b.status === 'PENDING' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelSingleBet(b)}
-                            className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer font-sans"
-                            title="Cancel bet & refund user wallet"
+            {/* Search & Filter Bar */}
+            <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={betsSearchQuery}
+                  onChange={(e) => setBetsSearchQuery(e.target.value)}
+                  placeholder="Filter by Bettor username, race name, or horse name..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+              {betsSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setBetsSearchQuery('')}
+                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto scrollbar-none rounded-xl border border-slate-800/80">
+              <table className="w-full min-w-[850px] text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-semibold text-[10px]">
+                    <th className="py-2.5 px-3">Time</th>
+                    <th className="py-2.5 px-3">Bettor</th>
+                    <th className="py-2.5 px-3">Race</th>
+                    <th className="py-2.5 px-3">Runner</th>
+                    <th className="py-2.5 px-3">Type</th>
+                    <th className="py-2.5 px-3">Odds</th>
+                    <th className="py-2.5 px-3">Stake</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Payout</th>
+                    <th className="py-2.5 px-3 text-right">Emergency Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {allBets
+                    .filter((b) => {
+                      if (!betsSearchQuery) return true;
+                      const q = betsSearchQuery.toLowerCase();
+                      return (
+                        (b.username && b.username.toLowerCase().includes(q)) ||
+                        (b.race_name && b.race_name.toLowerCase().includes(q)) ||
+                        (b.horse_name && b.horse_name.toLowerCase().includes(q)) ||
+                        (b.user_id && b.user_id.toLowerCase().includes(q))
+                      );
+                    })
+                    .map((b) => (
+                      <tr key={b.id} className="hover:bg-slate-850/50">
+                        <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                          {new Date(b.placed_at || b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-white font-sans">@{b.username || b.user_id}</td>
+                        <td className="py-2.5 px-3 text-slate-300 max-w-[120px] truncate font-sans">{b.race_name}</td>
+                        <td className="py-2.5 px-3 font-bold text-white font-sans">#{b.horse_no} {b.horse_name}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">
+                            {b.bet_type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-amber-400 font-bold">{b.odds.toFixed(2)}x</td>
+                        <td className="py-2.5 px-3 font-mono text-white">₹{b.stake.toLocaleString()}</td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              b.status === 'WON'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : b.status === 'LOST'
+                                ? 'bg-rose-500/20 text-rose-400'
+                                : b.status === 'CANCELLED' || b.status === 'REFUNDED'
+                                ? 'bg-slate-700 text-slate-300'
+                                : 'bg-amber-500/20 text-amber-400'
+                            }`}
                           >
-                            Cancel & Refund
-                          </button>
-                        ) : (
-                          <span className="text-slate-600 text-[10px] font-sans">Settled</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                            {b.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                          {b.payout_amount ? `+₹${b.payout_amount.toLocaleString()}` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {b.status === 'PENDING' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelSingleBet(b)}
+                              className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 text-[10px] font-bold cursor-pointer font-sans"
+                              title="Cancel bet & refund user wallet"
+                            >
+                              Cancel & Refund
+                            </button>
+                          ) : (
+                            <span className="text-slate-600 text-[10px] font-sans">Settled</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
