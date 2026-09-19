@@ -977,21 +977,21 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     const { email, phone, otp, otp_token } = req.body;
     const cleanEmail = email ? String(email).trim().toLowerCase() : "";
     const cleanPhone = phone ? String(phone).trim() : "";
-    const cleanOtp2 = String(otp || "").trim();
-    if (!cleanOtp2) {
+    const cleanOtp = String(otp || "").trim();
+    if (!cleanOtp) {
       return res.status(400).json({ error: "Please enter the 6-digit OTP code" });
     }
     const primaryKey = cleanEmail || cleanPhone;
     const dbOtpRecord = await getPersistentOtp(primaryKey);
     let isDbValid = false;
-    if (dbOtpRecord && dbOtpRecord.code === cleanOtp2 && dbOtpRecord.expires_at >= Date.now()) {
+    if (dbOtpRecord && dbOtpRecord.code === cleanOtp && dbOtpRecord.expires_at >= Date.now()) {
       isDbValid = true;
     }
-    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp2, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp2, otp_token) : false);
+    const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
     db.otps = db.otps || {};
     const storedOtp = db.otps[primaryKey] || (cleanPhone ? db.otps[cleanPhone] : void 0);
-    const isMemoryValid = !!(storedOtp && storedOtp.code === cleanOtp2 && storedOtp.expires_at >= Date.now());
-    const isTestFallback = cleanOtp2 === "123456";
+    const isMemoryValid = !!(storedOtp && storedOtp.code === cleanOtp && storedOtp.expires_at >= Date.now());
+    const isTestFallback = cleanOtp === "123456";
     if (!isDbValid && !isTokenValid && !isMemoryValid && !isTestFallback) {
       return res.status(400).json({
         error: "Invalid or expired OTP code. Please check your Gmail inbox or request a new code."
@@ -1017,6 +1017,7 @@ app.post("/api/auth/signup", async (req, res) => {
     const cleanEmail = email ? String(email).trim().toLowerCase() : "";
     const cleanPhone = phone ? String(phone).trim() : "";
     const cleanUsername = String(username).trim().toLowerCase();
+    const cleanOtp = String(otp || "").trim();
     const primaryKey = cleanEmail || cleanPhone;
     const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
     let isDbValid = false;
@@ -1377,8 +1378,8 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
       return res.status(404).json({ error: "User account not found" });
     }
     const targetEmail = (user.email || query).toLowerCase();
-    const cleanOtp2 = String(otp).trim();
-    const isTokenValid = verifyOtpToken(targetEmail, cleanOtp2, otp_token);
+    const cleanOtp = String(otp || "").trim();
+    const isTokenValid = verifyOtpToken(targetEmail, cleanOtp, otp_token);
     let isDbValid = false;
     if (!isTokenValid) {
       const persistent = await getPersistentOtp(targetEmail);
@@ -1386,9 +1387,9 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
       const storedOtp = db.otps[targetEmail];
       const candidateCode = persistent?.code || storedOtp?.code;
       const candidateExpiry = persistent?.expires_at || storedOtp?.expires_at || 0;
-      isDbValid = !!(candidateCode && candidateCode === cleanOtp2 && candidateExpiry >= Date.now());
+      isDbValid = !!(candidateCode && candidateCode === cleanOtp && candidateExpiry >= Date.now());
     }
-    const isTestFallback = cleanOtp2 === "123456";
+    const isTestFallback = cleanOtp === "123456";
     if (!isTokenValid && !isDbValid && !isTestFallback) {
       return res.status(400).json({ error: "Invalid or expired OTP code" });
     }

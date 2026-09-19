@@ -650,6 +650,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const cleanEmail = email ? String(email).trim().toLowerCase() : '';
     const cleanPhone = phone ? String(phone).trim() : '';
     const cleanUsername = String(username).trim().toLowerCase();
+    const cleanOtp = String(otp || '').trim();
     // 1. Check OTP first
     const primaryKey = cleanEmail || cleanPhone;
     const isTokenValid = verifyOtpToken(primaryKey, cleanOtp, otp_token) || (cleanPhone ? verifyOtpToken(cleanPhone, cleanOtp, otp_token) : false);
@@ -1107,7 +1108,7 @@ app.post('/api/auth/forgot-password/reset', async (req, res) => {
     }
 
     const targetEmail = (user.email || query).toLowerCase();
-    const cleanOtp = String(otp).trim();
+    const cleanOtp = String(otp || '').trim();
 
     const isTokenValid = verifyOtpToken(targetEmail, cleanOtp, otp_token);
 
