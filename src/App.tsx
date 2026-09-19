@@ -860,6 +860,34 @@ export default function App() {
           loadUserFinancials();
         }}
       />
+
+      {/* ---------------- MOBILE BOTTOM NAVIGATION BAR (Screens < md) ---------------- */}
+      <BottomNav
+        activeTab={activeTab}
+        pendingBetsCount={pendingBetsCount}
+        onGoHome={() => {
+          window.location.hash = '#/lobby';
+        }}
+        onOpenMyBets={() => {
+          window.location.hash = '#/mybets';
+        }}
+        onOpenDeposit={handleOpenDeposit}
+        onOpenResults={() => setIsResultsOpen(true)}
+        onOpenProfile={() => {
+          if (user) {
+            loadUserFinancials();
+            window.location.hash = '#/personal_details';
+          } else {
+            setAuthMode('login');
+            setIsAuthOpen(true);
+          }
+        }}
+        onOpenAdmin={() => {
+          window.location.hash = '#/admin';
+        }}
+        isAdmin={user?.role === 'ADMIN' || sessionStorage.getItem('derby_admin_authenticated') === 'true'}
+        isLoggedIn={!!user}
+      />
     </div>
   );
 }

@@ -1,24 +1,27 @@
 import React from 'react';
 import { 
   Home, 
-  Flame, 
   Clock, 
   User as UserIcon, 
   Shield, 
   Award,
-  Zap
+  Plus,
+  Flame,
+  FileText
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface BottomNavProps {
-  activeTab: 'races' | 'mybets' | 'admin';
+  activeTab: 'races' | 'rules' | 'mybets' | 'personal_details' | 'admin' | 'subadmin';
   pendingBetsCount: number;
   onGoHome: () => void;
   onOpenMyBets: () => void;
-  onOpenAdmin: () => void;
+  onOpenDeposit: () => void;
   onOpenResults: () => void;
   onOpenProfile: () => void;
+  onOpenAdmin: () => void;
   isAdmin: boolean;
+  isLoggedIn: boolean;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -26,105 +29,100 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   pendingBetsCount,
   onGoHome,
   onOpenMyBets,
-  onOpenAdmin,
+  onOpenDeposit,
   onOpenResults,
   onOpenProfile,
+  onOpenAdmin,
   isAdmin,
+  isLoggedIn,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 p-3 flex justify-center pointer-events-none">
-      <nav className="pointer-events-auto max-w-md w-full bg-[#12151d]/90 backdrop-blur-xl border border-white/10 rounded-full px-5 py-2.5 shadow-2xl flex items-center justify-between">
+    <div className="fixed bottom-0 left-0 right-0 z-40 p-2 sm:p-3 flex justify-center pointer-events-none md:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <nav className="pointer-events-auto max-w-md w-full bg-[#060c08]/95 backdrop-blur-xl border border-emerald-500/40 rounded-3xl px-3 sm:px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.8)] flex items-center justify-between">
         
-        {/* Home */}
+        {/* 1. Home */}
         <button
+          id="mobile-bottom-home-btn"
           onClick={() => {
             soundManager.playClick();
             onGoHome();
           }}
-          className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'races'
-              ? 'text-rose-500 scale-105'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-[#e5b869] font-black'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Home className="w-5 h-5" />
+          <Home className={`w-5 h-5 ${activeTab === 'races' ? 'text-[#e5b869] drop-shadow-[0_0_8px_rgba(229,184,105,0.5)]' : ''}`} />
           <span className="text-[10px] font-bold">Home</span>
         </button>
 
-        {/* My Bets */}
+        {/* 2. My Bets / Selections */}
         <button
+          id="mobile-bottom-mybets-btn"
           onClick={() => {
             soundManager.playClick();
             onOpenMyBets();
           }}
-          className={`relative flex flex-col items-center gap-0.5 transition cursor-pointer ${
+          className={`relative flex flex-col items-center gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'mybets'
-              ? 'text-rose-500 scale-105'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-[#e5b869] font-black'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Clock className="w-5 h-5" />
-          <span className="text-[10px] font-bold">My Bets</span>
+          <Clock className={`w-5 h-5 ${activeTab === 'mybets' ? 'text-[#e5b869] drop-shadow-[0_0_8px_rgba(229,184,105,0.5)]' : ''}`} />
+          <span className="text-[10px] font-bold">Selections</span>
           {pendingBetsCount > 0 && (
-            <span className="absolute -top-1 -right-2 w-4 h-4 bg-rose-500 text-white font-black text-[9px] rounded-full flex items-center justify-center">
+            <span className="absolute 0 top-0.5 right-1 min-w-4 h-4 px-1 bg-emerald-400 text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow-md">
               {pendingBetsCount}
             </span>
           )}
         </button>
 
-        {/* Center Action CTA: Start / Live */}
+        {/* 3. Center Action CTA: Quick Deposit / Add Funds */}
         <button
+          id="mobile-bottom-deposit-btn"
           onClick={() => {
             soundManager.playClick();
-            onGoHome();
+            onOpenDeposit();
           }}
-          className="relative -top-4 w-12 h-12 rounded-full bg-gradient-to-r from-rose-500 to-red-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/40 hover:scale-110 active:scale-95 transition cursor-pointer border-2 border-black"
-          title="Live Racing"
+          className="relative -top-3 w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#c5a028] via-[#e5b869] to-[#fff0a0] text-slate-950 flex flex-col items-center justify-center shadow-[0_0_20px_rgba(229,184,105,0.6)] active:scale-95 transition cursor-pointer border-2 border-[#060c08]"
+          title="Add Funds / Deposit"
         >
-          <Flame className="w-6 h-6 fill-current" />
+          <Plus className="w-6 h-6 stroke-[3]" />
         </button>
 
-        {/* Results */}
+        {/* 4. Results */}
         <button
+          id="mobile-bottom-results-btn"
           onClick={() => {
             soundManager.playClick();
             onOpenResults();
           }}
-          className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 transition cursor-pointer"
+          className="flex flex-col items-center gap-0.5 py-1 px-2 rounded-2xl text-slate-400 hover:text-white transition cursor-pointer"
         >
           <Award className="w-5 h-5" />
           <span className="text-[10px] font-bold">Results</span>
         </button>
 
-        {/* Admin / Profile */}
-        {isAdmin ? (
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              onOpenAdmin();
-            }}
-            className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
-              activeTab === 'admin'
-                ? 'text-indigo-400 scale-105'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Shield className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Admin</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              onOpenProfile();
-            }}
-            className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 transition cursor-pointer"
-          >
-            <UserIcon className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Account</span>
-          </button>
-        )}
+        {/* 5. Account / Personal Details */}
+        <button
+          id="mobile-bottom-account-btn"
+          onClick={() => {
+            soundManager.playClick();
+            onOpenProfile();
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
+            activeTab === 'personal_details'
+              ? 'text-[#e5b869] font-black'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <UserIcon className={`w-5 h-5 ${activeTab === 'personal_details' ? 'text-[#e5b869] drop-shadow-[0_0_8px_rgba(229,184,105,0.5)]' : ''}`} />
+          <span className="text-[10px] font-bold">{isLoggedIn ? 'Account' : 'Login'}</span>
+        </button>
       </nav>
     </div>
   );
 };
+
