@@ -619,11 +619,11 @@ export const RaceList: React.FC<RaceListProps> = ({
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#020905] via-[#020905]/45 to-black/30 pointer-events-none" />
 
-                          {/* Top Row: Upcoming Badge + Favorite Button */}
+                            {/* Top Row: Upcoming Badge + Favorite Button */}
                           <div className="relative z-10 flex items-center justify-between gap-2">
-                            <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-slate-900/90 text-emerald-300 font-bold text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md backdrop-blur-md border border-emerald-500/40">
-                              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
-                              <span>⏱ UPCOMING</span>
+                            <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-slate-900/90 text-slate-300 font-bold text-[10px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md backdrop-blur-md border border-slate-700">
+                              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#e5b869]" />
+                              <span>⏱ RACE CARD • POST: {race.race_time}</span>
                             </span>
 
                             <button
@@ -670,9 +670,9 @@ export const RaceList: React.FC<RaceListProps> = ({
                             <div className="flex items-center justify-between text-[11px] sm:text-sm font-medium pt-0.5 text-slate-300 border-t border-white/10">
                               <span className="flex items-center gap-1.5 font-mono text-slate-300">
                                 <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
-                                <span>{race.race_time} - {race.date_str || 'Today, 5th Sep'}</span>
+                                <span>{race.race_time} - {race.date_str || 'Today'}</span>
                               </span>
-                              <span className="font-bold text-rose-400 group-hover:text-rose-300 transition flex items-center gap-1 font-mono shrink-0">
+                              <span className="font-bold text-[#e5b869] group-hover:text-amber-300 transition flex items-center gap-1 font-mono shrink-0">
                                 <span>{race.horses.length} Runners</span>
                                 <span>→</span>
                               </span>
@@ -697,8 +697,8 @@ export const RaceList: React.FC<RaceListProps> = ({
                                     <span className="font-bold text-slate-200 truncate max-w-[85px] sm:max-w-[100px] text-[11px] sm:text-xs">
                                       {h.name}
                                     </span>
-                                    <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[10px] sm:text-[11px] bg-[#101e17] text-[#e5b869] border border-[#e5b869]/30">
-                                      {formatOdds(h.win_odds, oddsFormat)}
+                                    <span className="px-1.5 py-0.5 rounded-md font-bold font-mono text-[9px] sm:text-[10px] bg-slate-900/90 text-slate-400 border border-slate-700/60" title={`Draw/Gate: ${h.gate_no || h.horse_no || h.serial_no}`}>
+                                      D{h.gate_no !== undefined ? h.gate_no : (h.horse_no || h.serial_no)}
                                     </span>
                                   </div>
                                 ))}

@@ -13,7 +13,8 @@ import {
   Layers, 
   CheckCircle2, 
   AlertCircle,
-  Info
+  Info,
+  Lock
 } from 'lucide-react';
 
 interface RaceDetailProps {
@@ -110,10 +111,15 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
     : [];
 
   const isBettingOpen = 
-    (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE' || race.status === 'OPEN' || race.status === 'UPCOMING' || !race.status) && 
+    (race.status === 'OPEN_FOR_BETTING' || race.status === 'LIVE') && 
     !race.is_suspended && 
     race.status !== 'CLOSED' && 
     race.status !== 'RESULTED';
+  const isUpcomingFixture = 
+    race.status === 'UPCOMING' || 
+    race.status === 'DRAFT' || 
+    race.status === 'OPEN' || 
+    !race.status;
   const isOpen = isBettingOpen;
 
   const handleOddsClick = (horse: Horse, betType: BetType, odds: number) => {
@@ -306,13 +312,29 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
             </div>
           )}
 
-          {!isOpen && race.status !== 'RESULTED' && (
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] flex items-center gap-1.5">
-              <AlertCircle className="w-3 h-3 shrink-0" />
+          {isUpcomingFixture && (
+            <div className="p-3 rounded-xl bg-[#091510] border border-emerald-900/60 text-slate-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-md">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#e5b869] shrink-0" />
+                <div>
+                  <p className="font-bold text-white text-xs">Official Race Card (Runners Field)</p>
+                  <p className="text-[11px] text-slate-400">Betting opens approximately 30–45 minutes before post time ({race.race_time}).</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700 text-[#e5b869] text-[10px] font-mono font-bold self-start sm:self-auto shrink-0 flex items-center gap-1">
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Pre-Race Fixture</span>
+              </span>
+            </div>
+          )}
+
+          {!isOpen && !isUpcomingFixture && race.status !== 'RESULTED' && (
+            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {race.status === 'CLOSED'
                   ? 'Betting is closed. Runners are in-play.'
-                  : 'Race completed.'}
+                  : 'Betting is currently closed for this race.'}
               </span>
             </div>
           )}
@@ -435,7 +457,21 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
                       {/* Column 3: WIN Odds Button */}
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
-                        {isSuspended ? (
+                        {isUpcomingFixture ? (
+                          <div 
+                            id={`win-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 font-mono text-center flex flex-col items-center justify-center select-none shadow-inner"
+                            title={`Betting opens ~30-45 mins before post time (${race.race_time}).`}
+                          >
+                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 flex items-center justify-center gap-1 leading-tight font-mono">
+                              <Lock className="w-2.5 h-2.5 text-slate-500" />
+                              --
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-wider mt-0.5 font-bold">
+                              Not Open
+                            </span>
+                          </div>
+                        ) : isSuspended ? (
                           <div 
                             id={`win-odds-btn-${horse.id}`}
                             className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner"
@@ -483,7 +519,21 @@ export const RaceDetail: React.FC<RaceDetailProps> = ({
 
                       {/* Column 4: PLACE Odds Button */}
                       <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-center align-middle">
-                        {isSuspended ? (
+                        {isUpcomingFixture ? (
+                          <div 
+                            id={`place-odds-btn-${horse.id}`}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 font-mono text-center flex flex-col items-center justify-center select-none shadow-inner"
+                            title={`Betting opens ~30-45 mins before post time (${race.race_time}).`}
+                          >
+                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 flex items-center justify-center gap-1 leading-tight font-mono">
+                              <Lock className="w-2.5 h-2.5 text-slate-500" />
+                              --
+                            </span>
+                            <span className="text-[7px] sm:text-[8px] text-slate-500 uppercase tracking-wider mt-0.5 font-bold">
+                              Not Open
+                            </span>
+                          </div>
+                        ) : isSuspended ? (
                           <div 
                             id={`place-odds-btn-${horse.id}`}
                             className="w-full py-1.5 sm:py-2 px-1 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-300 font-mono text-center flex flex-col items-center justify-center cursor-not-allowed select-none shadow-inner"
