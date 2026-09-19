@@ -2025,39 +2025,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      {/* Metrics Banner */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Registered Users</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <p className="text-lg sm:text-2xl font-black text-white font-mono">
-              {users.length > 0 ? users.filter((u) => u.role !== 'admin').length : (stats?.totalUsers || 0)}
-            </p>
-            <span className="text-[10px] text-amber-400 font-mono font-bold">
-              {new Set((allBets || []).map((b) => b.user_id)).size} Active Bettors
-            </span>
-          </div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
-          <p className="text-lg sm:text-2xl font-black text-indigo-400 mt-1 font-mono">
-            {allBets.length > 0 ? allBets.length : (stats?.totalBets || 0)}
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Turnover</p>
-          <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono truncate">
-            ₹{(allBets.length > 0 ? allBets.reduce((s, b) => s + (b.amount || 0), 0) : (stats?.totalVolume || 0)).toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Pending Bets In-Play</p>
-          <p className="text-lg sm:text-2xl font-black text-amber-400 mt-1 font-mono">
-            {allBets.length > 0 ? allBets.filter((b) => b.status === 'PENDING').length : (stats?.pendingBetsCount || 0)}
-          </p>
-        </div>
-      </div>
-
       {isOddsOnlyStaff && (
         <div className="p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-2">
@@ -2246,6 +2213,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* TAB 1: ONLY SHOW LIVE RACE LIFECYCLE */}
       {(activeTab === 'live' || activeTab === 'lifecycle' || activeTab === 'races') && (
         <div className="space-y-6">
+          {/* Metrics Banner - ONLY IN LIVE RACES */}
+          {!isOddsOnlyStaff && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Registered Users</p>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-lg sm:text-2xl font-black text-white font-mono">
+                    {users.length > 0 ? users.filter((u) => u.role !== 'admin').length : (stats?.totalUsers || 0)}
+                  </p>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">
+                    {new Set((allBets || []).map((b) => b.user_id)).size} Active Bettors
+                  </span>
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Platform Bets</p>
+                <p className="text-lg sm:text-2xl font-black text-indigo-400 mt-1 font-mono">
+                  {allBets.length > 0 ? allBets.length : (stats?.totalBets || 0)}
+                </p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Total Turnover</p>
+                <p className="text-lg sm:text-2xl font-black text-emerald-400 mt-1 font-mono truncate">
+                  ₹{(allBets.length > 0 ? allBets.reduce((s, b) => s + (b.amount || 0), 0) : (stats?.totalVolume || 0)).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Pending Bets In-Play</p>
+                <p className="text-lg sm:text-2xl font-black text-amber-400 mt-1 font-mono">
+                  {allBets.length > 0 ? allBets.filter((b) => b.status === 'PENDING').length : (stats?.pendingBetsCount || 0)}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
