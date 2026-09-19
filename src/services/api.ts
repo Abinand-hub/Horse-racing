@@ -2,6 +2,7 @@ import {
   Banner, 
   Bet, 
   BetType, 
+  Horse,
   Race, 
   RaceCenter,
   RaceDay,

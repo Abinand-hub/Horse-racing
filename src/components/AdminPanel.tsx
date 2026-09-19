@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api, financialSync } from '../services/api';
 import { soundManager } from '../utils/audio';
+import { getRaceBettingCloseStatus, formatAutoCloseTime } from '../utils/raceTiming';
 import { Banner, Bet, Horse, Race, RaceCenter, RaceDay, RaceStatus, User, DepositRequest, WithdrawalRequest, DepositStatus, WithdrawalStatus } from '../types';
 import { 
   Shield, 
@@ -8,6 +9,7 @@ import {
   Plus, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   Edit3, 
   Trash2, 
   Upload, 
@@ -313,6 +315,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   const [selectedOddsRaceId, setSelectedOddsRaceId] = useState<string>('');
+  const [editingHorseId, setEditingHorseId] = useState<string | null>(null);
   const [pnlDateFilter, setPnlDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST7' | 'ALL' | 'CUSTOM'>('TODAY');
   const [pnlCustomDate, setPnlCustomDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [quickAdjustUserId, setQuickAdjustUserId] = useState<string>('');
@@ -1454,6 +1457,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleSuspendHorse = async (raceId: string, horseId: string) => {
     try {
       soundManager.playClick();
+      setEditingHorseId(horseId);
       // 0ms instant local update
       setRaces((prev) =>
         prev.map((r) => {
@@ -1464,7 +1468,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           };
         })
       );
-      notify('🚫 Runner suspended in real-time. Users see "Odds Changing".', 'info');
+      notify('🚫 Runner suspended in real-time. Users see "Odds Changing". Container opened for odds edit.', 'info');
 
       api.suspendHorse(raceId, horseId).then(() => {
         onRefreshData();
@@ -1499,6 +1503,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           };
         })
       );
+      setEditingHorseId(null);
       notify(`✅ Runner resumed! Live Odds: WIN ${winVal}x, PLACE ${placeVal}x`, 'success');
 
       api.resumeHorse(raceId, horseId, winVal, placeVal).then(() => {
@@ -1508,6 +1513,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
     } catch (err: any) {
       notify(err.message || 'Failed to resume runner', 'error');
+    }
+  };
+
+  const handleCloseBettingForRace = async (race: Race) => {
+    try {
+      soundManager.playClick();
+      setRaces((prev) =>
+        prev.map((r) => (r.id === race.id ? { ...r, status: 'CLOSED' as RaceStatus, is_suspended: true } : r))
+      );
+      notify(`🔒 Betting officially CLOSED for Race #${race.race_no || ''} ${race.name}. Market locked.`, 'warning');
+      await api.updateRaceStatus(race.id, 'CLOSED');
+      onRefreshData();
+    } catch (err: any) {
+      notify(err.message || 'Failed to close betting', 'error');
     }
   };
 
@@ -3312,418 +3331,612 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* ---------------- EXACT HANDWRITTEN ODDS BOARD CONTAINER ---------------- */}
                 <div className="bg-[#091510] rounded-2xl border-2 border-emerald-900/80 shadow-2xl overflow-hidden">
-                  
-                  {/* Handwritten Header: 01 | XYZ PLATE | 1200M | 1:30 | SUSP ALL */}
-                  <div className="bg-[#040805] border-b-2 border-emerald-900/80 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                      {/* Race No box */}
-                      <div className="px-3 py-1.5 rounded-xl bg-[#1a170b] border-2 border-[#e5b869] text-[#e5b869] font-mono font-black text-sm sm:text-base shadow-inner">
-                        {String(activeRace.race_no || '01').padStart(2, '0')}
-                      </div>
+                  {(() => {
+                    const timingStatus = getRaceBettingCloseStatus(activeRace);
+                    return (
+                      <>
+                        {/* Handwritten Header: 01 | XYZ PLATE | 1200M | 1:30 | 1-Min Auto-Close | SUSP ALL */}
+                        <div className="bg-[#040805] border-b-2 border-emerald-900/80 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                            {/* Race No box */}
+                            <div className="px-3 py-1.5 rounded-xl bg-[#1a170b] border-2 border-[#e5b869] text-[#e5b869] font-mono font-black text-sm sm:text-base shadow-inner">
+                              {String(activeRace.race_no || '01').padStart(2, '0')}
+                            </div>
 
-                      {/* Race Name */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base sm:text-xl font-black text-white uppercase tracking-wider font-mono">
-                            {activeRace.name}
-                          </h3>
-                          {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
-                            <span className="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-rose-500" />
-                              <span>🔴 LIVE IN-PLAY</span>
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase flex items-center gap-1.5">
-                              <Clock className="w-3 h-3 text-emerald-400" />
-                              <span>⏱️ UPCOMING</span>
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
-                          <MapPin className="w-3 h-3 text-[#e5b869]" />
-                          <span>{activeRace.venue}</span>
-                        </p>
-                      </div>
+                            {/* Race Name */}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-base sm:text-xl font-black text-white uppercase tracking-wider font-mono">
+                                  {activeRace.name}
+                                </h3>
+                                {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
+                                  <span className="px-2.5 py-1 rounded-full bg-rose-500/25 text-rose-400 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                    <span>🔴 LIVE IN-PLAY</span>
+                                  </span>
+                                ) : activeRace.status === 'CLOSED' ? (
+                                  <span className="px-2.5 py-1 rounded-full bg-rose-950/60 text-rose-400 border border-rose-600/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                                    <Lock className="w-3 h-3 text-rose-400" />
+                                    <span>🔒 BETTING CLOSED</span>
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase flex items-center gap-1.5">
+                                    <Clock className="w-3 h-3 text-emerald-400" />
+                                    <span>⏱️ UPCOMING FIXTURE</span>
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono mt-0.5">
+                                <MapPin className="w-3 h-3 text-[#e5b869]" />
+                                <span>{activeRace.venue}</span>
+                                <span>•</span>
+                                <span className="text-amber-400 font-bold">{activeRace.horses.length} Runners</span>
+                              </p>
+                            </div>
 
-                      {/* Distance & Time Pills */}
-                      <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-xl bg-slate-900 border border-emerald-700/50 text-emerald-400 font-black font-mono text-xs sm:text-sm">
-                          {activeRace.distance || '1200M'}
-                        </span>
-                        <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold font-mono text-xs sm:text-sm flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          {activeRace.race_time || '1:30'}
-                        </span>
-                      </div>
-                    </div>
+                            {/* Distance & Time Pills + 1-Min Auto-Close Badge */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-3 py-1 rounded-xl bg-slate-900 border border-emerald-700/50 text-emerald-400 font-black font-mono text-xs sm:text-sm">
+                                {activeRace.distance || '1200M'}
+                              </span>
+                              <span className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold font-mono text-xs sm:text-sm flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Post: {activeRace.race_time || '1:00 PM'}</span>
+                              </span>
+                              {/* 1-Minute Auto-Close Status Badge */}
+                              <span className={`px-3 py-1 rounded-xl font-mono font-bold text-xs flex items-center gap-1.5 border shadow-sm ${
+                                timingStatus.badgeColor === 'rose'
+                                  ? 'bg-rose-950/60 text-rose-300 border-rose-500/60'
+                                  : timingStatus.badgeColor === 'amber'
+                                  ? 'bg-amber-950/60 text-amber-300 border-amber-500/60 animate-pulse'
+                                  : 'bg-slate-900 text-emerald-300 border-emerald-500/40'
+                              }`}>
+                                <Timer className="w-3.5 h-3.5" />
+                                <span>Closes: {timingStatus.closeTimeStr} (1 min prior)</span>
+                              </span>
+                            </div>
+                          </div>
 
-                    {/* Master "SUSP ALL" / "RESUME ALL" & Live Status Action Buttons */}
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextSNo = activeRace.horses.length + 1;
-                          setQuickHorseData({
-                            name: '',
-                            jockey: '',
-                            trainer: '',
-                            horse_no: String(nextSNo),
-                            gate_no: String(nextSNo),
-                            win_odds: '2.50',
-                            place_odds: '1.40'
-                          });
-                          setQuickAddHorseRace(activeRace);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-indigo-500/40"
-                        title="Add a horse inside this race"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Add Horse</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        id={`master-susp-all-btn-${activeRace.id}`}
-                        onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
-                          isAllSuspended
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
-                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
-                        }`}
-                      >
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{isAllSuspended ? 'RESUME ALL' : 'SUSP ALL'}</span>
-                      </button>
-
-                      {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleMakeRaceUpcoming(activeRace)}
-                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-slate-700"
-                            title="Move race back to upcoming scheduled"
-                          >
-                            <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Move to Upcoming</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSettlingRace(activeRace);
-                              soundManager.playClick();
-                            }}
-                            className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
-                          >
-                            <Trophy className="w-3.5 h-3.5" />
-                            <span>Settle Winners</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleMakeRaceLive(activeRace)}
-                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-rose-950/50 active:scale-95"
-                        >
-                          <Flame className="w-3.5 h-3.5 text-amber-200" />
-                          <span>Make Live</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ---------------- HANDWRITTEN ODDS SPREADSHEET TABLE ---------------- */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[720px]">
-                      <thead>
-                        <tr className="bg-[#020503] border-b-2 border-emerald-900/80 text-xs font-black uppercase tracking-wider text-slate-300 font-mono">
-                          <th className="py-3 px-3 w-16 text-center border-r border-emerald-900/50">
-                            SL
-                          </th>
-                          <th className="py-3 px-4 border-r border-emerald-900/50">
-                            Horse Name
-                          </th>
-                          <th className="py-3 px-4 w-48 text-center border-r border-emerald-900/50">
-                            <span className="text-amber-400 block text-xs sm:text-sm font-black">WIN Odds</span>
-                            <span className="text-[9px] text-slate-400 font-normal">Editable Input (₹100)</span>
-                          </th>
-                          <th className="py-3 px-4 w-48 text-center border-r border-emerald-900/50">
-                            <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE Odds</span>
-                            <span className="text-[9px] text-slate-400 font-normal">Editable Input (₹100)</span>
-                          </th>
-                          <th className="py-3 px-4 w-52 text-center">
-                            <span className="block text-xs font-black">Action Controls</span>
-                            <span className="text-[9px] text-slate-400 font-normal">[SUSPEND / ODDS HISTORY]</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-emerald-950/80">
-                        {activeRace.horses.map((horse, idx) => {
-                          const isSuspended = horse.is_suspended || activeRace.is_suspended;
-                          const slNo = horse.serial_no || horse.horse_no || (idx + 1);
-                          const currentWinVal = tempOdds[horse.id]?.win_odds !== undefined ? tempOdds[horse.id].win_odds : horse.win_odds;
-                          const currentPlaceVal = tempOdds[horse.id]?.place_odds !== undefined ? tempOdds[horse.id].place_odds : horse.place_odds;
-
-                          return (
-                            <tr
-                              key={horse.id || idx}
-                              id={`admin-horse-row-${horse.id}`}
-                              className={`transition-colors font-mono ${
-                                isSuspended
-                                  ? 'bg-rose-950/20'
-                                  : idx % 2 === 0
-                                  ? 'bg-[#091510]'
-                                  : 'bg-[#07100c]'
-                              } hover:bg-[#0f241a]`}
+                          {/* Master "SUSP ALL" / "RESUME ALL" & Live Status Action Buttons */}
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextSNo = activeRace.horses.length + 1;
+                                setQuickHorseData({
+                                  name: '',
+                                  jockey: '',
+                                  trainer: '',
+                                  horse_no: String(nextSNo),
+                                  gate_no: String(nextSNo),
+                                  win_odds: '2.50',
+                                  place_odds: '1.40'
+                                });
+                                setQuickAddHorseRace(activeRace);
+                              }}
+                              className="px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-indigo-500/40"
+                              title="Add a horse inside this race"
                             >
-                              {/* SL (Serial Number) */}
-                              <td className="py-2.5 px-3 text-center font-black text-sm text-slate-200 border-r border-emerald-900/50">
-                                <span className="inline-flex w-7 h-7 rounded-lg bg-[#040805] border border-emerald-900/80 items-center justify-center text-[#e5b869]">
-                                  {slNo}
-                                </span>
-                              </td>
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Add Horse</span>
+                            </button>
 
-                              {/* Horse Name (Uppercase bold + Trainer/Jockey) */}
-                              <td className="py-2.5 px-4 border-r border-emerald-900/50">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">
-                                      {horse.name || `RUNNER #${slNo}`}
-                                    </span>
-                                    {isSuspended && (
-                                      <span className="px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider">
-                                        🚫 SUSPENDED
-                                      </span>
+                            <button
+                              type="button"
+                              id={`master-susp-all-btn-${activeRace.id}`}
+                              onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5 border ${
+                                isAllSuspended
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
+                              }`}
+                            >
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{isAllSuspended ? '🟢 RESUME ALL' : '🚫 SUSP ALL'}</span>
+                            </button>
+
+                            {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCloseBettingForRace(activeRace)}
+                                  className="px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 hover:text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 border border-rose-500/50"
+                                  title="Manually lock and close betting for this race"
+                                >
+                                  <Lock className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>Close Betting</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSettlingRace(activeRace);
+                                    soundManager.playClick();
+                                  }}
+                                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+                                >
+                                  <Trophy className="w-3.5 h-3.5" />
+                                  <span>Settle Winners</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleMakeRaceLive(activeRace)}
+                                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/50 border border-emerald-400/50 active:scale-95"
+                              >
+                                <Flame className="w-3.5 h-3.5 text-slate-950" />
+                                <span>⚡ OPEN FOR BETTING (Go Live)</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* ---------------- RUNNERS ODDS TABLE & SUSPEND CONTAINER ---------------- */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse min-w-[760px]">
+                            <thead>
+                              <tr className="bg-[#020503] border-b-2 border-emerald-900/80 text-xs font-black uppercase tracking-wider text-slate-300 font-mono">
+                                <th className="py-3 px-3 w-16 text-center border-r border-emerald-900/50">
+                                  SL
+                                </th>
+                                <th className="py-3 px-4 border-r border-emerald-900/50">
+                                  Horse Details
+                                </th>
+                                <th className="py-3 px-4 w-52 text-center border-r border-emerald-900/50">
+                                  <span className="text-amber-400 block text-xs sm:text-sm font-black">WIN Odds</span>
+                                  <span className="text-[9px] text-slate-400 font-normal">Live Multiplier</span>
+                                </th>
+                                <th className="py-3 px-4 w-52 text-center border-r border-emerald-900/50">
+                                  <span className="text-emerald-400 block text-xs sm:text-sm font-black">PLACE Odds</span>
+                                  <span className="text-[9px] text-slate-400 font-normal">Live Multiplier</span>
+                                </th>
+                                <th className="py-3 px-4 w-56 text-center">
+                                  <span className="block text-xs font-black">Controls</span>
+                                  <span className="text-[9px] text-slate-400 font-normal">[SUSPEND / RESUME / EDIT]</span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-emerald-950/80">
+                              {activeRace.horses.map((horse, idx) => {
+                                const isSuspended = horse.is_suspended || activeRace.is_suspended;
+                                const isEditing = editingHorseId === horse.id || isSuspended;
+                                const slNo = horse.serial_no || horse.horse_no || (idx + 1);
+                                const currentWinVal = tempOdds[horse.id]?.win_odds !== undefined ? tempOdds[horse.id].win_odds : horse.win_odds;
+                                const currentPlaceVal = tempOdds[horse.id]?.place_odds !== undefined ? tempOdds[horse.id].place_odds : horse.place_odds;
+                                const numWin = typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds;
+                                const numPlace = typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds;
+
+                                return (
+                                  <React.Fragment key={horse.id || idx}>
+                                    <tr
+                                      id={`admin-horse-row-${horse.id}`}
+                                      className={`transition-colors font-mono ${
+                                        isSuspended
+                                          ? 'bg-rose-950/30'
+                                          : idx % 2 === 0
+                                          ? 'bg-[#091510]'
+                                          : 'bg-[#07100c]'
+                                      } hover:bg-[#0f241a]`}
+                                    >
+                                      {/* SL (Serial Number) */}
+                                      <td className="py-3 px-3 text-center font-black text-sm text-slate-200 border-r border-emerald-900/50">
+                                        <span className={`inline-flex w-8 h-8 rounded-xl items-center justify-center font-bold text-sm ${
+                                          isSuspended
+                                            ? 'bg-rose-950 border border-rose-500 text-rose-300'
+                                            : 'bg-[#040805] border border-emerald-900/80 text-[#e5b869]'
+                                        }`}>
+                                          {slNo}
+                                        </span>
+                                      </td>
+
+                                      {/* Horse Name (Uppercase bold + Trainer/Jockey/Gate) */}
+                                      <td className="py-3 px-4 border-r border-emerald-900/50">
+                                        <div className="space-y-1">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm font-black text-white uppercase tracking-wide">
+                                              {horse.name || `RUNNER #${slNo}`}
+                                            </span>
+                                            {isSuspended ? (
+                                              <span className="px-2 py-0.5 rounded-full bg-rose-500/25 text-rose-300 border border-rose-500/50 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                                <span>🚫 SUSPENDED (Betting Frozen)</span>
+                                              </span>
+                                            ) : (
+                                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold uppercase">
+                                                🟢 Live
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-[11px] text-slate-400 font-sans flex items-center gap-2 flex-wrap">
+                                            <span>J: <strong className="text-slate-200">{horse.jockey || 'Jockey'}</strong></span>
+                                            <span>•</span>
+                                            <span>T: <strong className="text-slate-300">{horse.trainer || 'Trainer'}</strong></span>
+                                            {horse.gate_no !== undefined && (
+                                              <>
+                                                <span>•</span>
+                                                <span className="text-amber-400 font-semibold font-mono">Gate {horse.gate_no}</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </td>
+
+                                      {/* WIN Odds: Direct Quick Step + Input */}
+                                      <td className="py-2.5 px-3 border-r border-emerald-900/50 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = Math.max(1.05, Math.round((numWin - 0.1) * 100) / 100);
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
+                                              if (!isSuspended) {
+                                                handleUpdateOdds(horse.id, next, numPlace);
+                                              }
+                                            }}
+                                            className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
+                                            title="-0.10"
+                                          >
+                                            -
+                                          </button>
+
+                                          <input
+                                            type="number"
+                                            step="0.05"
+                                            min="1.05"
+                                            value={currentWinVal}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: val } }));
+                                            }}
+                                            onBlur={(e) => {
+                                              const val = parseFloat(e.target.value);
+                                              if (!isSuspended && val >= 1.05 && val !== horse.win_odds) {
+                                                handleUpdateOdds(horse.id, val, numPlace);
+                                              }
+                                            }}
+                                            className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${
+                                              isSuspended ? 'border-rose-500/80' : 'border-amber-500/60 focus:border-amber-300'
+                                            }`}
+                                          />
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = Math.round((numWin + 0.1) * 100) / 100;
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
+                                              if (!isSuspended) {
+                                                handleUpdateOdds(horse.id, next, numPlace);
+                                              }
+                                            }}
+                                            className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
+                                            title="+0.10"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </td>
+
+                                      {/* PLACE Odds: Direct Quick Step + Input */}
+                                      <td className="py-2.5 px-3 border-r border-emerald-900/50 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = Math.max(1.02, Math.round((numPlace - 0.05) * 100) / 100);
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
+                                              if (!isSuspended) {
+                                                handleUpdateOdds(horse.id, numWin, next);
+                                              }
+                                            }}
+                                            className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
+                                            title="-0.05"
+                                          >
+                                            -
+                                          </button>
+
+                                          <input
+                                            type="number"
+                                            step="0.05"
+                                            min="1.02"
+                                            value={currentPlaceVal}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: val } }));
+                                            }}
+                                            onBlur={(e) => {
+                                              const val = parseFloat(e.target.value);
+                                              if (!isSuspended && val >= 1.02 && val !== horse.place_odds) {
+                                                handleUpdateOdds(horse.id, numWin, val);
+                                              }
+                                            }}
+                                            className={`w-24 px-2 py-1.5 bg-[#020503] border-2 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none shadow-inner ${
+                                              isSuspended ? 'border-rose-500/80' : 'border-emerald-500/60 focus:border-emerald-300'
+                                            }`}
+                                          />
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = Math.round((numPlace + 0.05) * 100) / 100;
+                                              setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
+                                              if (!isSuspended) {
+                                                handleUpdateOdds(horse.id, numWin, next);
+                                              }
+                                            }}
+                                            className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
+                                            title="+0.05"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </td>
+
+                                      {/* Action: Prominent Suspend / Resume Button per runner */}
+                                      <td className="py-2.5 px-3 text-center">
+                                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                          {isSuspended ? (
+                                            <button
+                                              type="button"
+                                              id={`action-resume-runner-btn-${horse.id}`}
+                                              onClick={() => handleResumeHorse(activeRace.id, horse.id)}
+                                              className="py-1.5 px-3.5 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60 flex items-center gap-1"
+                                              title="Click to publish new odds live and resume betting on this horse"
+                                            >
+                                              <Check className="w-3.5 h-3.5" />
+                                              <span>RESUME</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              id={`action-suspend-runner-btn-${horse.id}`}
+                                              onClick={() => handleSuspendHorse(activeRace.id, horse.id)}
+                                              className="py-1.5 px-3.5 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border bg-rose-950/50 hover:bg-rose-900/70 text-rose-300 hover:text-white border-rose-500/60 flex items-center gap-1 shadow-sm"
+                                              title="Click SUSPEND to stop user betting and edit odds"
+                                            >
+                                              <AlertCircle className="w-3.5 h-3.5" />
+                                              <span>SUSPEND</span>
+                                            </button>
+                                          )}
+
+                                          {/* Odds History Audit Modal Trigger Button */}
+                                          <button
+                                            type="button"
+                                            id={`odds-history-btn-${horse.id}`}
+                                            onClick={() => {
+                                              soundManager.playClick();
+                                              setOddsHistoryModalHorse({ horse, race: activeRace });
+                                            }}
+                                            className="p-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-slate-700/80 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                            title="View Odds History (audit log)"
+                                          >
+                                            <Clock className="w-3.5 h-3.5" />
+                                            <span className="text-[10px] hidden xl:inline">History</span>
+                                          </button>
+
+                                          {/* Delete Runner from Race */}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteHorseFromRace(activeRace.id, horse.id, horse.name)}
+                                            className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition cursor-pointer"
+                                            title="Remove runner from race card"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+
+                                    {/* ---------------- EXPANDED INLINE ODDS EDITING CONTAINER (When Suspended / Editing) ---------------- */}
+                                    {isEditing && (
+                                      <tr className="bg-[#120808] border-y-2 border-rose-500/60">
+                                        <td colSpan={5} className="p-3 sm:p-4">
+                                          <div className="bg-[#1c0c0c] border border-rose-500/40 rounded-2xl p-3 sm:p-4 space-y-3 shadow-inner">
+                                            {/* Container Alert Banner */}
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-500/20 pb-2.5">
+                                              <div className="flex items-center gap-2">
+                                                <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+                                                <h4 className="text-xs sm:text-sm font-black text-rose-300 font-mono uppercase tracking-wider">
+                                                  🚫 Runner #{slNo} {horse.name} is Suspended — Edit Live Odds
+                                                </h4>
+                                              </div>
+                                              <span className="text-[11px] text-rose-300/80 font-mono">
+                                                Punters see "SUSPENDED / Odds Changing" in real time
+                                              </span>
+                                            </div>
+
+                                            {/* Quick Odds Editing Grid (WIN & PLACE side by side) */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                              {/* WIN Odds Box */}
+                                              <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/40 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-black text-amber-400 uppercase font-mono">WIN Odds Multiplier</span>
+                                                  <span className="text-[10px] text-slate-400 font-mono">₹1,000 Win = ₹{Math.round(numWin * 1000).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    type="number"
+                                                    step="0.05"
+                                                    min="1.05"
+                                                    value={currentWinVal}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value;
+                                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: val } }));
+                                                    }}
+                                                    className="w-full px-3 py-2 bg-[#020503] border-2 border-amber-500 rounded-xl text-amber-400 font-black font-mono text-base focus:outline-none focus:ring-2 focus:ring-amber-300 text-center"
+                                                  />
+                                                </div>
+                                                {/* Quick Win step pills */}
+                                                <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono font-bold">
+                                                  <span className="text-[10px] text-slate-400 mr-1">Quick:</span>
+                                                  {[-0.5, -0.2, -0.1, 0.1, 0.2, 0.5, 1.0].map((step) => (
+                                                    <button
+                                                      key={`win-step-${step}`}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const next = Math.max(1.05, Math.round((numWin + step) * 100) / 100);
+                                                        setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
+                                                      }}
+                                                      className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${
+                                                        step < 0 
+                                                          ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60' 
+                                                          : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
+                                                      }`}
+                                                    >
+                                                      {step > 0 ? `+${step.toFixed(2)}` : step.toFixed(2)}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+
+                                              {/* PLACE Odds Box */}
+                                              <div className="p-3 rounded-xl bg-slate-950/80 border border-emerald-500/40 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-black text-emerald-400 uppercase font-mono">PLACE Odds Multiplier</span>
+                                                  <span className="text-[10px] text-slate-400 font-mono">₹1,000 Place = ₹{Math.round(numPlace * 1000).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    type="number"
+                                                    step="0.05"
+                                                    min="1.02"
+                                                    value={currentPlaceVal}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value;
+                                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: val } }));
+                                                    }}
+                                                    className="w-full px-3 py-2 bg-[#020503] border-2 border-emerald-500 rounded-xl text-emerald-400 font-black font-mono text-base focus:outline-none focus:ring-2 focus:ring-emerald-300 text-center"
+                                                  />
+                                                </div>
+                                                {/* Quick Place step pills */}
+                                                <div className="flex items-center gap-1.5 flex-wrap text-xs font-mono font-bold">
+                                                  <span className="text-[10px] text-slate-400 mr-1">Quick:</span>
+                                                  {[-0.2, -0.1, -0.05, 0.05, 0.1, 0.2].map((step) => (
+                                                    <button
+                                                      key={`place-step-${step}`}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const next = Math.max(1.02, Math.round((numPlace + step) * 100) / 100);
+                                                        setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
+                                                      }}
+                                                      className={`px-2 py-1 rounded-lg border text-[11px] transition active:scale-95 cursor-pointer ${
+                                                        step < 0 
+                                                          ? 'bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-900/60' 
+                                                          : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
+                                                      }`}
+                                                    >
+                                                      {step > 0 ? `+${step.toFixed(2)}` : step.toFixed(2)}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Action Control: RESUME & BROADCAST NEW ODDS (Master Save & Broadcast) */}
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+                                              <div className="text-[11px] text-slate-400 font-mono">
+                                                New Staged Odds: <strong className="text-amber-400">WIN {numWin.toFixed(2)}x</strong> • <strong className="text-emerald-400">PLACE {numPlace.toFixed(2)}x</strong>
+                                              </div>
+
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleUpdateOdds(horse.id, numWin, numPlace)}
+                                                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
+                                                  title="Save new odds on server without un-suspending runner yet"
+                                                >
+                                                  💾 Save Odds (Stay Suspended)
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  id={`save-resume-horse-btn-${horse.id}`}
+                                                  onClick={() => handleResumeHorse(activeRace.id, horse.id)}
+                                                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 active:scale-95"
+                                                >
+                                                  <CheckCheck className="w-4 h-4 text-slate-950" />
+                                                  <span>✅ RESUME & BROADCAST ODDS</span>
+                                                </button>
+                                              </div>
+                                            </div>
+
+                                          </div>
+                                        </td>
+                                      </tr>
                                     )}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 font-sans flex items-center gap-2">
-                                    <span>J: <strong className="text-slate-200">{horse.jockey || 'Jockey'}</strong></span>
-                                    <span>•</span>
-                                    <span>T: <strong className="text-slate-300">{horse.trainer || 'Trainer'}</strong></span>
-                                    {horse.gate_no !== undefined && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="text-amber-400">Draw {horse.gate_no}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
 
-                              {/* WIN Odds: Direct input + quick step buttons */}
-                              <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const num = typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds;
-                                      const next = Math.max(1.05, Math.round((num - 0.1) * 100) / 100);
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
-                                      if (!isSuspended) {
-                                        handleUpdateOdds(horse.id, next, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
-                                      }
-                                    }}
-                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
-                                    title="-0.10"
-                                  >
-                                    -
-                                  </button>
+                        {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All at bottom right) */}
+                        <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-slate-400 font-mono">
+                              Race Card: <strong className="text-white">{activeRace.horses.length} Runners</strong>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextSNo = activeRace.horses.length + 1;
+                                setQuickHorseData({
+                                  name: '',
+                                  jockey: '',
+                                  trainer: '',
+                                  horse_no: String(nextSNo),
+                                  gate_no: String(nextSNo),
+                                  win_odds: '2.50',
+                                  place_odds: '1.40'
+                                });
+                                setQuickAddHorseRace(activeRace);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Add Horse to Race</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(activeRace)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>Edit Fixture</span>
+                            </button>
 
-                                  <input
-                                    type="number"
-                                    step="0.05"
-                                    min="1.05"
-                                    value={currentWinVal}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: val } }));
-                                    }}
-                                    onBlur={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      if (!isSuspended && val >= 1.05 && val !== horse.win_odds) {
-                                        handleUpdateOdds(horse.id, val, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
-                                      }
-                                    }}
-                                    className="w-24 px-2 py-1.5 bg-[#020503] border-2 border-amber-500/60 rounded-lg text-amber-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-amber-300 focus:ring-1 focus:ring-amber-300 shadow-inner"
-                                  />
+                            {activeRace.status === 'LIVE' || activeRace.status === 'OPEN_FOR_BETTING' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleCloseBettingForRace(activeRace)}
+                                className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                              >
+                                <Lock className="w-3.5 h-3.5 text-rose-400" />
+                                <span>Close Betting (1-Min Lock)</span>
+                              </button>
+                            ) : null}
+                          </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const num = typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds;
-                                      const next = Math.round((num + 0.1) * 100) / 100;
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], win_odds: next } }));
-                                      if (!isSuspended) {
-                                        handleUpdateOdds(horse.id, next, typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds);
-                                      }
-                                    }}
-                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
-                                    title="+0.10"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </td>
-
-                              {/* PLACE Odds: Direct input + quick step buttons */}
-                              <td className="py-2 px-3 border-r border-emerald-900/50 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const num = typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds;
-                                      const next = Math.max(1.02, Math.round((num - 0.05) * 100) / 100);
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
-                                      if (!isSuspended) {
-                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, next);
-                                      }
-                                    }}
-                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
-                                    title="-0.05"
-                                  >
-                                    -
-                                  </button>
-
-                                  <input
-                                    type="number"
-                                    step="0.05"
-                                    min="1.02"
-                                    value={currentPlaceVal}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: val } }));
-                                    }}
-                                    onBlur={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      if (!isSuspended && val >= 1.02 && val !== horse.place_odds) {
-                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, val);
-                                      }
-                                    }}
-                                    className="w-24 px-2 py-1.5 bg-[#020503] border-2 border-emerald-500/60 rounded-lg text-emerald-400 font-black font-mono text-center text-xs sm:text-sm focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300 shadow-inner"
-                                  />
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const num = typeof currentPlaceVal === 'number' ? currentPlaceVal : parseFloat(String(currentPlaceVal)) || horse.place_odds;
-                                      const next = Math.round((num + 0.05) * 100) / 100;
-                                      setTempOdds(prev => ({ ...prev, [horse.id]: { ...prev[horse.id], place_odds: next } }));
-                                      if (!isSuspended) {
-                                        handleUpdateOdds(horse.id, typeof currentWinVal === 'number' ? currentWinVal : parseFloat(String(currentWinVal)) || horse.win_odds, next);
-                                      }
-                                    }}
-                                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-black text-xs border border-slate-700 flex items-center justify-center cursor-pointer active:scale-95"
-                                    title="+0.05"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </td>
-
-                              {/* Action: SUSPEND / RESUME & ODDS HISTORY button per runner */}
-                              <td className="py-2.5 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                  {/* Single Horse Suspend Button */}
-                                  <button
-                                    type="button"
-                                    id={`action-runner-btn-${horse.id}`}
-                                    onClick={() => handleToggleHorseSuspend(activeRace.id, horse.id)}
-                                    className={`py-1.5 px-3 rounded-xl font-mono font-black text-xs transition cursor-pointer active:scale-95 border ${
-                                      isSuspended
-                                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/80 shadow-md shadow-emerald-950/60'
-                                        : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border-rose-500/50'
-                                    }`}
-                                    title={isSuspended ? 'Click RESUME to publish new odds live and enable betting' : 'Click SUSPEND to stop betting on this single horse'}
-                                  >
-                                    {isSuspended ? 'RESUME' : 'SUSPEND'}
-                                  </button>
-
-                                  {/* Odds History Audit Modal Trigger Button */}
-                                  <button
-                                    type="button"
-                                    id={`odds-history-btn-${horse.id}`}
-                                    onClick={() => {
-                                      soundManager.playClick();
-                                      setOddsHistoryModalHorse({ horse, race: activeRace });
-                                    }}
-                                    className="p-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-slate-700/80 text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                                    title="View Odds History (see what odds were given 5 mins ago)"
-                                  >
-                                    <Clock className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] hidden xl:inline">History</span>
-                                  </button>
-
-                                  {/* Delete Runner from Race */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteHorseFromRace(activeRace.id, horse.id, horse.name)}
-                                    className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition cursor-pointer"
-                                    title="Remove runner from race card"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Table Bottom Action Bar (matching bottom of handwritten sheet with Susp All at bottom right) */}
-                  <div className="bg-[#040805] border-t-2 border-emerald-900/80 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-slate-400 font-mono">
-                        Race Card: <strong className="text-white">{activeRace.horses.length} Runners</strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextSNo = activeRace.horses.length + 1;
-                          setQuickHorseData({
-                            name: '',
-                            jockey: '',
-                            trainer: '',
-                            horse_no: String(nextSNo),
-                            gate_no: String(nextSNo),
-                            win_odds: '2.50',
-                            place_odds: '1.40'
-                          });
-                          setQuickAddHorseRace(activeRace);
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Add Horse to Race</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(activeRace)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Edit Fixture</span>
-                      </button>
-                    </div>
-
-                    {/* SUSP ALL / RESUME ALL button at Bottom Right as requested */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        id={`bottom-susp-all-btn-${activeRace.id}`}
-                        onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
-                        className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
-                          isAllSuspended
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
-                            : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
-                        }`}
-                      >
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{isAllSuspended ? 'RESUME ALL' : 'SUSP ALL'}</span>
-                      </button>
-                    </div>
-                  </div>
-
+                          {/* SUSP ALL / RESUME ALL button at Bottom Right as requested */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              id={`bottom-susp-all-btn-${activeRace.id}`}
+                              onClick={() => handleToggleRaceSuspendAll(activeRace.id)}
+                              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black font-mono transition cursor-pointer shadow-lg active:scale-95 flex items-center gap-2 border ${
+                                isAllSuspended
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/50 shadow-emerald-950/40'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/50 shadow-rose-950/40'
+                              }`}
+                            >
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{isAllSuspended ? '🟢 RESUME ALL RUNNERS' : '🚫 SUSPEND ALL RUNNERS'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );
