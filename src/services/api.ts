@@ -2072,23 +2072,26 @@ export const api = {
 
   async settleRace(
     raceId: string, 
-    positionsOrWinner: { position_1: string[]; position_2?: string[]; position_3?: string[] } | string, 
+    positionsOrWinner: { position_1: string[]; position_2?: string[]; position_3?: string[]; position_4?: string[] } | string, 
     legacyPlaceIds?: string[]
   ): Promise<any> {
     // Parse positions
     let p1: string[] = [];
     let p2: string[] = [];
     let p3: string[] = [];
+    let p4: string[] = [];
 
     if (typeof positionsOrWinner === 'object' && Array.isArray(positionsOrWinner.position_1)) {
       p1 = positionsOrWinner.position_1.filter(Boolean);
       p2 = (positionsOrWinner.position_2 || []).filter(Boolean);
       p3 = (positionsOrWinner.position_3 || []).filter(Boolean);
+      p4 = (positionsOrWinner.position_4 || []).filter(Boolean);
     } else if (typeof positionsOrWinner === 'string') {
       p1 = [positionsOrWinner];
       const placeList = Array.isArray(legacyPlaceIds) ? legacyPlaceIds : [positionsOrWinner];
       p2 = placeList.filter(id => id !== positionsOrWinner).slice(0, 1);
-      p3 = placeList.filter(id => id !== positionsOrWinner).slice(1);
+      p3 = placeList.filter(id => id !== positionsOrWinner).slice(1, 2);
+      p4 = placeList.filter(id => id !== positionsOrWinner).slice(2, 3);
     }
 
     const isDeadHeatWin = p1.length > 1;
@@ -2103,6 +2106,7 @@ export const api = {
           position_1: p1,
           position_2: p2,
           position_3: p3,
+          position_4: p4,
           winner_horse_id: p1[0] || '',
           place_horses_ids: [...p1, ...p2, ...p3],
         }),
@@ -2160,6 +2164,7 @@ export const api = {
       race.position_1 = p1;
       race.position_2 = p2;
       race.position_3 = p3;
+      race.position_4 = p4;
       race.winner_horse_id = p1[0] || null;
       race.place_horses_ids = placeList;
       race.is_dead_heat = isDeadHeat;
@@ -2306,10 +2311,73 @@ export const api = {
         body: JSON.stringify({ reason }),
       });
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        // Update local storage as well
+        this.abandonLocalRace(raceId, reason);
+        return data;
       }
     } catch {}
-    return { success: false, message: 'Failed to abandon race', refundedCount: 0, totalRefunded: 0 };
+
+    return this.abandonLocalRace(raceId, reason);
+  },
+
+  abandonLocalRace(raceId: string, reason?: string): { success: boolean; message: string; refundedCount: number; totalRefunded: number } {
+    let localBets: Bet[] = [];
+    try {
+      const raw = localStorage.getItem('derby_custom_bets');
+      if (raw) localBets = JSON.parse(raw);
+    } catch {}
+
+    let currentUser: User = DUMMY_USER;
+    try {
+      const savedUser = localStorage.getItem('derby_user');
+      if (savedUser) currentUser = JSON.parse(savedUser);
+    } catch {}
+
+    let localTxs: Transaction[] = [];
+    try {
+      const rawTxs = localStorage.getItem('derby_custom_txs');
+      if (rawTxs) localTxs = JSON.parse(rawTxs);
+    } catch {}
+
+    let refundedCount = 0;
+    let totalRefunded = 0;
+
+    for (const bet of localBets) {
+      if (bet.race_id === raceId && bet.status === 'PENDING') {
+        bet.status = 'REFUNDED';
+        bet.settled_at = new Date().toISOString();
+        totalRefunded += bet.stake;
+        refundedCount++;
+
+        currentUser.balance = (currentUser.balance ?? 0) + bet.stake;
+        currentUser.exposure = Math.max(0, (currentUser.exposure ?? 0) - bet.stake);
+
+        localTxs.unshift({
+          id: `tx_${Date.now()}_${bet.id}`,
+          user_id: bet.user_id,
+          type: 'REFUND',
+          amount: bet.stake,
+          balance_after: currentUser.balance,
+          description: `100% Refund for Cancelled/Abandoned Race #${raceId}: #${bet.horse_no} ${bet.horse_name} (${reason || 'Track Unfit / Abandoned'})`,
+          created_at: new Date().toISOString(),
+          reference_id: bet.id,
+        });
+      }
+    }
+
+    try {
+      localStorage.setItem('derby_custom_bets', JSON.stringify(localBets));
+      localStorage.setItem('derby_user', JSON.stringify(currentUser));
+      localStorage.setItem('derby_custom_txs', JSON.stringify(localTxs));
+    } catch {}
+
+    return {
+      success: true,
+      message: `Race declared ABANDONED / VOID. ${refundedCount} bets refunded 100% (₹${totalRefunded.toLocaleString('en-IN')})!`,
+      refundedCount,
+      totalRefunded,
+    };
   },
 
   async cancelBet(betId: string, reason?: string): Promise<{ success: boolean; message: string; bet?: Bet }> {

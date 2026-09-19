@@ -94,6 +94,7 @@ export interface Race {
   position_1?: string[]; // IDs of horses tied for 1st place (Dead Heat)
   position_2?: string[]; // IDs of horses tied for 2nd place
   position_3?: string[]; // IDs of horses tied for 3rd place
+  position_4?: string[]; // IDs of horses in 4th place
   is_dead_heat?: boolean;
   dead_heat_note?: string;
   horses: Horse[];

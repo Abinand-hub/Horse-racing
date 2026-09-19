@@ -2067,9 +2067,9 @@ app.put('/api/admin/horses/:id/odds', (req, res) => {
 });
 
 // 5. SETTLE RACE & AUTO PAYOUT BETS (CORE REQUIREMENT - WITH DEAD HEAT SUPPORT)
-// Supports multi-horse dead heat for 1st, 2nd, and 3rd place with Method A (Betfair / Industry Standard) stake division
+// Supports multi-horse dead heat for 1st, 2nd, and 3rd place with Method A (Betfair / Industry Standard) stake division, plus 4th position
 app.post('/api/admin/races/:id/settle', (req, res) => {
-  const { position_1, position_2, position_3, winner_horse_id, place_horses_ids } = req.body;
+  const { position_1, position_2, position_3, position_4, winner_horse_id, place_horses_ids } = req.body;
   const race = db.races.find((r) => r.id === req.params.id);
   if (!race) return res.status(404).json({ error: 'Race not found' });
 
@@ -2077,16 +2077,19 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
   let p1: string[] = [];
   let p2: string[] = [];
   let p3: string[] = [];
+  let p4: string[] = [];
 
   if (Array.isArray(position_1) && position_1.length > 0) {
     p1 = position_1.filter(Boolean);
     p2 = Array.isArray(position_2) ? position_2.filter(Boolean) : [];
     p3 = Array.isArray(position_3) ? position_3.filter(Boolean) : [];
+    p4 = Array.isArray(position_4) ? position_4.filter(Boolean) : [];
   } else if (winner_horse_id) {
     p1 = [winner_horse_id];
     const placeList = Array.isArray(place_horses_ids) ? place_horses_ids : [winner_horse_id];
     p2 = placeList.filter(id => id !== winner_horse_id).slice(0, 1);
-    p3 = placeList.filter(id => id !== winner_horse_id).slice(1);
+    p3 = placeList.filter(id => id !== winner_horse_id).slice(1, 2);
+    p4 = placeList.filter(id => id !== winner_horse_id).slice(2, 3);
   } else {
     return res.status(400).json({ error: '1st Place winner horse is required to settle race' });
   }
@@ -2142,6 +2145,7 @@ app.post('/api/admin/races/:id/settle', (req, res) => {
   race.position_1 = p1;
   race.position_2 = p2;
   race.position_3 = p3;
+  race.position_4 = p4;
   race.winner_horse_id = p1[0] || null;
   race.place_horses_ids = placeAll;
   race.is_dead_heat = isDeadHeat;

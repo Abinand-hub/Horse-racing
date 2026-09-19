@@ -289,9 +289,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   const [selectedOddsRaceId, setSelectedOddsRaceId] = useState<string>('');
 
-  // Settlement dialog state (Dead Heat Enabled)
+  // Settlement dialog state (Dead Heat Enabled, 1st/2nd/3rd/4th Dropdowns)
   const [settlingRace, setSettlingRace] = useState<Race | null>(null);
-  const [settlePositions, setSettlePositions] = useState<Record<string, 1 | 2 | 3 | 0>>({});
+  const [settlePositions, setSettlePositions] = useState<Record<string, 1 | 2 | 3 | 4 | 0>>({});
+  const [settleViewMode, setSettleViewMode] = useState<'DROPDOWN' | 'RUNNERS'>('DROPDOWN');
 
   // Add Race Form state (Clean Blank by Default)
   const [newRaceName, setNewRaceName] = useState('');
@@ -833,12 +834,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleOpenSettle = (race: Race) => {
     setSettlingRace(race);
-    const initialPositions: Record<string, 1 | 2 | 3 | 0> = {};
+    const initialPositions: Record<string, 1 | 2 | 3 | 4 | 0> = {};
     if (race.position_1 && race.position_1.length > 0) {
       race.horses.forEach((h) => {
         if (race.position_1?.includes(h.id)) initialPositions[h.id] = 1;
         else if (race.position_2?.includes(h.id)) initialPositions[h.id] = 2;
         else if (race.position_3?.includes(h.id)) initialPositions[h.id] = 3;
+        else if (race.position_4?.includes(h.id)) initialPositions[h.id] = 4;
         else initialPositions[h.id] = 0;
       });
     } else {
@@ -846,6 +848,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         if (idx === 0) initialPositions[h.id] = 1;
         else if (idx === 1) initialPositions[h.id] = 2;
         else if (idx === 2) initialPositions[h.id] = 3;
+        else if (idx === 3) initialPositions[h.id] = 4;
         else initialPositions[h.id] = 0;
       });
     }
@@ -857,6 +860,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const p1 = Object.keys(settlePositions).filter((id) => settlePositions[id] === 1);
     const p2 = Object.keys(settlePositions).filter((id) => settlePositions[id] === 2);
     const p3 = Object.keys(settlePositions).filter((id) => settlePositions[id] === 3);
+    const p4 = Object.keys(settlePositions).filter((id) => settlePositions[id] === 4);
 
     if (p1.length === 0) {
       setActionMessage('⚠️ Please select at least one horse for 1st Place');
@@ -870,6 +874,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         position_1: p1,
         position_2: p2,
         position_3: p3,
+        position_4: p4,
       });
       soundManager.playWinPayout();
       setActionMessage(res.message || '🏆 Race settled and payouts distributed! Results and financial ledger updated in Finished Races.');
@@ -6148,25 +6153,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* CORE FEATURE: RACE SETTLEMENT DIALOG (WITH DEAD HEAT DECLARATION LOGIC) */}
+      {/* CORE FEATURE: RACE SETTLEMENT & RESULT DECLARATION (WITH 1st/2nd/3rd/4th DROPDOWNS & DEAD HEAT) */}
       {settlingRace && (() => {
         const p1 = settlingRace.horses.filter((h) => settlePositions[h.id] === 1);
         const p2 = settlingRace.horses.filter((h) => settlePositions[h.id] === 2);
         const p3 = settlingRace.horses.filter((h) => settlePositions[h.id] === 3);
+        const p4 = settlingRace.horses.filter((h) => settlePositions[h.id] === 4);
         const isDeadHeatWin = p1.length > 1;
         const isDeadHeatPlace = p2.length > 1 || p3.length > 1;
         const isDeadHeat = isDeadHeatWin || isDeadHeatPlace;
 
+        // Pending bets for this race
+        const pendingRaceBets = (allBets || []).filter(
+          (b) => (b.race_id === settlingRace.id || b.race_name === settlingRace.name) && b.status === 'PENDING'
+        );
+        const totalPendingStake = pendingRaceBets.reduce((acc, b) => acc + (b.stake || 0), 0);
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-            <div className="w-full max-w-2xl bg-slate-900 border-2 border-emerald-900/80 rounded-2xl shadow-2xl p-5 space-y-4 my-8 max-h-[92vh] overflow-y-auto">
+            <div className="w-full max-w-3xl bg-slate-900 border-2 border-emerald-900/80 rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 my-8 max-h-[92vh] overflow-y-auto">
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-10">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-400" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <Trophy className="w-5 h-5" />
+                  </div>
                   <div>
-                    <h3 className="font-bold text-white text-base flex items-center gap-2">
-                      <span>Declare Official Race Verdict</span>
+                    <h3 className="font-black text-white text-base sm:text-lg flex items-center gap-2">
+                      <span>5. RESULT DECLARATION & SETTLEMENT</span>
                       {isDeadHeat && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
                           🔥 Dead Heat Active
@@ -6174,98 +6188,129 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       )}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Select official finishing positions. Multiple horses can be assigned the same position to declare a <strong>Dead Heat</strong>.
+                      Declare 1st, 2nd, 3rd, 4th finishers or Dead Heat. Auto-settles all bets instantly.
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSettlingRace(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Race Meta */}
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between gap-3 flex-wrap text-xs">
+              {/* Race Meta Bar */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 flex-wrap text-xs">
                 <div>
                   <span className="text-amber-400 font-bold">{settlingRace.venue}</span>
                   <h4 className="text-sm font-black text-white">{settlingRace.name}</h4>
                 </div>
-                <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300">
-                  <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300 flex-wrap">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
                     {settlingRace.distance}
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
                     {settlingRace.race_time}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 font-bold">
+                    {settlingRace.horses.length} Runners
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-800/60 text-amber-300 font-bold">
+                    {pendingRaceBets.length} Bets Placed (₹{totalPendingStake.toLocaleString('en-IN')})
                   </span>
                 </div>
               </div>
 
-              {/* Quick Preset Buttons */}
-              <div className="space-y-1.5">
-                <p className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-[#e5b869]" />
-                  Quick Presets:
-                </p>
+              {/* View Mode Selector Tabs */}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setSettleViewMode('DROPDOWN')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      settleViewMode === 'DROPDOWN'
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>Dropdown Selection (1st-4th)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettleViewMode('RUNNERS')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      settleViewMode === 'RUNNERS'
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>Runner Cards Mode</span>
+                  </button>
+                </div>
+
+                {/* Quick Preset Buttons */}
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.playClick();
-                      const next: Record<string, 1 | 2 | 3 | 0> = {};
+                      const next: Record<string, 1 | 2 | 3 | 4 | 0> = {};
                       settlingRace.horses.forEach((h, i) => {
                         if (i === 0) next[h.id] = 1;
                         else if (i === 1) next[h.id] = 2;
                         else if (i === 2) next[h.id] = 3;
+                        else if (i === 3) next[h.id] = 4;
                         else next[h.id] = 0;
                       });
                       setSettlePositions(next);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold transition border border-slate-700 cursor-pointer"
                   >
-                    Standard (1st, 2nd, 3rd)
+                    Standard (1-2-3-4)
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.playClick();
-                      const next: Record<string, 1 | 2 | 3 | 0> = {};
+                      const next: Record<string, 1 | 2 | 3 | 4 | 0> = {};
                       settlingRace.horses.forEach((h, i) => {
                         if (i === 0 || i === 1) next[h.id] = 1; // 2 horses tied 1st
                         else if (i === 2) next[h.id] = 3; // 3rd place
+                        else if (i === 3) next[h.id] = 4; // 4th place
                         else next[h.id] = 0;
                       });
                       setSettlePositions(next);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold transition border border-amber-500/40 cursor-pointer"
                   >
-                    🔥 Dead Heat 1st (#1 & #2 Tied)
+                    🔥 Dead Heat 1st (#1 & #2)
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.playClick();
-                      const next: Record<string, 1 | 2 | 3 | 0> = {};
+                      const next: Record<string, 1 | 2 | 3 | 4 | 0> = {};
                       settlingRace.horses.forEach((h, i) => {
                         if (i === 0) next[h.id] = 1; // 1st
                         else if (i === 1 || i === 2) next[h.id] = 2; // 2 horses tied 2nd
+                        else if (i === 3) next[h.id] = 4; // 4th
                         else next[h.id] = 0;
                       });
                       setSettlePositions(next);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-[11px] font-bold transition border border-blue-500/40 cursor-pointer"
                   >
-                    🔥 Dead Heat 2nd (#2 & #3 Tied)
+                    🔥 Dead Heat 2nd (#2 & #3)
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.playClick();
-                      const next: Record<string, 1 | 2 | 3 | 0> = {};
+                      const next: Record<string, 1 | 2 | 3 | 4 | 0> = {};
                       settlingRace.horses.forEach((h, i) => {
                         if (i === 0) next[h.id] = 1; // 1st
                         else if (i === 1) next[h.id] = 2; // 2nd
@@ -6276,14 +6321,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     }}
                     className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold transition border border-emerald-500/40 cursor-pointer"
                   >
-                    🔥 Dead Heat 3rd (#3 & #4 Tied)
+                    🔥 Dead Heat 3rd (#3 & #4)
                   </button>
                 </div>
               </div>
 
               {/* Dead Heat Auto-Detection Alert Banner */}
               {isDeadHeatWin && (
-                <div className="p-3.5 rounded-xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-200 text-xs space-y-1 animate-in fade-in">
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-200 text-xs space-y-1 animate-in fade-in">
                   <div className="flex items-center gap-2 font-black text-amber-300">
                     <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                     <span>🔥 DEAD HEAT FOR 1ST PLACE (WIN) DETECTED ({p1.length} Winners)</span>
@@ -6295,7 +6340,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               )}
 
               {!isDeadHeatWin && isDeadHeatPlace && (
-                <div className="p-3.5 rounded-xl bg-blue-500/15 border-2 border-blue-500/50 text-blue-200 text-xs space-y-1 animate-in fade-in">
+                <div className="p-3.5 rounded-2xl bg-blue-500/15 border-2 border-blue-500/50 text-blue-200 text-xs space-y-1 animate-in fade-in">
                   <div className="flex items-center gap-2 font-black text-blue-300">
                     <AlertCircle className="w-4 h-4 text-blue-400 shrink-0" />
                     <span>🔥 DEAD HEAT FOR PLACE DETECTED</span>
@@ -6308,176 +6353,442 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               )}
 
-              {/* Runners Finishing Position Assignment List */}
-              <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
-                {settlingRace.horses.map((horse) => {
-                  const currentPos = settlePositions[horse.id] || 0;
+              {/* SECTION A: DROPDOWN SELECTION MODE (1st, 2nd, 3rd, 4th Dropdowns) */}
+              {settleViewMode === 'DROPDOWN' && (
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      Select Finishing Order from Dropdowns
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Multi-selection allowed for Dead Heat
+                    </span>
+                  </div>
 
-                  return (
-                    <div
-                      key={horse.id}
-                      className={`p-3 rounded-xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        currentPos === 1
-                          ? 'bg-amber-500/15 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-                          : currentPos === 2
-                          ? 'bg-blue-500/15 border-blue-500/50'
-                          : currentPos === 3
-                          ? 'bg-emerald-500/15 border-emerald-500/50'
-                          : 'bg-slate-950/80 border-slate-800/80 opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      {/* Horse Info */}
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 text-[#e5b869] font-black font-mono flex items-center justify-center shrink-0">
-                          {horse.serial_no || horse.horse_no}
-                        </span>
-                        <div className="min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-black text-white uppercase text-xs sm:text-sm">
-                              {horse.name}
-                            </span>
-                            {horse.gate_no !== undefined && (
-                              <span className="text-[10px] text-amber-400 font-mono">
-                                (Draw {horse.gate_no})
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
-                            <span>J: {horse.jockey}</span>
-                            <span>•</span>
-                            <span>T: {horse.trainer}</span>
-                            <span>•</span>
-                            <span className="text-amber-400 font-mono">Win: {horse.win_odds}x</span>
-                            <span>•</span>
-                            <span className="text-emerald-400 font-mono">Place: {horse.place_odds}x</span>
-                          </div>
-                        </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 1st Place Dropdown */}
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-black text-amber-400 text-xs flex items-center gap-1.5">
+                          <span>🥇 1st Place (WINNER)</span>
+                          {p1.length > 1 && <span className="text-[10px] bg-amber-500/30 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">DH: {p1.length} Horses</span>}
+                        </label>
                       </div>
+                      <select
+                        value={p1[0] || ''}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setSettlePositions((prev) => {
+                            const next = { ...prev };
+                            // Remove previous 1st place
+                            Object.keys(next).forEach((k) => {
+                              if (next[k] === 1) next[k] = 0;
+                            });
+                            if (selectedId) next[selectedId] = 1;
+                            return next;
+                          });
+                        }}
+                        className="w-full px-3 py-2 bg-slate-900 border border-amber-500/60 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+                      >
+                        <option value="">-- Select 1st Place Horse --</option>
+                        {settlingRace.horses.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            #{h.serial_no || h.horse_no} {h.name} (J: {h.jockey} | Win: {h.win_odds}x)
+                          </option>
+                        ))}
+                      </select>
 
-                      {/* Position Buttons */}
-                      <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundManager.playClick();
-                            setSettlePositions((prev) => ({ ...prev, [horse.id]: 1 }));
+                      {/* Dead Heat 1st secondary selector */}
+                      <div className="pt-1 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Tied for 1st (Dead Heat)?</span>
+                        <select
+                          value={p1[1] || ''}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setSettlePositions((prev) => {
+                              const next = { ...prev };
+                              // Keep p1[0] as 1, set p1[1] as 1 or remove
+                              if (p1[1] && p1[1] !== selectedId) next[p1[1]] = 0;
+                              if (selectedId) next[selectedId] = 1;
+                              return next;
+                            });
                           }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-black font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                            currentPos === 1
-                              ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md font-black'
-                              : 'bg-slate-900 hover:bg-slate-800 text-amber-400 border-slate-700'
-                          }`}
-                          title="Assign 1st Place (Winner)"
+                          className="px-2 py-1 bg-slate-900 border border-amber-500/30 rounded-lg text-amber-300 font-bold text-[11px] focus:outline-none cursor-pointer max-w-[200px]"
                         >
-                          <span>🥇 1st</span>
-                          {currentPos === 1 && <Check className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundManager.playClick();
-                            setSettlePositions((prev) => ({ ...prev, [horse.id]: 2 }));
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                            currentPos === 2
-                              ? 'bg-blue-500 text-white border-blue-300 shadow-md font-black'
-                              : 'bg-slate-900 hover:bg-slate-800 text-blue-400 border-slate-700'
-                          }`}
-                          title="Assign 2nd Place"
-                        >
-                          <span>🥈 2nd</span>
-                          {currentPos === 2 && <Check className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundManager.playClick();
-                            setSettlePositions((prev) => ({ ...prev, [horse.id]: 3 }));
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
-                            currentPos === 3
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md font-black'
-                              : 'bg-slate-900 hover:bg-slate-800 text-emerald-400 border-slate-700'
-                          }`}
-                          title="Assign 3rd Place"
-                        >
-                          <span>🥉 3rd</span>
-                          {currentPos === 3 && <Check className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            soundManager.playClick();
-                            setSettlePositions((prev) => ({ ...prev, [horse.id]: 0 }));
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold font-mono transition cursor-pointer border ${
-                            currentPos === 0
-                              ? 'bg-slate-800 text-slate-400 border-slate-700'
-                              : 'bg-slate-950 hover:bg-slate-900 text-slate-500 border-slate-800'
-                          }`}
-                          title="Unplaced"
-                        >
-                          ✕
-                        </button>
+                          <option value="">+ Add 2nd Horse (Dead Heat)</option>
+                          {settlingRace.horses.filter(h => h.id !== p1[0]).map((h) => (
+                            <option key={h.id} value={h.id}>
+                              #{h.serial_no || h.horse_no} {h.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
 
-              {/* Verdict Summary Card */}
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                    {/* 2nd Place Dropdown */}
+                    <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-black text-blue-300 text-xs flex items-center gap-1.5">
+                          <span>🥈 2nd Place (PLACE)</span>
+                          {p2.length > 1 && <span className="text-[10px] bg-blue-500/30 px-1.5 py-0.5 rounded text-blue-200 font-mono font-bold">DH: {p2.length} Horses</span>}
+                        </label>
+                      </div>
+                      <select
+                        value={p2[0] || ''}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setSettlePositions((prev) => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach((k) => {
+                              if (next[k] === 2) next[k] = 0;
+                            });
+                            if (selectedId) next[selectedId] = 2;
+                            return next;
+                          });
+                        }}
+                        className="w-full px-3 py-2 bg-slate-900 border border-blue-500/60 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                      >
+                        <option value="">-- Select 2nd Place Horse --</option>
+                        {settlingRace.horses.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            #{h.serial_no || h.horse_no} {h.name} (J: {h.jockey} | Place: {h.place_odds}x)
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Dead Heat 2nd secondary selector */}
+                      <div className="pt-1 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Tied for 2nd (Dead Heat)?</span>
+                        <select
+                          value={p2[1] || ''}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setSettlePositions((prev) => {
+                              const next = { ...prev };
+                              if (p2[1] && p2[1] !== selectedId) next[p2[1]] = 0;
+                              if (selectedId) next[selectedId] = 2;
+                              return next;
+                            });
+                          }}
+                          className="px-2 py-1 bg-slate-900 border border-blue-500/30 rounded-lg text-blue-300 font-bold text-[11px] focus:outline-none cursor-pointer max-w-[200px]"
+                        >
+                          <option value="">+ Add 2nd Horse (Dead Heat)</option>
+                          {settlingRace.horses.filter(h => h.id !== p2[0]).map((h) => (
+                            <option key={h.id} value={h.id}>
+                              #{h.serial_no || h.horse_no} {h.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* 3rd Place Dropdown */}
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-black text-emerald-300 text-xs flex items-center gap-1.5">
+                          <span>🥉 3rd Place (PLACE)</span>
+                          {p3.length > 1 && <span className="text-[10px] bg-emerald-500/30 px-1.5 py-0.5 rounded text-emerald-200 font-mono font-bold">DH: {p3.length} Horses</span>}
+                        </label>
+                      </div>
+                      <select
+                        value={p3[0] || ''}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setSettlePositions((prev) => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach((k) => {
+                              if (next[k] === 3) next[k] = 0;
+                            });
+                            if (selectedId) next[selectedId] = 3;
+                            return next;
+                          });
+                        }}
+                        className="w-full px-3 py-2 bg-slate-900 border border-emerald-500/60 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+                      >
+                        <option value="">-- Select 3rd Place Horse --</option>
+                        {settlingRace.horses.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            #{h.serial_no || h.horse_no} {h.name} (J: {h.jockey} | Place: {h.place_odds}x)
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Dead Heat 3rd secondary selector */}
+                      <div className="pt-1 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">Tied for 3rd (Dead Heat)?</span>
+                        <select
+                          value={p3[1] || ''}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setSettlePositions((prev) => {
+                              const next = { ...prev };
+                              if (p3[1] && p3[1] !== selectedId) next[p3[1]] = 0;
+                              if (selectedId) next[selectedId] = 3;
+                              return next;
+                            });
+                          }}
+                          className="px-2 py-1 bg-slate-900 border border-emerald-500/30 rounded-lg text-emerald-300 font-bold text-[11px] focus:outline-none cursor-pointer max-w-[200px]"
+                        >
+                          <option value="">+ Add 2nd Horse (Dead Heat)</option>
+                          {settlingRace.horses.filter(h => h.id !== p3[0]).map((h) => (
+                            <option key={h.id} value={h.id}>
+                              #{h.serial_no || h.horse_no} {h.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* 4th Place Dropdown */}
+                    <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-black text-purple-300 text-xs flex items-center gap-1.5">
+                          <span>🎖 4th Place (OFFICIAL 4TH)</span>
+                        </label>
+                      </div>
+                      <select
+                        value={p4[0] || ''}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setSettlePositions((prev) => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach((k) => {
+                              if (next[k] === 4) next[k] = 0;
+                            });
+                            if (selectedId) next[selectedId] = 4;
+                            return next;
+                          });
+                        }}
+                        className="w-full px-3 py-2 bg-slate-900 border border-purple-500/60 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+                      >
+                        <option value="">-- Select 4th Place Horse --</option>
+                        {settlingRace.horses.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            #{h.serial_no || h.horse_no} {h.name} (J: {h.jockey})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-400 pt-1">
+                        Records official superfecta / 4th finisher on turf verdict.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION B: RUNNERS FINISHING POSITION ASSIGNMENT LIST */}
+              {settleViewMode === 'RUNNERS' && (
+                <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
+                  {settlingRace.horses.map((horse) => {
+                    const currentPos = settlePositions[horse.id] || 0;
+
+                    return (
+                      <div
+                        key={horse.id}
+                        className={`p-3 rounded-2xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          currentPos === 1
+                            ? 'bg-amber-500/15 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                            : currentPos === 2
+                            ? 'bg-blue-500/15 border-blue-500/50'
+                            : currentPos === 3
+                            ? 'bg-emerald-500/15 border-emerald-500/50'
+                            : currentPos === 4
+                            ? 'bg-purple-500/15 border-purple-500/50'
+                            : 'bg-slate-950/80 border-slate-800/80 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        {/* Horse Info */}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 text-[#e5b869] font-black font-mono flex items-center justify-center shrink-0">
+                            {horse.serial_no || horse.horse_no}
+                          </span>
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-black text-white uppercase text-xs sm:text-sm">
+                                {horse.name}
+                              </span>
+                              {horse.gate_no !== undefined && (
+                                <span className="text-[10px] text-amber-400 font-mono">
+                                  (Draw {horse.gate_no})
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                              <span>J: {horse.jockey}</span>
+                              <span>•</span>
+                              <span>T: {horse.trainer}</span>
+                              <span>•</span>
+                              <span className="text-amber-400 font-mono">Win: {horse.win_odds}x</span>
+                              <span>•</span>
+                              <span className="text-emerald-400 font-mono">Place: {horse.place_odds}x</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Position Buttons */}
+                        <div className="flex items-center gap-1 shrink-0 self-end sm:self-center flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundManager.playClick();
+                              setSettlePositions((prev) => ({ ...prev, [horse.id]: 1 }));
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-black font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
+                              currentPos === 1
+                                ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md font-black'
+                                : 'bg-slate-900 hover:bg-slate-800 text-amber-400 border-slate-700'
+                            }`}
+                            title="Assign 1st Place (Winner)"
+                          >
+                            <span>🥇 1st</span>
+                            {currentPos === 1 && <Check className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundManager.playClick();
+                              setSettlePositions((prev) => ({ ...prev, [horse.id]: 2 }));
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
+                              currentPos === 2
+                                ? 'bg-blue-500 text-white border-blue-300 shadow-md font-black'
+                                : 'bg-slate-900 hover:bg-slate-800 text-blue-400 border-slate-700'
+                            }`}
+                            title="Assign 2nd Place"
+                          >
+                            <span>🥈 2nd</span>
+                            {currentPos === 2 && <Check className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundManager.playClick();
+                              setSettlePositions((prev) => ({ ...prev, [horse.id]: 3 }));
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
+                              currentPos === 3
+                                ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-md font-black'
+                                : 'bg-slate-900 hover:bg-slate-800 text-emerald-400 border-slate-700'
+                            }`}
+                            title="Assign 3rd Place"
+                          >
+                            <span>🥉 3rd</span>
+                            {currentPos === 3 && <Check className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundManager.playClick();
+                              setSettlePositions((prev) => ({ ...prev, [horse.id]: 4 }));
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition cursor-pointer active:scale-95 flex items-center gap-1 border ${
+                              currentPos === 4
+                                ? 'bg-purple-500 text-white border-purple-300 shadow-md font-black'
+                                : 'bg-slate-900 hover:bg-slate-800 text-purple-400 border-slate-700'
+                            }`}
+                            title="Assign 4th Place"
+                          >
+                            <span>🎖 4th</span>
+                            {currentPos === 4 && <Check className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundManager.playClick();
+                              setSettlePositions((prev) => ({ ...prev, [horse.id]: 0 }));
+                            }}
+                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold font-mono transition cursor-pointer border ${
+                              currentPos === 0
+                                ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                : 'bg-slate-950 hover:bg-slate-900 text-slate-500 border-slate-800'
+                            }`}
+                            title="Unplaced"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Verdict Summary 4-Place Card */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs space-y-1.5">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Result Summary:
+                  Official Verdict Summary:
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
                     <span className="text-amber-400 font-black text-[11px] block">
-                      🥇 1st Place (WIN {isDeadHeatWin ? `• ${p1.length}-WAY DH` : ''}):
+                      🥇 1st (WIN {isDeadHeatWin ? `• ${p1.length}-WAY DH` : ''}):
                     </span>
                     <span className="text-white font-bold text-xs truncate block">
                       {p1.length > 0 ? p1.map((h) => `#${h.serial_no || h.horse_no} ${h.name}`).join(' & ') : 'None selected'}
                     </span>
                   </div>
 
-                  <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30">
                     <span className="text-blue-300 font-black text-[11px] block">
-                      🥈 2nd Place (PLACE):
+                      🥈 2nd (PLACE {p2.length > 1 ? `• ${p2.length}-WAY DH` : ''}):
                     </span>
                     <span className="text-white font-bold text-xs truncate block">
                       {p2.length > 0 ? p2.map((h) => `#${h.serial_no || h.horse_no} ${h.name}`).join(' & ') : isDeadHeatWin ? '(No 2nd in DH)' : 'None'}
                     </span>
                   </div>
 
-                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
                     <span className="text-emerald-300 font-black text-[11px] block">
-                      🥉 3rd Place (PLACE):
+                      🥉 3rd (PLACE {p3.length > 1 ? `• ${p3.length}-WAY DH` : ''}):
                     </span>
                     <span className="text-white font-bold text-xs truncate block">
                       {p3.length > 0 ? p3.map((h) => `#${h.serial_no || h.horse_no} ${h.name}`).join(' & ') : 'None'}
                     </span>
                   </div>
+
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                    <span className="text-purple-300 font-black text-[11px] block">
+                      🎖 4th (OFFICIAL 4TH):
+                    </span>
+                    <span className="text-white font-bold text-xs truncate block">
+                      {p4.length > 0 ? p4.map((h) => `#${h.serial_no || h.horse_no} ${h.name}`).join(' & ') : 'None'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+              {/* Action Buttons: Cancel, Abandon/Void (100% Refund), Execute Settle */}
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-800 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setSettlingRace(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
                 >
                   Cancel
                 </button>
+
+                {/* 1-Click ABANDONED / VOID DECLARATION WITH 100% REFUND */}
+                <button
+                  type="button"
+                  onClick={() => handleAbandonRace(settlingRace)}
+                  title="If race is cancelled, abandon race and refund 100% of bets to punter balances"
+                  className="px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>Declare ABANDONED / VOID (100% Refund All Bets)</span>
+                </button>
+
                 <button
                   type="button"
                   id="execute-settle-btn"
                   disabled={isLoading || p1.length === 0}
                   onClick={handleExecuteSettlement}
-                  className={`flex-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+                  className={`flex-1 min-w-[200px] py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
                     isDeadHeat
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 ring-2 ring-amber-400/50'
                       : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
